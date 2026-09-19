@@ -6,5 +6,6 @@ node_modules/
 Thumbs.db
 *.log
 .sites-runtime/
+.wrangler/
 design-reference/
 data/image-prompts.json

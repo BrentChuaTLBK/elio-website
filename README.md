@@ -6,7 +6,29 @@ A responsive, static prototype of Elio's approved homepage concept. This is the 
 
 Run `node server.mjs`, then open http://127.0.0.1:4173. No package installation is needed. You can also open `dist/index.html` directly in a browser. The local server binds only to this computer.
 
-For a static host, the publish directory is `dist` and no build command is needed. All asset URLs are relative so the prototype also works under a repository subpath. There is no backend or required environment variable. Deployment and custom-domain configuration are intentionally left to the owner.
+For a static host, the publish directory is `dist` and no build command is needed. All asset URLs are relative so the prototype also works under a repository subpath. There is no backend or required environment variable.
+
+## Cloudflare deployment
+
+The site uses **Workers Static Assets**, with its deployment settings tracked in `wrangler.jsonc`. Cloudflare serves `dist` directly; `server.mjs` is only for local previews and is not deployed. The custom domain is `eliocheesecakes.com`.
+
+Connect the deployment repository `BrentChuaTLBK/elio-website` through Cloudflare Workers Builds:
+
+| Setting | Value |
+| --- | --- |
+| Project name | `elio-website` |
+| Production branch | `main` |
+| Root path | `/` |
+| Build command | `npm run check` |
+| Deploy command | `npx wrangler deploy` |
+| Non-production branch deploy command | `npx wrangler versions upload` |
+| Application environment variables | None |
+
+The build command checks JavaScript syntax; no compilation step is needed. Use Cloudflare's generated build API token, never a token committed to GitHub. The domain must be active in the same Cloudflare account. The custom-domain setting lets Cloudflare configure the site's DNS and HTTPS during deployment.
+
+Keep `main` for the deployed version and use other branches for changes you want to preview first. The non-production command uploads a preview version without promoting it to the live site. When changes are made in the source repository `PlayerBC/elio-website`, merge or sync them into the deployment repository to trigger deployment.
+
+Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/), [build settings](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/), and [custom domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/).
 
 ## What works
 
