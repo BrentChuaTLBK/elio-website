@@ -43,6 +43,7 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - Selecting the Elio box opens `box.html`, with a large image gallery and thumbnail navigation, three flavor selectors, quantity controls, an unsaved gift-message preview, and expandable box/care details. Price and Add to bag remain coming-soon placeholders. The reference's sample price and product name have not been adopted as business facts.
 - Account, order history, and bag controls open styled “Coming soon” placeholders. Sign-in, registration, and checkout buttons are disabled. No account, cart, payment, order, or customer data is collected or stored.
 - A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
+- Immediately above the newsletter, an editorial block introduces the three-piece box, a gifting banner, and three everyday Elio moments. “Build your trio” opens the box preview, “Explore gifting” opens the existing packaging details, and the Instagram handle links to Elio. The copy and controls are real HTML; the photographs are replaceable concept assets.
 
 ## Structure
 
@@ -70,6 +71,10 @@ The hero, featured flavor images, and gifting image are AI-generated **concept p
 | `dist/assets/hero-concept.webp` | Hero image and preload in `dist/index.html` |
 | `dist/assets/flavors-concept.webp` | Shared vanilla/matcha/chocolate triptych in `dist/content.js` |
 | `dist/assets/gifting-concept.webp` | Homepage showcase, shop and flavor-catalog heroes, box gallery, and gifting dialog |
+| `dist/assets/trio-story-concept.webp` | Open three-piece box photograph above the newsletter in `dist/index.html` |
+| `dist/assets/thoughtful-gift-concept.webp`, `dist/assets/thoughtful-gift-wide-concept.webp` | Mobile and desktop gifting banner photographs in `dist/index.html` |
+| `dist/assets/unboxing-moment-concept.webp` | Unboxing lifestyle photograph in `dist/index.html` |
+| `dist/assets/coffee-moment-concept.webp` | Cheesecake and coffee lifestyle photograph in `dist/index.html` |
 
 To use separate product photos, add `image: 'assets/your-photo.webp'` to the relevant flavor in `dist/content.js`. Gorgonzola, Ube, Hojicha, and Speculoos currently use clearly labeled typographic photo placeholders throughout the catalog; their product photography remains open. The box gallery uses existing concept photographs, including crops of the bag and carton, rather than new production photos.
 
@@ -114,6 +119,8 @@ The standalone order page and compact showcase were subsequently checked at 1440
 The repeated-swipe regression was reproduced before the fix, then checked with native touch input in Chrome mobile emulation at 390 and 320 px: 32 rapid swipes forward and 32 backward at each width without reaching a physical end. Canceled-gesture recovery, product taps after swiping, and vertical page scrolling passed. The existing carousel checks for buttons, keyboard navigation, resizing, reduced motion, and catalog growth also passed.
 
 The box-detail and flavor-catalog pages were checked at 1440, 1024, 768, 390, and 320 px. Checks covered gallery navigation, keyboard operation, flavor selection, quantity normalization, gift-message clearing (including browser history), expandable details, catalog filters, all flavor descriptions, focus restoration, and direct links. Rotation was tested with a smaller monthly lineup, an added flavor, and an empty lineup; all pages consistently show unavailable flavors and prevent selecting them in the box preview. The centered wordmark and desktop/mobile layouts were visually inspected. No missing assets, runtime errors, purchase submissions, or stored customer data were found.
+
+The editorial block above the newsletter was visually checked at 1440, 1024, 768, 390, and 320 px. The box preview and gifting dialog links, keyboard focus restoration, Instagram destination, disabled newsletter controls, responsive image variants, and absence of horizontal overflow were verified. Its new photographs are AI-generated concepts, with a wider desktop gifting composition so the full packaging remains visible.
 
 Run syntax checks directly:
 

@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-19T21:08:09.038Z",
+  "checkedAt": "2026-09-19T21:21:30.518Z",
   "results": [
     {
       "width": 1440,
@@ -679,5 +679,100 @@
     "errors": [],
     "missing": []
   },
-  "catalogRevision": "The prior #flavors modal is superseded by flavors.html; see flavorCatalog checks."
+  "catalogRevision": "The prior #flavors modal is superseded by flavors.html; see flavorCatalog checks.",
+  "bottomEditorialSection": {
+    "checkedAt": "2026-09-19T21:21:10.164Z",
+    "results": [
+      {
+        "width": 1440,
+        "overflow": false,
+        "beforeNewsletter": true,
+        "height": 1267.609375,
+        "momentsInOneRow": true,
+        "newsletterDisabled": true,
+        "boxLink": "passed",
+        "giftingDialog": "passed",
+        "keyboardFocus": "passed",
+        "imageLoads": "passed"
+      },
+      {
+        "width": 1024,
+        "overflow": false,
+        "beforeNewsletter": true,
+        "height": 1142.390625,
+        "momentsInOneRow": true,
+        "newsletterDisabled": true,
+        "boxLink": "passed",
+        "giftingDialog": "passed",
+        "keyboardFocus": "passed",
+        "imageLoads": "passed"
+      },
+      {
+        "width": 768,
+        "overflow": false,
+        "beforeNewsletter": true,
+        "height": 1067.53125,
+        "momentsInOneRow": true,
+        "newsletterDisabled": true,
+        "boxLink": "passed",
+        "giftingDialog": "passed",
+        "keyboardFocus": "passed",
+        "imageLoads": "passed"
+      },
+      {
+        "width": 390,
+        "overflow": false,
+        "beforeNewsletter": true,
+        "height": 1420.484375,
+        "momentsInOneRow": true,
+        "newsletterDisabled": true,
+        "boxLink": "passed",
+        "giftingDialog": "passed",
+        "keyboardFocus": "passed",
+        "imageLoads": "passed"
+      },
+      {
+        "width": 320,
+        "overflow": false,
+        "beforeNewsletter": true,
+        "height": 1361,
+        "momentsInOneRow": true,
+        "newsletterDisabled": true,
+        "boxLink": "passed",
+        "giftingDialog": "passed",
+        "keyboardFocus": "passed",
+        "imageLoads": "passed"
+      }
+    ],
+    "errors": [],
+    "missing": [],
+    "responsiveImageFraming": [
+      {
+        "width": 1440,
+        "photoSource": "thoughtful-gift-wide-concept.webp",
+        "overflow": false
+      },
+      {
+        "width": 1024,
+        "photoSource": "thoughtful-gift-wide-concept.webp",
+        "overflow": false
+      },
+      {
+        "width": 768,
+        "photoSource": "thoughtful-gift-wide-concept.webp",
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "photoSource": "thoughtful-gift-concept.webp",
+        "overflow": false
+      },
+      {
+        "width": 320,
+        "photoSource": "thoughtful-gift-concept.webp",
+        "overflow": false
+      }
+    ],
+    "keyboardSkipLink": "passed"
+  }
 }
