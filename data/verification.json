@@ -1,13 +1,10 @@
 {
+  "checkedAt": "2026-09-19T19:12:29.664Z",
   "results": [
     {
       "width": 1440,
       "scrollWidth": 1440,
       "images": [
-        {
-          "src": "assets/elio-logo-original.png",
-          "loaded": true
-        },
         {
           "src": "assets/hero-concept.webp",
           "loaded": true
@@ -26,10 +23,6 @@
         },
         {
           "src": "assets/gifting-concept.webp",
-          "loaded": true
-        },
-        {
-          "src": "assets/elio-logo-original.png",
           "loaded": true
         }
       ],
@@ -41,10 +34,6 @@
       "scrollWidth": 768,
       "images": [
         {
-          "src": "assets/elio-logo-original.png",
-          "loaded": true
-        },
-        {
           "src": "assets/hero-concept.webp",
           "loaded": true
         },
@@ -62,10 +51,6 @@
         },
         {
           "src": "assets/gifting-concept.webp",
-          "loaded": true
-        },
-        {
-          "src": "assets/elio-logo-original.png",
           "loaded": true
         }
       ],
@@ -77,10 +62,6 @@
       "scrollWidth": 390,
       "images": [
         {
-          "src": "assets/elio-logo-original.png",
-          "loaded": true
-        },
-        {
           "src": "assets/hero-concept.webp",
           "loaded": true
         },
@@ -98,10 +79,6 @@
         },
         {
           "src": "assets/gifting-concept.webp",
-          "loaded": true
-        },
-        {
-          "src": "assets/elio-logo-original.png",
           "loaded": true
         }
       ],
@@ -113,10 +90,6 @@
       "scrollWidth": 320,
       "images": [
         {
-          "src": "assets/elio-logo-original.png",
-          "loaded": true
-        },
-        {
           "src": "assets/hero-concept.webp",
           "loaded": true
         },
@@ -135,10 +108,6 @@
         {
           "src": "assets/gifting-concept.webp",
           "loaded": true
-        },
-        {
-          "src": "assets/elio-logo-original.png",
-          "loaded": true
         }
       ],
       "font": true,
@@ -148,5 +117,45 @@
   "errors": [],
   "missing": [],
   "deepLinks": "passed",
-  "enlargedText": "passed"
+  "enlargedText": "passed",
+  "carousel": {
+    "results": [
+      {
+        "width": 1440,
+        "flavors": 7,
+        "arrows": "passed",
+        "keyboard": "passed",
+        "details": "passed",
+        "overflow": false
+      },
+      {
+        "width": 768,
+        "flavors": 7,
+        "arrows": "passed",
+        "keyboard": "passed",
+        "details": "passed",
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "flavors": 7,
+        "arrows": "passed",
+        "keyboard": "passed",
+        "details": "passed",
+        "overflow": false
+      },
+      {
+        "width": 320,
+        "flavors": 7,
+        "arrows": "passed",
+        "keyboard": "passed",
+        "details": "passed",
+        "overflow": false
+      }
+    ],
+    "futureCatalogGrowth": "passed",
+    "unavailableFlavors": "passed",
+    "touchSwipe": "passed",
+    "errors": []
+  }
 }

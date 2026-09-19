@@ -1,4 +1,7 @@
-/* Replace image paths here and in index.html. Concept images are not final product photography. */
+/* Add flavors to this list to include them in the carousel and full catalog automatically.
+   Optional fields: image: 'assets/flavor.webp', available: false.
+   Unavailable flavors remain browsable and show a status label; this is not live inventory.
+   Replace image paths here and in index.html. Concept images are not final product photography. */
 window.ELIO_CONTENT = {
   productImage: 'assets/flavors-concept.webp',
   flavors: [
@@ -10,5 +13,6 @@ window.ELIO_CONTENT = {
     { id: 'hojicha', name: 'Hojicha', line: 'Toasted and Mellow', description: 'Made with roasted Japanese green tea for a warm, toasted flavor and a smooth, subtly nutty finish.' },
     { id: 'speculoos', name: 'Speculoos', line: 'Caramelized and Spiced', description: 'Made with caramelized biscuit spread for warm, spiced sweetness, balanced with a touch of sea salt.' }
   ],
+  // These lead the carousel; all other flavors follow automatically.
   featuredOrder: ['vanilla', 'matcha', 'chocolate']
 };
