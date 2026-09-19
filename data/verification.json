@@ -215,6 +215,7 @@
   "deepLinks": "passed",
   "enlargedText": "passed",
   "carousel": {
+    "checkedAt": "2026-09-19T20:48:29.838Z",
     "results": [
       {
         "width": 1440,
@@ -503,5 +504,42 @@
         "pageOverflow": false
       }
     ]
+  },
+  "repeatedTouch": {
+    "checkedAt": "2026-09-19T20:48:04.016Z",
+    "results": [
+      {
+        "width": 390,
+        "direction": "forward",
+        "consecutiveSwipes": 32,
+        "stalledAtEnd": false,
+        "boundedCardCount": true
+      },
+      {
+        "width": 390,
+        "direction": "backward",
+        "consecutiveSwipes": 32,
+        "stalledAtEnd": false,
+        "boundedCardCount": true
+      },
+      {
+        "width": 320,
+        "direction": "forward",
+        "consecutiveSwipes": 32,
+        "stalledAtEnd": false,
+        "boundedCardCount": true
+      },
+      {
+        "width": 320,
+        "direction": "backward",
+        "consecutiveSwipes": 32,
+        "stalledAtEnd": false,
+        "boundedCardCount": true
+      }
+    ],
+    "canceledGestureRecovery": "passed",
+    "productTapAfterSwiping": "passed",
+    "verticalPageScroll": "passed",
+    "errors": []
   }
 }

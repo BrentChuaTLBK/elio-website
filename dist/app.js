@@ -112,15 +112,32 @@
     } else moveCarousel(event.key === 'ArrowRight' ? 1 : -1);
   });
   track.addEventListener('scroll', () => {
+    // Native touch momentum can consume the buffer before the debounce runs.
+    // Recenter at its outer edge, but don't interrupt button-driven animation.
+    if (layout && navigationTarget === null) {
+      const margin = Math.min(track.clientWidth, layout.cycle / 2);
+      if (track.scrollLeft < margin || track.scrollLeft > track.scrollWidth - track.clientWidth - margin) normalizePosition();
+    }
     updateCarousel();
     clearTimeout(settleTimer);
     settleTimer = setTimeout(settleCarousel, 160);
   }, { passive: true });
-  track.addEventListener('touchstart', () => { touching = true; navigationTarget = null; }, { passive: true });
-  const endTouch = () => { touching = false; clearTimeout(settleTimer); settleTimer = setTimeout(settleCarousel, 160); };
+  track.addEventListener('touchstart', () => {
+    touching = true;
+    navigationTarget = null;
+    clearTimeout(settleTimer);
+    // Start each gesture in the original set, even during rapid repeat swipes.
+    normalizePosition();
+  }, { passive: true });
+  const endTouch = () => {
+    touching = false;
+    normalizePosition();
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(settleCarousel, 160);
+  };
   track.addEventListener('touchend', endTouch, { passive: true });
   track.addEventListener('touchcancel', endTouch, { passive: true });
-  track.addEventListener('wheel', () => { navigationTarget = null; }, { passive: true });
+  track.addEventListener('wheel', () => { navigationTarget = null; normalizePosition(); }, { passive: true });
   // A visible copy remains clickable, but focus must return to its original card.
   track.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.target.closest('[data-carousel-copy] a')) event.preventDefault();
