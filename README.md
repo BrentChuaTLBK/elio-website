@@ -32,7 +32,7 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 
 ## What works
 
-- Responsive homepage following the approved composition, ivory/brown/gold palette, centered original logo, and food-first imagery.
+- Responsive homepage following the approved composition, ivory/brown/gold palette, centered typographic wordmark, and food-first imagery.
 - Mobile navigation, collection anchors, all seven flavor descriptions, individual flavor dialogs, gifting details, and a factual brand introduction.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Ordering and bag controls open clearly labeled prototype information. No cart, payment, order, or customer data is collected or stored.
@@ -45,7 +45,7 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 | `dist/styles.css` | Responsive components and shared design tokens |
 | `dist/content.js` | Structured flavor names, descriptions, and image replacement points |
 | `dist/app.js` | Reusable product rendering, navigation, accessible detail views |
-| `dist/assets/` | Original logo, optimized concept images, licensed heading font |
+| `dist/assets/` | Typographic favicon, retained original logo, optimized concept images, licensed heading font |
 | `server.mjs` | Dependency-free local preview server |
 | `data/verification.json` | Desktop, tablet, and mobile check results |
 
@@ -61,7 +61,9 @@ The hero, featured flavor images, and gifting image are AI-generated **concept p
 | `dist/assets/flavors-concept.webp` | Shared vanilla/matcha/chocolate triptych in `dist/content.js` |
 | `dist/assets/gifting-concept.webp` | Gifting image in `dist/index.html` and box detail in `dist/app.js` |
 
-To use separate product photos, add `image: 'assets/your-photo.webp'` to the relevant flavor in `dist/content.js`. The four other flavors have text descriptions only; their product photography remains open. The logo is the supplied original PNG, never a generated replacement.
+To use separate product photos, add `image: 'assets/your-photo.webp'` to the relevant flavor in `dist/content.js`. The four other flavors have text descriptions only; their product photography remains open.
+
+The header, footer, and story use a live-text wordmark reading “ELIO / BASQUE CHEESECAKE / by TLB Kitchen,” as requested in the latest design revision. ELIO and BASQUE CHEESECAKE stay centered and prominent; the TLB Kitchen credit is deliberately tiny. Shared `.wordmark` styles use warm bronze on ivory and lighter bronze on the dark footer to echo the planned packaging finish. The browser tab uses a simple serif E. The original circular PNG is retained as a source asset but is not displayed on the site.
 
 The heading font is **Libre Caslon Display**, chosen to approximate the reference; it is not claimed to be Elio's official font. Its SIL Open Font License is included in `dist/assets/FONT-LICENSE.txt`. Body text uses the visitor's Georgia/system serif font.
 
