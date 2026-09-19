@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-19T19:31:26.216Z",
+  "checkedAt": "2026-09-19T19:46:46.731Z",
   "results": [
     {
       "width": 1440,
@@ -296,5 +296,105 @@
       }
     ],
     "errors": []
+  },
+  "services": {
+    "checkedAt": "2026-09-19T19:45:45.341Z",
+    "results": [
+      {
+        "width": 1440,
+        "centered": true,
+        "overlap": false,
+        "overflow": false,
+        "navigation": "passed",
+        "placeholderRoutes": [
+          "account",
+          "orders",
+          "ordering",
+          "bag"
+        ],
+        "disabledControls": "passed",
+        "focus": "passed"
+      },
+      {
+        "width": 1001,
+        "centered": true,
+        "overlap": false,
+        "overflow": false,
+        "navigation": "passed",
+        "placeholderRoutes": [
+          "account",
+          "orders",
+          "ordering",
+          "bag"
+        ],
+        "disabledControls": "passed",
+        "focus": "passed"
+      },
+      {
+        "width": 1000,
+        "centered": true,
+        "overlap": false,
+        "overflow": false,
+        "navigation": "passed",
+        "placeholderRoutes": [
+          "account",
+          "orders",
+          "ordering",
+          "bag"
+        ],
+        "disabledControls": "passed",
+        "focus": "passed"
+      },
+      {
+        "width": 768,
+        "centered": true,
+        "overlap": false,
+        "overflow": false,
+        "navigation": "passed",
+        "placeholderRoutes": [
+          "account",
+          "orders",
+          "ordering",
+          "bag"
+        ],
+        "disabledControls": "passed",
+        "focus": "passed"
+      },
+      {
+        "width": 390,
+        "centered": true,
+        "overlap": false,
+        "overflow": false,
+        "navigation": "passed",
+        "placeholderRoutes": [
+          "account",
+          "orders",
+          "ordering",
+          "bag"
+        ],
+        "disabledControls": "passed",
+        "focus": "passed"
+      },
+      {
+        "width": 320,
+        "centered": true,
+        "overlap": false,
+        "overflow": false,
+        "navigation": "passed",
+        "placeholderRoutes": [
+          "account",
+          "orders",
+          "ordering",
+          "bag"
+        ],
+        "disabledControls": "passed",
+        "focus": "passed"
+      }
+    ],
+    "breakpointMenuReset": "passed",
+    "customerDataStored": false,
+    "submissions": [],
+    "errors": [],
+    "missing": []
   }
 }

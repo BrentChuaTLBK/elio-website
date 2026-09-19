@@ -36,7 +36,8 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - Mobile navigation, a full flavor catalog carousel, individual flavor dialogs, gifting details, and a factual brand introduction.
 - The carousel loops continuously in both directions: the first flavor follows the last. It supports native touch/trackpad scrolling, previous/next buttons, keyboard arrows and Home/End, screen-reader announcements, and reduced motion. It does not autoplay.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
-- Ordering and bag controls open clearly labeled prototype information. No cart, payment, order, or customer data is collected or stored.
+- Account and bag icons appear beside the centered wordmark. Compact navigation is used at widths up to 1000 px and includes My account, My orders, and Order online links.
+- Account, order history, ordering, and bag controls open styled “Coming soon” placeholders. Sign-in, registration, and checkout buttons are disabled. No account, cart, payment, order, or customer data is collected or stored.
 - A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
 
 ## Structure
@@ -85,6 +86,8 @@ Still unconfirmed: prices, stock, box combinations/mix-and-match rules, ordering
 
 The newsletter section is visual only. It has no submitting form, email capture, storage, or email-provider integration. Final signup copy and privacy/consent details need to be supplied before enabling it.
 
+The service placeholders can be previewed directly at `#account`, `#orders`, `#ordering`, and `#bag`. Account authentication/registration, order history and tracking, a persistent shopping bag, and checkout/payments still need their actual systems and business rules. These placeholders contain no credential fields, fake customer information, sample orders, or active purchase flow.
+
 This prototype includes `noindex, nofollow` metadata. Review that setting when an actual public launch is authorized. A public source repository is not a live business launch.
 
 ## Verification
@@ -92,6 +95,8 @@ This prototype includes `noindex, nofollow` metadata. Review that setting when a
 JavaScript syntax checks passed. Chrome visual and interaction checks passed at 1440, 768, 390, and 320 px widths. No page overflow, missing images, failed asset requests, or browser runtime errors were found. Catalog navigation, product details, gifting, prototype bag, mobile menu, Escape handling, focus restoration, and direct detail links were exercised. Loop checks covered repeated forward/backward navigation, keyboard wrapping, native phone swipes across both boundaries, animated rapid clicks, resize behavior, detail/focus handling for visible copies, and the automatic inclusion of an eighth test flavor. A two-flavor catalog was also checked. Unavailable status was verified using test data only.
 
 The desktop retains the reference's section order, with the collection revised into larger cards in a horizontal carousel. Desktop shows two full cards and a preview of the next; phone shows one card and a preview. The phone layout gives the hero copy and photograph separate space, stacks gifting content, and uses a compact menu. These checks are not a full cross-browser or production accessibility audit.
+
+The account/order placeholders were checked at 1440, 1001, 1000, 768, 390, and 320 px, including both sides of the compact-header breakpoint. The wordmark remained centered with no overlapping controls or horizontal overflow. Direct links, navigation between placeholders, Escape/focus restoration, disabled controls, and menu reset on resize passed. No customer-data submissions or browser storage writes occurred.
 
 Run syntax checks directly:
 
