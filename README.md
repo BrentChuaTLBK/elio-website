@@ -37,7 +37,7 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - The carousel loops continuously in both directions: the first flavor follows the last. It supports native touch/trackpad scrolling, previous/next buttons, keyboard arrows and Home/End, screen-reader announcements, and reduced motion. It does not autoplay.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Ordering and bag controls open clearly labeled prototype information. No cart, payment, order, or customer data is collected or stored.
-- A responsive newsletter placeholder sits above the footer, with an Elio envelope illustration, email-field layout, and working Instagram link. The email input and arrow are disabled, with an explicit unavailable message.
+- A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
 
 ## Structure
 

@@ -255,15 +255,46 @@
     "errors": []
   },
   "newsletter": {
-    "viewports": [
-      1440,
-      390,
-      320
-    ],
+    "checkedAt": "2026-09-19T19:38:39.168Z",
+    "layout": "compact",
     "visualLayout": "passed",
-    "emailInputDisabled": true,
-    "submitButtonDisabled": true,
     "submittingForm": false,
-    "instagramLink": "https://www.instagram.com/elio.cheesecakes/"
+    "results": [
+      {
+        "width": 1440,
+        "height": 144.1875,
+        "overflow": false,
+        "inputDisabled": true,
+        "buttonDisabled": true,
+        "headingFont": "32px",
+        "heightReduction": "73%"
+      },
+      {
+        "width": 768,
+        "height": 140.890625,
+        "overflow": false,
+        "inputDisabled": true,
+        "buttonDisabled": true,
+        "headingFont": "29px"
+      },
+      {
+        "width": 390,
+        "height": 214.34375,
+        "overflow": false,
+        "inputDisabled": true,
+        "buttonDisabled": true,
+        "headingFont": "28px",
+        "heightReduction": "62%"
+      },
+      {
+        "width": 320,
+        "height": 214.34375,
+        "overflow": false,
+        "inputDisabled": true,
+        "buttonDisabled": true,
+        "headingFont": "28px"
+      }
+    ],
+    "errors": []
   }
 }
