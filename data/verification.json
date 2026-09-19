@@ -1,0 +1,152 @@
+{
+  "results": [
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "images": [
+        {
+          "src": "assets/elio-logo-original.png",
+          "loaded": true
+        },
+        {
+          "src": "assets/hero-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/gifting-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/elio-logo-original.png",
+          "loaded": true
+        }
+      ],
+      "font": true,
+      "interactions": "passed"
+    },
+    {
+      "width": 768,
+      "scrollWidth": 768,
+      "images": [
+        {
+          "src": "assets/elio-logo-original.png",
+          "loaded": true
+        },
+        {
+          "src": "assets/hero-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/gifting-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/elio-logo-original.png",
+          "loaded": true
+        }
+      ],
+      "font": true,
+      "interactions": "passed"
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "images": [
+        {
+          "src": "assets/elio-logo-original.png",
+          "loaded": true
+        },
+        {
+          "src": "assets/hero-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/gifting-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/elio-logo-original.png",
+          "loaded": true
+        }
+      ],
+      "font": true,
+      "interactions": "passed"
+    },
+    {
+      "width": 320,
+      "scrollWidth": 320,
+      "images": [
+        {
+          "src": "assets/elio-logo-original.png",
+          "loaded": true
+        },
+        {
+          "src": "assets/hero-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/gifting-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/elio-logo-original.png",
+          "loaded": true
+        }
+      ],
+      "font": true,
+      "interactions": "passed"
+    }
+  ],
+  "errors": [],
+  "missing": [],
+  "deepLinks": "passed",
+  "enlargedText": "passed"
+}

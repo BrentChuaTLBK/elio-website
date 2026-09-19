@@ -25,8 +25,9 @@ For a static host, the publish directory is `dist` and no build command is neede
 | `dist/app.js` | Reusable product rendering, navigation, accessible detail views |
 | `dist/assets/` | Original logo, optimized concept images, licensed heading font |
 | `server.mjs` | Dependency-free local preview server |
-| `design-reference/` | Original brief and approved visual / packaging references |
-| `data/image-prompts.json` | Exact built-in image generation prompts and source references |
+| `data/verification.json` | Desktop, tablet, and mobile check results |
+
+The original development brief, design and packaging references, and image generation prompts are not required for deployment and are excluded from the published file tree. The local handoff includes them separately. `.gitignore` keeps those local source materials out of future routine commits.
 
 ## Temporary assets and open decisions
 

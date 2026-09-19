@@ -1,0 +1,10 @@
+{
+  "name": "elio-website-vision",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Elio's first website vision — a local, static prototype.",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check dist/app.js && node --check dist/content.js && node --check server.mjs"
+  }
+}

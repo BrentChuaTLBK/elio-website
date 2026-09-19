@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#3d251c">
+  <meta name="description" content="Discover Elio's individual square Basque cheesecakes. Beautifully burnt, soft at heart, and beautifully boxed in threes.">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Elio — Burnt beautifully. Soft within.</title>
+  <link rel="icon" type="image/png" href="assets/elio-logo-original.png">
+  <link rel="preload" href="assets/hero-concept.webp" as="image" fetchpriority="high">
+  <link rel="stylesheet" href="styles.css">
+  <script src="content.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="announcement">A little indulgence. Beautifully boxed.</div>
+  <header class="site-header">
+    <div class="header-inner">
+      <button class="menu-toggle icon-button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-nav"><span></span><span></span></button>
+      <nav class="desktop-nav nav-left" aria-label="Main navigation">
+        <a href="#collection">Our cheesecakes</a><a href="#story">Our story</a>
+      </nav>
+      <a class="brand" href="#home" aria-label="Elio home"><img src="assets/elio-logo-original.png" width="108" height="108" alt="ELIO Basque Cheesecake by TLB Kitchen"></a>
+      <nav class="desktop-nav nav-right" aria-label="Gifting and ordering">
+        <a href="#gifting">Gifting</a><a class="button header-order" href="#ordering">Order now</a>
+      </nav>
+      <a class="bag-link icon-button" href="#bag" aria-label="Shopping bag — prototype"><svg viewBox="0 0 32 36" fill="none" aria-hidden="true"><path d="M7 10h18l2 22H5L7 10Z"/><path d="M11 14V8a5 5 0 0 1 10 0v6"/></svg></a>
+    </div>
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation" hidden>
+      <a href="#collection">Our cheesecakes</a><a href="#story">Our story</a><a href="#gifting">Gifting</a><a href="#ordering">Order now <span class="small-note">Prototype</span></a>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="hero" id="home" aria-labelledby="hero-title">
+      <img class="hero-image" src="assets/hero-concept.webp" width="2400" height="960" alt="Two square Basque cheesecakes with deeply caramelized tops, a spoon revealing a soft vanilla center" fetchpriority="high">
+      <div class="hero-copy">
+        <h1 id="hero-title">Burnt beautifully.<br>Soft within.</h1>
+        <p>Square Basque cheesecakes with a deeply<br class="desktop-break"> caramelized top and an irresistibly soft center.</p>
+        <a class="button" href="#collection">Explore the cheesecakes</a>
+        <p class="hero-note">Three pieces. Your favorite flavors.</p>
+      </div>
+    </section>
+    <div class="brand-band" aria-label="The Elio experience"><span>Beautifully burnt</span><span>Soft at heart</span><span>Made to share</span></div>
+    <section class="collection section-wrap" id="collection" aria-labelledby="collection-title">
+      <div class="section-heading"><div><p class="eyebrow">The collection</p><h2 id="collection-title">Find your favorite.</h2></div><a class="text-link" href="#flavors">Explore all seven flavors <span aria-hidden="true">→</span></a></div>
+      <div class="product-grid" id="featured-products"></div>
+      <noscript><p>Vanilla — Classic and Creamy. Matcha — Earthy and Bold. Chocolate — Dark and Silky. Enable JavaScript to explore flavor details and the prototype navigation.</p></noscript>
+    </section>
+    <section class="gifting" id="gifting" aria-labelledby="gifting-title">
+      <img class="gift-image" src="assets/gifting-concept.webp" width="1400" height="1000" alt="Elio's brown and gold paper bag beside an open cream-lined carton holding three square cheesecakes in a single row" loading="lazy">
+      <div class="gift-copy"><div class="gold-rule"></div><p class="eyebrow">The Elio box</p><h2 id="gifting-title">A little box.<br>A beautiful gesture.</h2><p>Three individual cheesecakes, beautifully boxed for gifting or keeping.</p><a class="button" href="#box">Discover the box</a></div>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="footer-inner"><a href="#home" aria-label="Elio home"><img src="assets/elio-logo-original.png" width="104" height="104" alt="ELIO Basque Cheesecake by TLB Kitchen" loading="lazy"></a><div><p>Burnt beautifully. Soft within.</p><a href="https://www.instagram.com/elio.cheesecakes/" target="_blank" rel="noopener noreferrer">@elio.cheesecakes<span class="sr-only"> (opens in a new tab)</span></a></div></div></footer>
+  <dialog id="detail-dialog" aria-labelledby="dialog-title"><button class="dialog-close icon-button" aria-label="Close details"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19"/></svg></button><div id="dialog-content"></div></dialog>
+</body>
+</html>
