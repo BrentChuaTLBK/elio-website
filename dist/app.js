@@ -152,8 +152,8 @@
   const soonLabel = '<span class="prototype-label">Coming soon</span>';
   const futureFeatures = (items) => `<ul class="future-features">${items.map((item) => `<li><span>${item}</span><span class="small-note">Coming soon</span></li>`).join('')}</ul>`;
   const accountView = () => `<div class="dialog-body simple-dialog service-placeholder">${soonLabel}${heading('My account', 'Your own little<br>corner of Elio.')}<p class="dialog-intro">Your Elio account is coming soon. Sign-in and registration aren’t available yet.</p><div class="placeholder-actions" aria-label="Account access coming soon"><button class="button" type="button" disabled>Sign in</button><button class="button button-outline" type="button" disabled>Create account</button></div><p class="asset-note">Account details aren’t collected or saved.</p><div class="placeholder-links"><a class="text-link" href="#orders">My orders <span aria-hidden="true">→</span></a><a class="text-link" href="#flavors">Explore the flavors <span aria-hidden="true">→</span></a></div></div>`;
-  const ordersView = () => `<div class="dialog-body simple-dialog service-placeholder">${soonLabel}${heading('My orders', 'Your orders,<br>in one place.')}<p class="dialog-intro">A place for your order history and updates, once online ordering is ready.</p>${futureFeatures(['Order history', 'Order updates'])}<p class="asset-note">Order history and tracking aren’t available yet.</p><div class="placeholder-links"><a class="text-link" href="#account">My account <span aria-hidden="true">→</span></a><a class="text-link" href="#ordering">About ordering <span aria-hidden="true">→</span></a></div></div>`;
-  const orderView = (isBag) => `<div class="dialog-body simple-dialog service-placeholder">${soonLabel}${heading(isBag ? 'Your bag' : 'Online ordering', isBag ? 'A little room<br>for indulgence.' : 'Your next little<br>indulgence awaits.')}<p class="dialog-intro">Online ordering is coming soon. For now, no items or orders are being saved.</p>${futureFeatures(isBag ? ['Your cheesecake selection', 'Checkout'] : ['Shopping bag', 'Checkout', 'Order updates'])}<button class="button" type="button" disabled>${isBag ? 'Checkout coming soon' : 'Ordering coming soon'}</button><div class="placeholder-links"><a class="text-link" href="#flavors">Explore the collection <span aria-hidden="true">→</span></a><a class="text-link" href="#orders">My orders <span aria-hidden="true">→</span></a></div><p class="asset-note">Questions? <a href="mailto:elio.cheesecakes@gmail.com">Get in touch with Elio.</a></p></div>`;
+  const ordersView = () => `<div class="dialog-body simple-dialog service-placeholder">${soonLabel}${heading('My orders', 'Your orders,<br>in one place.')}<p class="dialog-intro">A place for your order history and updates, once online ordering is ready.</p>${futureFeatures(['Order history', 'Order updates'])}<p class="asset-note">Order history and tracking aren’t available yet.</p><div class="placeholder-links"><a class="text-link" href="#account">My account <span aria-hidden="true">→</span></a><a class="text-link" href="order.html">Order a box <span aria-hidden="true">→</span></a></div></div>`;
+  const orderView = (isBag) => `<div class="dialog-body simple-dialog service-placeholder">${soonLabel}${heading(isBag ? 'Your bag' : 'Online ordering', isBag ? 'A little room<br>for indulgence.' : 'Your next little<br>indulgence awaits.')}<p class="dialog-intro">Online ordering is coming soon. For now, no items or orders are being saved.</p>${futureFeatures(isBag ? ['Your cheesecake selection', 'Checkout'] : ['Shopping bag', 'Checkout', 'Order updates'])}<button class="button" type="button" disabled>${isBag ? 'Checkout coming soon' : 'Ordering coming soon'}</button><div class="placeholder-links"><a class="text-link" href="order.html">Order a box <span aria-hidden="true">→</span></a><a class="text-link" href="#orders">My orders <span aria-hidden="true">→</span></a></div><p class="asset-note">Questions? <a href="mailto:elio.cheesecakes@gmail.com">Get in touch with Elio.</a></p></div>`;
   function getView(hash) {
     const id = hash.slice(1);
     if (id === 'flavors') return collectionView();
@@ -161,11 +161,12 @@
     if (id === 'story') return storyView();
     if (id === 'account') return accountView();
     if (id === 'orders') return ordersView();
-    if (id === 'ordering' || id === 'bag') return orderView(id === 'bag');
+    if (id === 'bag') return orderView(true);
     if (id.startsWith('flavor-')) { const flavor = byId(id.slice(7)); if (flavor) return flavorView(flavor); }
     return null;
   }
   function syncRoute() {
+    if (location.hash === '#ordering') { location.replace('order.html'); return; }
     const view = getView(location.hash);
     if (view) {
       content.innerHTML = view;
@@ -174,7 +175,11 @@
       document.querySelector('#dialog-title').focus({ preventScroll: true });
     } else if (dialog.open) {
       dialog.close();
-      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+      if (trigger?.isConnected) {
+        const slide = trigger.closest('.flavor-slide');
+        if (slide) goToFlavor(Number(slide.dataset.flavorIndex), false);
+        trigger.focus({ preventScroll: true });
+      }
     }
   }
   function closeDialog() {

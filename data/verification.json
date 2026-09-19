@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-19T19:46:46.731Z",
+  "checkedAt": "2026-09-19T20:15:27.676Z",
   "results": [
     {
       "width": 1440,
@@ -395,6 +395,113 @@
     "customerDataStored": false,
     "submissions": [],
     "errors": [],
+    "missing": [],
+    "orderingRevision": "The earlier ordering modal is superseded by order.html; see orderPage checks."
+  },
+  "orderPage": {
+    "checkedAt": "2026-09-19T20:13:18.678Z",
+    "results": [
+      {
+        "width": 1440,
+        "compactShowcase": "passed",
+        "orderNavigation": "passed",
+        "searchAndDetails": "passed",
+        "focus": "passed",
+        "directLinks": "passed",
+        "legacyOrderLink": "passed",
+        "overflow": false
+      },
+      {
+        "width": 1001,
+        "compactShowcase": "passed",
+        "orderNavigation": "passed",
+        "searchAndDetails": "passed",
+        "focus": "passed",
+        "directLinks": "passed",
+        "legacyOrderLink": "passed",
+        "overflow": false
+      },
+      {
+        "width": 768,
+        "compactShowcase": "passed",
+        "orderNavigation": "passed",
+        "searchAndDetails": "passed",
+        "focus": "passed",
+        "directLinks": "passed",
+        "legacyOrderLink": "passed",
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "compactShowcase": "passed",
+        "orderNavigation": "passed",
+        "searchAndDetails": "passed",
+        "focus": "passed",
+        "directLinks": "passed",
+        "legacyOrderLink": "passed",
+        "overflow": false
+      },
+      {
+        "width": 320,
+        "compactShowcase": "passed",
+        "orderNavigation": "passed",
+        "searchAndDetails": "passed",
+        "focus": "passed",
+        "directLinks": "passed",
+        "legacyOrderLink": "passed",
+        "overflow": false
+      }
+    ],
+    "growingCatalog": "passed",
+    "unavailableFlavor": "passed",
+    "customerDataStored": false,
+    "submissions": [],
+    "errors": [],
     "missing": []
+  },
+  "photoOverlays": {
+    "checkedAt": "2026-09-19T20:14:43.925Z",
+    "results": [
+      {
+        "width": 1440,
+        "headerOverPhoto": true,
+        "buttonInsidePhoto": true,
+        "copyInsidePhoto": true,
+        "textLogo": true,
+        "pageOverflow": false
+      },
+      {
+        "width": 1001,
+        "headerOverPhoto": true,
+        "buttonInsidePhoto": true,
+        "copyInsidePhoto": true,
+        "textLogo": true,
+        "pageOverflow": false
+      },
+      {
+        "width": 768,
+        "headerOverPhoto": true,
+        "buttonInsidePhoto": true,
+        "copyInsidePhoto": true,
+        "textLogo": true,
+        "pageOverflow": false
+      },
+      {
+        "width": 390,
+        "headerOverPhoto": true,
+        "buttonInsidePhoto": true,
+        "copyInsidePhoto": true,
+        "textLogo": true,
+        "pageOverflow": false
+      },
+      {
+        "width": 320,
+        "headerOverPhoto": true,
+        "buttonInsidePhoto": true,
+        "copyInsidePhoto": true,
+        "textLogo": true,
+        "pageOverflow": false
+      }
+    ]
   }
 }
