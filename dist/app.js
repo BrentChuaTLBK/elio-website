@@ -10,40 +10,94 @@
     : `<span class="product-photo product-placeholder" aria-label="${escape(flavor.name)} — photograph coming soon"><span class="placeholder-brand" aria-hidden="true">ELIO</span><span class="placeholder-name" aria-hidden="true">${escape(flavor.name)}</span><span class="placeholder-note" aria-hidden="true">Photograph coming soon</span></span>`;
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map(byId).filter(Boolean);
   const track = document.querySelector('#featured-products');
-  track.innerHTML = catalog.map((flavor, index) => {
-    return `<article class="flavor-slide" role="group" aria-roledescription="slide" aria-label="${escape(flavor.name)}, ${index + 1} of ${catalog.length}"><a class="product-card" href="#flavor-${escape(flavor.id)}" aria-label="Discover ${escape(flavor.name)}: ${escape(flavor.line)}${flavor.available === false ? ' — currently unavailable' : ''}">${photo(flavor)}<div class="product-label"><h3>${escape(flavor.name)}</h3><span class="product-arrow" aria-hidden="true">→</span></div><p class="product-line">${escape(flavor.line)}</p>${availability(flavor)}</a></article>`;
-  }).join('');
+  const renderSlide = (flavor, index, copy = false) => `<article class="flavor-slide" data-flavor-index="${index}"${copy ? ' data-carousel-copy aria-hidden="true"' : ` role="group" aria-roledescription="slide" aria-label="${escape(flavor.name)}, ${index + 1} of ${catalog.length}"`}><a class="product-card" href="#flavor-${escape(flavor.id)}"${copy ? ' tabindex="-1"' : ''} aria-label="Discover ${escape(flavor.name)}: ${escape(flavor.line)}${flavor.available === false ? ' — currently unavailable' : ''}">${photo(flavor)}<div class="product-label"><h3>${escape(flavor.name)}</h3><span class="product-arrow" aria-hidden="true">→</span></div><p class="product-line">${escape(flavor.line)}</p>${availability(flavor)}</a></article>`;
+  const canLoop = catalog.length > 1;
+  // Copies buffer native scrolling at both ends. Only the originals enter the
+  // accessibility tree and tab order; the full catalog still contains each flavor once.
+  const copyCount = canLoop ? Math.ceil(3 / catalog.length) * catalog.length : 0;
+  const copies = Array.from({ length: copyCount }, (_, index) => renderSlide(catalog[index % catalog.length], index % catalog.length, true)).join('');
+  track.innerHTML = copies + catalog.map((flavor, index) => renderSlide(flavor, index)).join('') + copies;
 
-  const slides = [...track.children];
+  const allSlides = [...track.children];
+  const slides = allSlides.filter((slide) => !slide.hasAttribute('data-carousel-copy'));
   const controls = document.querySelector('.carousel-controls');
   const [previous, next] = controls.querySelectorAll('button');
   const progress = controls.querySelector('.carousel-progress span');
   const carouselStatus = document.querySelector('#carousel-status');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  let announceTimer;
-  const maxScroll = () => Math.max(0, track.scrollWidth - track.clientWidth);
+  let settleTimer;
+  let layout;
+  let navigationTarget = null;
+  let touching = false;
+  const wrap = (index) => ((index % catalog.length) + catalog.length) % catalog.length;
+  function slidePosition(slide) {
+    return slide.getBoundingClientRect().left - track.getBoundingClientRect().left + track.scrollLeft - parseFloat(getComputedStyle(track).paddingLeft);
+  }
+  function currentIndex() {
+    return layout && canLoop ? wrap(Math.round((track.scrollLeft - layout.start) / layout.step)) : 0;
+  }
+  function jumpTo(left) {
+    track.scrollTo({ left, behavior: 'instant' });
+  }
+  function normalizePosition() {
+    if (!layout || !canLoop) return;
+    const relative = track.scrollLeft - layout.start;
+    if (relative < -1 || relative >= layout.cycle - 1) {
+      const cycles = relative < -1 ? Math.floor(relative / layout.cycle) : Math.floor((relative + 1) / layout.cycle);
+      const shift = cycles * layout.cycle;
+      jumpTo(track.scrollLeft - shift);
+      if (navigationTarget !== null) navigationTarget -= shift;
+    }
+  }
   function updateCarousel(announce = false) {
-    const max = maxScroll();
-    const position = Math.max(0, Math.min(track.scrollLeft, max));
-    previous.setAttribute('aria-disabled', String(position <= 2));
-    next.setAttribute('aria-disabled', String(position >= max - 2));
-    controls.hidden = max <= 2;
-    progress.style.width = `${Math.min(1, track.clientWidth / track.scrollWidth) * 100}%`;
-    progress.style.left = `${position / track.scrollWidth * 100}%`;
+    controls.hidden = !canLoop;
+    previous.setAttribute('aria-disabled', String(!canLoop));
+    next.setAttribute('aria-disabled', String(!canLoop));
+    progress.style.width = `${100 / Math.max(1, catalog.length)}%`;
+    progress.style.left = `${currentIndex() / Math.max(1, catalog.length) * 100}%`;
     if (announce) {
       const viewport = track.getBoundingClientRect();
-      const visible = slides.filter((slide) => {
+      const visible = allSlides.filter((slide) => {
         const rect = slide.getBoundingClientRect();
         return Math.min(rect.right, viewport.right) - Math.max(rect.left, viewport.left) > rect.width * .6;
       });
-      const names = visible.map((slide) => catalog[slides.indexOf(slide)].name);
+      const names = [...new Set(visible.map((slide) => catalog[Number(slide.dataset.flavorIndex)].name))];
       carouselStatus.textContent = names.length ? `Showing ${names.join(' and ')}.` : '';
     }
   }
+  function settleCarousel() {
+    if (touching) return;
+    normalizePosition();
+    navigationTarget = null;
+    updateCarousel(true);
+  }
+  function measureCarousel() {
+    const index = currentIndex();
+    const start = slides.length ? slidePosition(slides[0]) : 0;
+    const step = allSlides.length > 1 ? slidePosition(allSlides[1]) - slidePosition(allSlides[0]) : track.clientWidth;
+    if (layout && Math.abs(layout.step - step) < .1 && layout.width === track.clientWidth) return;
+    layout = { start, step, cycle: catalog.length * step, width: track.clientWidth };
+    navigationTarget = null;
+    jumpTo(start + index * step);
+    updateCarousel();
+  }
+  function goToFlavor(index, animate = true) {
+    if (!layout || !catalog.length) return;
+    navigationTarget = layout.start + wrap(index) * layout.step;
+    track.scrollTo({ left: navigationTarget, behavior: animate && !reducedMotion.matches ? 'smooth' : 'instant' });
+  }
   function moveCarousel(direction) {
-    const step = slides.length > 1 ? slides[1].offsetLeft - slides[0].offsetLeft : track.clientWidth;
-    const left = Math.max(0, Math.min(maxScroll(), track.scrollLeft + direction * step));
-    track.scrollTo({ left, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+    if (!canLoop || !layout) return;
+    normalizePosition();
+    const position = navigationTarget ?? (layout.start + Math.round((track.scrollLeft - layout.start) / layout.step) * layout.step);
+    navigationTarget = position + direction * layout.step;
+    // Keep rapid repeated clicks inside the scrolling buffer too.
+    if (navigationTarget < layout.step || navigationTarget > track.scrollWidth - track.clientWidth - layout.step) {
+      const index = wrap(Math.round((position - layout.start) / layout.step));
+      jumpTo(layout.start + index * layout.step);
+      navigationTarget = layout.start + (index + direction) * layout.step;
+    }
+    track.scrollTo({ left: navigationTarget, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
   }
   previous.addEventListener('click', () => { if (previous.getAttribute('aria-disabled') !== 'true') moveCarousel(-1); });
   next.addEventListener('click', () => { if (next.getAttribute('aria-disabled') !== 'true') moveCarousel(1); });
@@ -54,16 +108,25 @@
     // Keep focus on the viewport when moving away from a focused product link.
     track.focus({ preventScroll: true });
     if (event.key === 'Home' || event.key === 'End') {
-      track.scrollTo({ left: event.key === 'Home' ? 0 : maxScroll(), behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+      goToFlavor(event.key === 'Home' ? 0 : catalog.length - 1);
     } else moveCarousel(event.key === 'ArrowRight' ? 1 : -1);
   });
   track.addEventListener('scroll', () => {
     updateCarousel();
-    clearTimeout(announceTimer);
-    announceTimer = setTimeout(() => updateCarousel(true), 180);
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(settleCarousel, 160);
   }, { passive: true });
-  new ResizeObserver(() => updateCarousel()).observe(track);
-  updateCarousel();
+  track.addEventListener('touchstart', () => { touching = true; navigationTarget = null; }, { passive: true });
+  const endTouch = () => { touching = false; clearTimeout(settleTimer); settleTimer = setTimeout(settleCarousel, 160); };
+  track.addEventListener('touchend', endTouch, { passive: true });
+  track.addEventListener('touchcancel', endTouch, { passive: true });
+  track.addEventListener('wheel', () => { navigationTarget = null; }, { passive: true });
+  // A visible copy remains clickable, but focus must return to its original card.
+  track.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.target.closest('[data-carousel-copy] a')) event.preventDefault();
+  });
+  new ResizeObserver(measureCarousel).observe(track);
+  measureCarousel();
 
   const menuToggle = document.querySelector('.menu-toggle');
   const mobileNav = document.querySelector('#mobile-nav');
@@ -119,7 +182,14 @@
     const hash = link.getAttribute('href');
     if (getView(hash)) {
       event.preventDefault();
-      if (!dialog.open) trigger = link.closest('#mobile-nav') ? menuToggle : link;
+      if (!dialog.open) {
+        const copy = link.closest('[data-carousel-copy]');
+        if (copy) {
+          const index = Number(copy.dataset.flavorIndex);
+          goToFlavor(index, false);
+          trigger = slides[index].querySelector('a');
+        } else trigger = link.closest('#mobile-nav') ? menuToggle : link;
+      }
       const backgroundHash = dialog.open ? history.state?.backgroundHash : location.hash;
       const state = { backgroundHash: backgroundHash || '#home' };
       if (dialog.open) history.replaceState(state, '', hash); else history.pushState(state, '', hash);

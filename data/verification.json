@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-19T19:12:29.664Z",
+  "checkedAt": "2026-09-19T19:27:36.862Z",
   "results": [
     {
       "width": 1440,
@@ -7,6 +7,30 @@
       "images": [
         {
           "src": "assets/hero-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
           "loaded": true
         },
         {
@@ -50,6 +74,30 @@
           "loaded": true
         },
         {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
           "src": "assets/gifting-concept.webp",
           "loaded": true
         }
@@ -63,6 +111,30 @@
       "images": [
         {
           "src": "assets/hero-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
           "loaded": true
         },
         {
@@ -106,6 +178,30 @@
           "loaded": true
         },
         {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
+          "src": "assets/flavors-concept.webp",
+          "loaded": true
+        },
+        {
           "src": "assets/gifting-concept.webp",
           "loaded": true
         }
@@ -122,40 +218,40 @@
     "results": [
       {
         "width": 1440,
-        "flavors": 7,
-        "arrows": "passed",
-        "keyboard": "passed",
-        "details": "passed",
-        "overflow": false
+        "forwardLoop": "passed",
+        "reverseLoop": "passed",
+        "keyboardLoop": "passed",
+        "duplicateTabStops": false
       },
       {
         "width": 768,
-        "flavors": 7,
-        "arrows": "passed",
-        "keyboard": "passed",
-        "details": "passed",
-        "overflow": false
+        "forwardLoop": "passed",
+        "reverseLoop": "passed",
+        "keyboardLoop": "passed",
+        "duplicateTabStops": false
       },
       {
         "width": 390,
-        "flavors": 7,
-        "arrows": "passed",
-        "keyboard": "passed",
-        "details": "passed",
-        "overflow": false
+        "forwardLoop": "passed",
+        "reverseLoop": "passed",
+        "keyboardLoop": "passed",
+        "duplicateTabStops": false
       },
       {
         "width": 320,
-        "flavors": 7,
-        "arrows": "passed",
-        "keyboard": "passed",
-        "details": "passed",
-        "overflow": false
+        "forwardLoop": "passed",
+        "reverseLoop": "passed",
+        "keyboardLoop": "passed",
+        "duplicateTabStops": false
       }
     ],
-    "futureCatalogGrowth": "passed",
-    "unavailableFlavors": "passed",
-    "touchSwipe": "passed",
+    "copyDetailsAndFocus": "passed",
+    "animatedRapidClicks": "passed",
+    "resize": "passed",
+    "growingCatalog": "passed",
+    "twoFlavorCatalog": "passed",
+    "unavailableFlavor": "passed",
+    "touchLoopBothDirections": "passed",
     "errors": []
   }
 }

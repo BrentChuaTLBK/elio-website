@@ -34,7 +34,7 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 
 - Responsive homepage following the approved composition, ivory/brown/gold palette, centered typographic wordmark, and food-first imagery.
 - Mobile navigation, a full flavor catalog carousel, individual flavor dialogs, gifting details, and a factual brand introduction.
-- The carousel supports native touch/trackpad scrolling, previous/next buttons, keyboard arrows and Home/End, screen-reader announcements, and reduced motion. It does not autoplay.
+- The carousel loops continuously in both directions: the first flavor follows the last. It supports native touch/trackpad scrolling, previous/next buttons, keyboard arrows and Home/End, screen-reader announcements, and reduced motion. It does not autoplay.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Ordering and bag controls open clearly labeled prototype information. No cart, payment, order, or customer data is collected or stored.
 
@@ -72,6 +72,8 @@ Set `available: false` on a flavor to show “Currently unavailable” on its ca
 
 The carousel's keyboard controls, explicit navigation buttons, and status announcements draw on [W3C's carousel guidance](https://www.w3.org/WAI/tutorials/carousels/).
 
+Hidden copies at either end make the scroll loop without a visible rewind. They do not add duplicate entries to screen readers, keyboard navigation, or the full catalog. Selecting a visible copy opens the same flavor details and restores focus to the original card. Resizing preserves the current flavor.
+
 ## Branding
 
 The header, footer, and story use a live-text wordmark reading “ELIO / BASQUE CHEESECAKE / by TLB Kitchen,” as requested in the latest design revision. ELIO and BASQUE CHEESECAKE stay centered and prominent; the TLB Kitchen credit is deliberately tiny. Shared `.wordmark` styles use warm bronze on ivory and lighter bronze on the dark footer to echo the planned packaging finish. The browser tab and Apple touch icon use optimized 64 px and 180 px copies of the supplied original circular logo, preserving its artwork, proportions, and transparency. The full-resolution original PNG is retained as their source asset.
@@ -84,7 +86,7 @@ This prototype includes `noindex, nofollow` metadata. Review that setting when a
 
 ## Verification
 
-JavaScript syntax checks passed. Chrome visual and interaction checks passed at 1440, 768, 390, and 320 px widths. No page overflow, missing images, failed asset requests, or browser runtime errors were found. Catalog navigation, product details, gifting, prototype bag, mobile menu, Escape handling, focus restoration, and direct detail links were exercised. Separate checks covered carousel arrows, keyboard navigation, native phone swiping, and the automatic inclusion of an eighth test flavor. Unavailable status was verified in the carousel, catalog, and detail view using test data only.
+JavaScript syntax checks passed. Chrome visual and interaction checks passed at 1440, 768, 390, and 320 px widths. No page overflow, missing images, failed asset requests, or browser runtime errors were found. Catalog navigation, product details, gifting, prototype bag, mobile menu, Escape handling, focus restoration, and direct detail links were exercised. Loop checks covered repeated forward/backward navigation, keyboard wrapping, native phone swipes across both boundaries, animated rapid clicks, resize behavior, detail/focus handling for visible copies, and the automatic inclusion of an eighth test flavor. A two-flavor catalog was also checked. Unavailable status was verified using test data only.
 
 The desktop retains the reference's section order, with the collection revised into larger cards in a horizontal carousel. Desktop shows two full cards and a preview of the next; phone shows one card and a preview. The phone layout gives the hero copy and photograph separate space, stacks gifting content, and uses a compact menu. These checks are not a full cross-browser or production accessibility audit.
 
