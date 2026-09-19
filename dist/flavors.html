@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#3d251c">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Explore Elio's flavors of the month and the full square Basque cheesecake collection. Discover the story behind each flavor.">
+  <title>Our flavors — Elio Basque Cheesecake</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="assets/elio-favicon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/elio-apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="order.css">
+  <link rel="stylesheet" href="flavors.css">
+  <script src="content.js" defer></script>
+  <script src="flavors.js" defer></script>
+</head>
+<body class="flavors-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="order-header">
+    <a class="order-back" href="index.html"><span aria-hidden="true">←</span> <span>Back to Elio</span></a>
+    <a class="wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home"><span class="wordmark-name">ELIO</span><span class="wordmark-description">Basque Cheesecake</span><span class="wordmark-byline">by TLB Kitchen</span></a>
+    <nav aria-label="Account and bag"><a class="icon-button" href="index.html#account" aria-label="My account — coming soon" title="My account — coming soon"><svg viewBox="0 0 32 36" fill="none" aria-hidden="true"><circle cx="16" cy="10" r="5"/><path d="M6 31v-3a10 10 0 0 1 20 0v3"/></svg></a><a class="icon-button" href="order.html#your-bag" aria-label="Your bag"><svg viewBox="0 0 32 36" fill="none" aria-hidden="true"><path d="M7 10h18l2 22H5L7 10Z"/><path d="M11 14V8a5 5 0 0 1 10 0v6"/></svg></a></nav>
+  </header>
+  <main id="main">
+    <section class="flavors-hero" aria-labelledby="flavors-title">
+      <img src="assets/gifting-concept.webp" width="1400" height="1000" alt="Elio's brown and bronze packaging with three square cheesecakes — concept photograph" fetchpriority="high">
+      <div class="flavors-hero-copy"><p class="eyebrow">The Elio collection</p><h1 id="flavors-title">Find your favorite.</h1><p>A rotating menu.<br> An ever-growing collection.</p><a class="text-link" href="order.html">Explore the Elio box <span aria-hidden="true">→</span></a></div>
+    </section>
+    <div class="flavors-shell">
+      <div class="flavor-filters" role="group" aria-label="Filter flavors by taste">
+        <button type="button" data-category="all" aria-pressed="true">All flavors</button>
+        <button type="button" data-category="classic" aria-pressed="false">Classic</button>
+        <button type="button" data-category="tea" aria-pressed="false">Tea</button>
+        <button type="button" data-category="rich" aria-pressed="false">Rich &amp; bold</button>
+      </div>
+      <p class="sr-only" id="filter-status" role="status" aria-atomic="true"></p>
+      <section class="flavor-section" id="monthly-menu" aria-labelledby="monthly-title">
+        <div class="flavor-section-heading"><div><p class="eyebrow">In the current rotation</p><h2 id="monthly-title">Flavors of the month.</h2></div><p>Find a familiar favorite.<br> Fall for something new.</p></div>
+        <div class="flavors-grid" id="monthly-flavors"></div>
+        <p class="flavors-empty" id="monthly-empty" hidden></p>
+      </section>
+      <section class="flavor-section flavor-archive" id="other-flavors" aria-labelledby="other-title">
+        <div class="flavor-section-heading"><div><p class="eyebrow">The rest of the collection</p><h2 id="other-title">More to discover.</h2></div><p>Out of rotation for now.<br> Still part of the Elio story.</p></div>
+        <div class="flavors-grid" id="other-flavors-grid"></div>
+        <p class="flavors-empty" id="other-empty" hidden></p>
+      </section>
+      <p class="flavors-footnote">Our menu changes throughout the year. Online ordering is coming soon.</p>
+      <noscript><p>Enable JavaScript to explore the flavor collection and descriptions.</p></noscript>
+    </div>
+  </main>
+  <footer class="site-footer"><div class="footer-inner"><a class="wordmark footer-wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home"><span class="wordmark-name">ELIO</span><span class="wordmark-description">Basque Cheesecake</span><span class="wordmark-byline">by TLB Kitchen</span></a><div><p>Burnt beautifully. Soft within.</p><a href="https://www.instagram.com/elio.cheesecakes/" target="_blank" rel="noopener noreferrer">@elio.cheesecakes<span class="sr-only"> (opens in a new tab)</span></a></div></div></footer>
+  <dialog id="flavor-dialog" aria-labelledby="dialog-title"><button class="dialog-close icon-button" type="button" aria-label="Close details"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19"/></svg></button><div id="flavor-dialog-content"></div></dialog>
+</body>
+</html>

@@ -1,15 +1,15 @@
 (() => {
   'use strict';
-  const { flavors, featuredOrder, productImage } = window.ELIO_CONTENT;
+  const { flavors, featuredOrder, productImage, isAvailable } = window.ELIO_CONTENT;
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map((id) => flavors.find((flavor) => flavor.id === id)).filter(Boolean);
   const hasPhoto = (flavor) => Boolean(flavor.image || flavor.imagePosition);
   const photo = (flavor) => hasPhoto(flavor)
     ? `<span class="product-photo" style="--image-left:-${parseFloat(flavor.imagePosition || '0') * 2}%"><img src="${escape(flavor.image || productImage)}" width="2172" height="724" alt="${escape(flavor.name)} square Basque cheesecake — concept photograph" loading="lazy"${flavor.image ? ' style="left:0;width:100%;height:100%;object-fit:cover"' : ''}></span>`
     : `<span class="product-photo product-placeholder" aria-label="${escape(flavor.name)} — photograph coming soon"><span class="placeholder-brand" aria-hidden="true">ELIO</span><span class="placeholder-name" aria-hidden="true">${escape(flavor.name)}</span><span class="placeholder-note" aria-hidden="true">Photograph coming soon</span></span>`;
-  const availability = (flavor) => flavor.available === false ? '<p class="availability-label">Currently unavailable</p>' : '';
+  const availability = (flavor) => !isAvailable(flavor) ? '<p class="availability-label">Currently unavailable</p>' : '';
   const products = document.querySelector('#order-products');
-  products.innerHTML = catalog.map((flavor) => `<article class="order-card" data-flavor="${escape(flavor.id)}"><a href="#flavor-${escape(flavor.id)}" aria-label="View ${escape(flavor.name)} flavor details${flavor.available === false ? ' — currently unavailable' : ''}">${photo(flavor)}<div class="product-label"><h3>${escape(flavor.name)}</h3><span class="product-arrow" aria-hidden="true">→</span></div><p class="product-line">${escape(flavor.line)}</p>${availability(flavor)}<span class="order-card-link">View flavor</span></a></article>`).join('');
+  products.innerHTML = catalog.map((flavor) => `<article class="order-card" data-flavor="${escape(flavor.id)}"><a href="#flavor-${escape(flavor.id)}" aria-label="View ${escape(flavor.name)} flavor details${!isAvailable(flavor) ? ' — currently unavailable' : ''}">${photo(flavor)}<div class="product-label"><h3>${escape(flavor.name)}</h3><span class="product-arrow" aria-hidden="true">→</span></div><p class="product-line">${escape(flavor.line)}</p>${availability(flavor)}<span class="order-card-link">View flavor</span></a></article>`).join('');
   const search = document.querySelector('#flavor-search');
   function filterCatalog() {
     const query = search.value.trim().toLocaleLowerCase();

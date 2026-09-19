@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-19T20:15:27.676Z",
+  "checkedAt": "2026-09-19T21:08:09.038Z",
   "results": [
     {
       "width": 1440,
@@ -215,7 +215,7 @@
   "deepLinks": "passed",
   "enlargedText": "passed",
   "carousel": {
-    "checkedAt": "2026-09-19T20:48:29.838Z",
+    "checkedAt": "2026-09-19T21:08:09.038Z",
     "results": [
       {
         "width": 1440,
@@ -400,7 +400,7 @@
     "orderingRevision": "The earlier ordering modal is superseded by order.html; see orderPage checks."
   },
   "orderPage": {
-    "checkedAt": "2026-09-19T20:13:18.678Z",
+    "checkedAt": "2026-09-19T21:07:54.293Z",
     "results": [
       {
         "width": 1440,
@@ -541,5 +541,143 @@
     "productTapAfterSwiping": "passed",
     "verticalPageScroll": "passed",
     "errors": []
-  }
+  },
+  "boxDetail": {
+    "checkedAt": "2026-09-19T21:04:37.313Z",
+    "results": [
+      {
+        "width": 1440,
+        "shopEntry": "passed",
+        "gallery": "passed",
+        "keyboardGallery": "passed",
+        "flavorPreview": "passed",
+        "quantity": "passed",
+        "giftPreview": "passed",
+        "accordions": "passed",
+        "historyClearsDraft": "passed",
+        "overflow": false
+      },
+      {
+        "width": 1024,
+        "shopEntry": "passed",
+        "gallery": "passed",
+        "keyboardGallery": "passed",
+        "flavorPreview": "passed",
+        "quantity": "passed",
+        "giftPreview": "passed",
+        "accordions": "passed",
+        "historyClearsDraft": "passed",
+        "overflow": false
+      },
+      {
+        "width": 768,
+        "shopEntry": "passed",
+        "gallery": "passed",
+        "keyboardGallery": "passed",
+        "flavorPreview": "passed",
+        "quantity": "passed",
+        "giftPreview": "passed",
+        "accordions": "passed",
+        "historyClearsDraft": "passed",
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "shopEntry": "passed",
+        "gallery": "passed",
+        "keyboardGallery": "passed",
+        "flavorPreview": "passed",
+        "quantity": "passed",
+        "giftPreview": "passed",
+        "accordions": "passed",
+        "historyClearsDraft": "passed",
+        "overflow": false
+      },
+      {
+        "width": 320,
+        "shopEntry": "passed",
+        "gallery": "passed",
+        "keyboardGallery": "passed",
+        "flavorPreview": "passed",
+        "quantity": "passed",
+        "giftPreview": "passed",
+        "accordions": "passed",
+        "historyClearsDraft": "passed",
+        "overflow": false
+      }
+    ],
+    "galleryUsesConceptAssets": true,
+    "pricingUnconfirmed": true,
+    "addToBagDisabled": true,
+    "growingCatalog": "passed",
+    "unavailableFlavors": "passed",
+    "allFlavorsUnavailable": "passed",
+    "customerDataStored": false,
+    "submissions": [],
+    "errors": [],
+    "missing": []
+  },
+  "flavorCatalog": {
+    "checkedAt": "2026-09-19T21:05:47.043Z",
+    "results": [
+      {
+        "width": 1440,
+        "monthlyLineup": 7,
+        "clickableDescriptions": "passed",
+        "filters": "passed",
+        "keyboardAndFocus": "passed",
+        "history": "passed",
+        "centeredLogo": true,
+        "overflow": false
+      },
+      {
+        "width": 1024,
+        "monthlyLineup": 7,
+        "clickableDescriptions": "passed",
+        "filters": "passed",
+        "keyboardAndFocus": "passed",
+        "history": "passed",
+        "centeredLogo": true,
+        "overflow": false
+      },
+      {
+        "width": 768,
+        "monthlyLineup": 7,
+        "clickableDescriptions": "passed",
+        "filters": "passed",
+        "keyboardAndFocus": "passed",
+        "history": "passed",
+        "centeredLogo": true,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "monthlyLineup": 7,
+        "clickableDescriptions": "passed",
+        "filters": "passed",
+        "keyboardAndFocus": "passed",
+        "history": "passed",
+        "centeredLogo": true,
+        "overflow": false
+      },
+      {
+        "width": 320,
+        "monthlyLineup": 7,
+        "clickableDescriptions": "passed",
+        "filters": "passed",
+        "keyboardAndFocus": "passed",
+        "history": "passed",
+        "centeredLogo": true,
+        "overflow": false
+      }
+    ],
+    "deepLinks": "passed",
+    "legacyCatalogLink": "passed",
+    "rotationAcrossAllPages": "passed",
+    "catalogGrowth": "passed",
+    "emptyMonthlyMenu": "passed",
+    "errors": [],
+    "missing": []
+  },
+  "catalogRevision": "The prior #flavors modal is superseded by flavors.html; see flavorCatalog checks."
 }

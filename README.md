@@ -35,10 +35,12 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - Responsive homepage with the navigation layered over the hero photograph, ivory/brown/gold palette, centered typographic wordmark, and food-first imagery. The same text logo is retained, using its lighter bronze variant over the photo.
 - The flavor collection and gifting section now form one compact showcase: three browsable flavor tiles beside a box photograph. The box copy and “Order a box” button are live HTML over the image, with a dark fade for contrast. They stack cleanly on mobile.
 - Mobile navigation, a full flavor catalog carousel, individual flavor dialogs, gifting details, and a factual brand introduction.
+- “Explore all flavors” opens `flavors.html`: a photo-led catalog with taste filters, clickable descriptions, a monthly menu, and a separate section for flavors outside the rotation. All current flavors are in the initial monthly lineup, as confirmed by Elio. The legacy `#flavors` link redirects to this page.
 - The carousel loops continuously in both directions: the first flavor follows the last. It supports native touch/trackpad scrolling, previous/next buttons, keyboard arrows and Home/End, screen-reader announcements, and reduced motion. It does not autoplay.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Account and bag icons appear beside the centered wordmark. Compact navigation is used at widths up to 1000 px and includes My account, My orders, and Order a box links.
 - “Order a box” opens `order.html`, an Elio order-page preview modeled on [TLB Kitchen's product-grid and bag-summary layout](https://thelittlebakerkitchen.com/shop.html). It has searchable flavor cards, accessible detail views, a box hero, and a bag summary. Checkout remains disabled; no prices, box combinations, or delivery policies have been invented.
+- Selecting the Elio box opens `box.html`, with a large image gallery and thumbnail navigation, three flavor selectors, quantity controls, an unsaved gift-message preview, and expandable box/care details. Price and Add to bag remain coming-soon placeholders. The reference's sample price and product name have not been adopted as business facts.
 - Account, order history, and bag controls open styled “Coming soon” placeholders. Sign-in, registration, and checkout buttons are disabled. No account, cart, payment, order, or customer data is collected or stored.
 - A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
 
@@ -51,6 +53,8 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 | `dist/content.js` | Structured flavor names, descriptions, and image replacement points |
 | `dist/app.js` | Reusable product rendering, navigation, accessible detail views |
 | `dist/order.html`, `dist/order.css`, `dist/order.js` | Standalone order-page preview, searchable catalog, and flavor detail dialogs |
+| `dist/flavors.html`, `dist/flavors.css`, `dist/flavors.js` | Monthly lineup, full flavor collection, category filters, and clickable descriptions |
+| `dist/box.html`, `dist/box.css`, `dist/box.js` | Box-detail gallery and non-purchasing flavor, quantity, and gift-message preview |
 | `dist/assets/` | Original logo, optimized logo icons and concept images, licensed heading font |
 | `server.mjs` | Dependency-free local preview server |
 | `data/verification.json` | Desktop, tablet, and mobile check results |
@@ -65,15 +69,17 @@ The hero, featured flavor images, and gifting image are AI-generated **concept p
 | --- | --- |
 | `dist/assets/hero-concept.webp` | Hero image and preload in `dist/index.html` |
 | `dist/assets/flavors-concept.webp` | Shared vanilla/matcha/chocolate triptych in `dist/content.js` |
-| `dist/assets/gifting-concept.webp` | Homepage showcase in `dist/index.html`, order hero in `dist/order.html`, and box detail in `dist/app.js` |
+| `dist/assets/gifting-concept.webp` | Homepage showcase, shop and flavor-catalog heroes, box gallery, and gifting dialog |
 
-To use separate product photos, add `image: 'assets/your-photo.webp'` to the relevant flavor in `dist/content.js`. Gorgonzola, Ube, Hojicha, and Speculoos currently use clearly labeled typographic photo placeholders in the carousel; their product photography remains open.
+To use separate product photos, add `image: 'assets/your-photo.webp'` to the relevant flavor in `dist/content.js`. Gorgonzola, Ube, Hojicha, and Speculoos currently use clearly labeled typographic photo placeholders throughout the catalog; their product photography remains open. The box gallery uses existing concept photographs, including crops of the bag and carton, rather than new production photos.
 
 ## Growing the flavor catalog
 
-Add a flavor object to `flavors` in `dist/content.js` with a unique `id`, `name`, `line`, and `description`. It appears automatically in the homepage carousel, full catalog, order page, and its own `#flavor-id` detail view. Add `image` when its photograph is ready. `featuredOrder` only controls which flavors lead; every other flavor follows automatically. Public copy uses “Explore all flavors” without a fixed count.
+Add a flavor object to `flavors` in `dist/content.js` with a unique `id`, `name`, `line`, and `description`. It appears automatically in the homepage carousel, full catalog, order page, and its own `#flavor-id` detail view. Add `image` when its photograph is ready. Optional `category` values are `classic`, `tea`, and `rich`; flavors without a category still appear under All flavors. `featuredOrder` only controls which flavors lead; every other flavor follows automatically. Public copy uses “Explore all flavors” without a fixed count.
 
-Set `available: false` on a flavor to show “Currently unavailable” on its card, catalog entry, and detail view. Keep the flavor in the list so visitors can still browse it. Remove the field or set it to `true` to remove that label. No flavors are marked unavailable by default. This is an editorial status for the prototype, not a connection to stock or ordering systems.
+Update the `monthlyMenu` array in `dist/content.js` with the IDs in the current rotation. All current flavors are included initially. Removing an ID moves that flavor to “More to discover,” keeps its description accessible, and marks it “Currently unavailable” across the homepage, catalog, and shop. It also disables that option in the box preview. Adding an ID brings it back into the monthly lineup. A newly added flavor stays outside the menu until its ID is included; adding catalog entries never silently makes them selectable.
+
+`available: false` is an optional override that keeps a flavor unavailable even when its ID is in `monthlyMenu`. Remove that override and include the ID in `monthlyMenu` to make it selectable again. An empty monthly list displays a coming-soon message and leaves the full collection browsable. The shared `isAvailable` helper keeps all pages consistent. This is an editorial menu, not live inventory or an enabled order service.
 
 The carousel's keyboard controls, explicit navigation buttons, and status announcements draw on [W3C's carousel guidance](https://www.w3.org/WAI/tutorials/carousels/).
 
@@ -107,11 +113,15 @@ The standalone order page and compact showcase were subsequently checked at 1440
 
 The repeated-swipe regression was reproduced before the fix, then checked with native touch input in Chrome mobile emulation at 390 and 320 px: 32 rapid swipes forward and 32 backward at each width without reaching a physical end. Canceled-gesture recovery, product taps after swiping, and vertical page scrolling passed. The existing carousel checks for buttons, keyboard navigation, resizing, reduced motion, and catalog growth also passed.
 
+The box-detail and flavor-catalog pages were checked at 1440, 1024, 768, 390, and 320 px. Checks covered gallery navigation, keyboard operation, flavor selection, quantity normalization, gift-message clearing (including browser history), expandable details, catalog filters, all flavor descriptions, focus restoration, and direct links. Rotation was tested with a smaller monthly lineup, an added flavor, and an empty lineup; all pages consistently show unavailable flavors and prevent selecting them in the box preview. The centered wordmark and desktop/mobile layouts were visually inspected. No missing assets, runtime errors, purchase submissions, or stored customer data were found.
+
 Run syntax checks directly:
 
 ```sh
 node --check dist/app.js
 node --check dist/order.js
+node --check dist/box.js
+node --check dist/flavors.js
 node --check dist/content.js
 node --check server.mjs
 ```
