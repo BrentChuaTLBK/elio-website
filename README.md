@@ -37,6 +37,7 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - The carousel loops continuously in both directions: the first flavor follows the last. It supports native touch/trackpad scrolling, previous/next buttons, keyboard arrows and Home/End, screen-reader announcements, and reduced motion. It does not autoplay.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Ordering and bag controls open clearly labeled prototype information. No cart, payment, order, or customer data is collected or stored.
+- A responsive newsletter placeholder sits above the footer, with an Elio envelope illustration, email-field layout, and working Instagram link. The email input and arrow are disabled, with an explicit unavailable message.
 
 ## Structure
 
@@ -81,6 +82,8 @@ The header, footer, and story use a live-text wordmark reading “ELIO / BASQUE 
 The heading font is **Libre Caslon Display**, chosen to approximate the reference; it is not claimed to be Elio's official font. Its SIL Open Font License is included in `dist/assets/FONT-LICENSE.txt`. Body text uses the visitor's Georgia/system serif font.
 
 Still unconfirmed: prices, stock, box combinations/mix-and-match rules, ordering channel, checkout/payment, inventory, delivery/pickup policies, launch timing, and any longer brand history. There are no invented reviews, awards, scarcity claims, or delivery promises. The provided Instagram and email are contact links only.
+
+The newsletter section is visual only. It has no submitting form, email capture, storage, or email-provider integration. Final signup copy and privacy/consent details need to be supplied before enabling it.
 
 This prototype includes `noindex, nofollow` metadata. Review that setting when an actual public launch is authorized. A public source repository is not a live business launch.
 

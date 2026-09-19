@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-19T19:27:36.862Z",
+  "checkedAt": "2026-09-19T19:31:26.216Z",
   "results": [
     {
       "width": 1440,
@@ -253,5 +253,17 @@
     "unavailableFlavor": "passed",
     "touchLoopBothDirections": "passed",
     "errors": []
+  },
+  "newsletter": {
+    "viewports": [
+      1440,
+      390,
+      320
+    ],
+    "visualLayout": "passed",
+    "emailInputDisabled": true,
+    "submitButtonDisabled": true,
+    "submittingForm": false,
+    "instagramLink": "https://www.instagram.com/elio.cheesecakes/"
   }
 }
