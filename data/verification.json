@@ -506,7 +506,7 @@
     ]
   },
   "repeatedTouch": {
-    "checkedAt": "2026-09-19T20:48:04.016Z",
+    "checkedAt": "2026-09-20T16:49:51.059Z",
     "results": [
       {
         "width": 390,
@@ -774,5 +774,86 @@
       }
     ],
     "keyboardSkipLink": "passed"
+  },
+  "carouselAutoplay": {
+    "checkedAt": "2026-09-20T16:51:30.157Z",
+    "results": [
+      {
+        "width": 1440,
+        "pixelsIn1Point6Seconds": 23,
+        "automaticLoop": "passed",
+        "pausePlay": "passed",
+        "reducedMotion": "passed",
+        "overlappingControls": false,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "pixelsIn1Point6Seconds": 23,
+        "automaticLoop": "passed",
+        "pausePlay": "passed",
+        "reducedMotion": "passed",
+        "overlappingControls": false,
+        "overflow": false
+      },
+      {
+        "width": 320,
+        "pixelsIn1Point6Seconds": 23,
+        "automaticLoop": "passed",
+        "pausePlay": "passed",
+        "reducedMotion": "passed",
+        "overlappingControls": false,
+        "overflow": false
+      }
+    ],
+    "hoverPauseAndResume": "passed",
+    "persistentKeyboardPause": "passed",
+    "errors": [],
+    "interactions": {
+      "checkedAt": "2026-09-20T16:52:06.046Z",
+      "nativeSwipePauseAndResume": "passed",
+      "offscreenPauseAndResume": "passed",
+      "dialogPause": "passed"
+    },
+    "loopRegression": {
+      "results": [
+        {
+          "width": 1440,
+          "forwardLoop": "passed",
+          "reverseLoop": "passed",
+          "keyboardLoop": "passed",
+          "duplicateTabStops": false
+        },
+        {
+          "width": 768,
+          "forwardLoop": "passed",
+          "reverseLoop": "passed",
+          "keyboardLoop": "passed",
+          "duplicateTabStops": false
+        },
+        {
+          "width": 390,
+          "forwardLoop": "passed",
+          "reverseLoop": "passed",
+          "keyboardLoop": "passed",
+          "duplicateTabStops": false
+        },
+        {
+          "width": 320,
+          "forwardLoop": "passed",
+          "reverseLoop": "passed",
+          "keyboardLoop": "passed",
+          "duplicateTabStops": false
+        }
+      ],
+      "copyDetailsAndFocus": "passed",
+      "animatedRapidClicks": "passed",
+      "resize": "passed",
+      "growingCatalog": "passed",
+      "twoFlavorCatalog": "passed",
+      "unavailableFlavor": "passed",
+      "touchLoopBothDirections": "passed",
+      "errors": []
+    }
   }
 }

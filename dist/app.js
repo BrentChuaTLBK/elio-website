@@ -25,6 +25,19 @@
   const progress = controls.querySelector('.carousel-progress span');
   const carouselStatus = document.querySelector('#carousel-status');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const carousel = document.querySelector('.flavor-carousel');
+  const autoplayButton = document.querySelector('.carousel-autoplay');
+  const autoplaySpeed = 14; // Pixels per second, independent of refresh rate.
+  const interactionDelay = 4000;
+  let autoplayEnabled = !reducedMotion.matches;
+  let autoplayFrame = 0;
+  let autoplayTimer;
+  let autoplayPosition = 0;
+  let lastFrameTime = null;
+  let resumeAt = 0;
+  let inView = false;
+  let hovered = false;
+  let pageActive = true;
   let settleTimer;
   let layout;
   let navigationTarget = null;
@@ -51,6 +64,7 @@
   }
   function updateCarousel(announce = false) {
     controls.hidden = !canLoop;
+    autoplayButton.hidden = !canLoop;
     previous.setAttribute('aria-disabled', String(!canLoop));
     next.setAttribute('aria-disabled', String(!canLoop));
     progress.style.width = `${100 / Math.max(1, catalog.length)}%`;
@@ -66,28 +80,33 @@
     }
   }
   function settleCarousel() {
-    if (touching) return;
+    if (touching || autoplayFrame) return;
     normalizePosition();
     navigationTarget = null;
     updateCarousel(true);
+    syncAutoplay();
   }
   function measureCarousel() {
-    const index = currentIndex();
+    const index = layout && canLoop && track.classList.contains('is-drifting') ? wrap((track.scrollLeft - layout.start) / layout.step) : currentIndex();
     const start = slides.length ? slidePosition(slides[0]) : 0;
     const step = allSlides.length > 1 ? slidePosition(allSlides[1]) - slidePosition(allSlides[0]) : track.clientWidth;
     if (layout && Math.abs(layout.step - step) < .1 && layout.width === track.clientWidth) return;
+    stopAutoplay();
     layout = { start, step, cycle: catalog.length * step, width: track.clientWidth };
     navigationTarget = null;
     jumpTo(start + index * step);
     updateCarousel();
+    syncAutoplay();
   }
   function goToFlavor(index, animate = true) {
     if (!layout || !catalog.length) return;
+    prepareManualScroll();
     navigationTarget = layout.start + wrap(index) * layout.step;
     track.scrollTo({ left: navigationTarget, behavior: animate && !reducedMotion.matches ? 'smooth' : 'instant' });
   }
   function moveCarousel(direction) {
     if (!canLoop || !layout) return;
+    prepareManualScroll();
     normalizePosition();
     const position = navigationTarget ?? (layout.start + Math.round((track.scrollLeft - layout.start) / layout.step) * layout.step);
     navigationTarget = position + direction * layout.step;
@@ -112,6 +131,7 @@
     } else moveCarousel(event.key === 'ArrowRight' ? 1 : -1);
   });
   track.addEventListener('scroll', () => {
+    if (autoplayFrame) { updateCarousel(); return; }
     // Native touch momentum can consume the buffer before the debounce runs.
     // Recenter at its outer edge, but don't interrupt button-driven animation.
     if (layout && navigationTarget === null) {
@@ -124,6 +144,7 @@
   }, { passive: true });
   track.addEventListener('touchstart', () => {
     touching = true;
+    prepareManualScroll();
     navigationTarget = null;
     clearTimeout(settleTimer);
     // Start each gesture in the original set, even during rapid repeat swipes.
@@ -131,17 +152,111 @@
   }, { passive: true });
   const endTouch = () => {
     touching = false;
+    holdAutoplay();
     normalizePosition();
     clearTimeout(settleTimer);
     settleTimer = setTimeout(settleCarousel, 160);
   };
   track.addEventListener('touchend', endTouch, { passive: true });
   track.addEventListener('touchcancel', endTouch, { passive: true });
-  track.addEventListener('wheel', () => { navigationTarget = null; normalizePosition(); }, { passive: true });
+  track.addEventListener('wheel', () => { prepareManualScroll(); navigationTarget = null; normalizePosition(); }, { passive: true });
   // A visible copy remains clickable, but focus must return to its original card.
   track.addEventListener('pointerdown', (event) => {
+    holdAutoplay();
     if (event.pointerType === 'mouse' && event.target.closest('[data-carousel-copy] a')) event.preventDefault();
   });
+
+  function updateAutoplayButton() {
+    const label = autoplayEnabled ? 'Pause automatic scrolling' : 'Play automatic scrolling';
+    autoplayButton.setAttribute('aria-label', label);
+    autoplayButton.title = label;
+    autoplayButton.dataset.playing = String(autoplayEnabled);
+  }
+  function stopAutoplay() {
+    cancelAnimationFrame(autoplayFrame);
+    autoplayFrame = 0;
+    lastFrameTime = null;
+    carouselStatus.setAttribute('aria-live', 'polite');
+    // Keep the fractional position while paused; restoring snap here would jump.
+  }
+  function canAutoplay() {
+    return autoplayEnabled && canLoop && layout && inView && pageActive && !document.hidden && !hovered && !touching && navigationTarget === null && !document.querySelector('dialog[open]');
+  }
+  function animateCarousel(time) {
+    if (!canAutoplay()) { stopAutoplay(); return; }
+    const elapsed = lastFrameTime === null ? 0 : Math.min(time - lastFrameTime, 50);
+    lastFrameTime = time;
+    // Accumulate fractions explicitly: integer scroll rounding must not stall a slow glide.
+    autoplayPosition += elapsed / 1000 * autoplaySpeed;
+    autoplayPosition = layout.start + ((autoplayPosition - layout.start) % layout.cycle + layout.cycle) % layout.cycle;
+    jumpTo(autoplayPosition);
+    autoplayFrame = requestAnimationFrame(animateCarousel);
+  }
+  function syncAutoplay() {
+    clearTimeout(autoplayTimer);
+    if (!canAutoplay()) { stopAutoplay(); return; }
+    const delay = resumeAt - performance.now();
+    if (delay > 0) {
+      stopAutoplay();
+      autoplayTimer = setTimeout(syncAutoplay, delay);
+      return;
+    }
+    if (autoplayFrame) return;
+    clearTimeout(settleTimer);
+    track.classList.add('is-drifting');
+    autoplayPosition = track.scrollLeft;
+    carouselStatus.textContent = '';
+    carouselStatus.setAttribute('aria-live', 'off');
+    autoplayFrame = requestAnimationFrame(animateCarousel);
+  }
+  function holdAutoplay() {
+    resumeAt = performance.now() + interactionDelay;
+    stopAutoplay();
+    syncAutoplay();
+  }
+  function prepareManualScroll() {
+    holdAutoplay();
+    track.classList.remove('is-drifting');
+  }
+  autoplayButton.addEventListener('click', () => {
+    autoplayEnabled = !autoplayEnabled;
+    resumeAt = 0;
+    updateAutoplayButton();
+    syncAutoplay();
+  });
+  carousel.addEventListener('pointerenter', (event) => {
+    if (event.pointerType !== 'mouse') return;
+    hovered = true;
+    syncAutoplay();
+  });
+  carousel.addEventListener('pointerleave', (event) => {
+    if (event.pointerType !== 'mouse') return;
+    hovered = false;
+    holdAutoplay();
+  });
+  carousel.addEventListener('focusin', (event) => {
+    // The rotation control itself can start scrolling; other focus stops it until Play.
+    if (event.target === autoplayButton) return;
+    autoplayEnabled = false;
+    updateAutoplayButton();
+    syncAutoplay();
+  });
+  reducedMotion.addEventListener('change', () => {
+    if (reducedMotion.matches) autoplayEnabled = false;
+    updateAutoplayButton();
+    syncAutoplay();
+  });
+  document.addEventListener('visibilitychange', syncAutoplay);
+  window.addEventListener('pagehide', () => { pageActive = false; clearTimeout(autoplayTimer); stopAutoplay(); });
+  window.addEventListener('pageshow', () => { pageActive = true; syncAutoplay(); });
+  new IntersectionObserver(([entry]) => {
+    const visible = entry.isIntersecting && entry.intersectionRatio >= .35;
+    if (visible && !inView) resumeAt = performance.now() + 1000;
+    inView = visible;
+    syncAutoplay();
+  }, { threshold: [0, .35] }).observe(carousel);
+  new MutationObserver(syncAutoplay).observe(document.querySelector('#detail-dialog'), { attributes: true, attributeFilter: ['open'] });
+  updateAutoplayButton();
   new ResizeObserver(measureCarousel).observe(track);
   measureCarousel();
 
