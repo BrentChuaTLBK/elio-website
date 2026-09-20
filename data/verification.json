@@ -215,10 +215,11 @@
   "deepLinks": "passed",
   "enlargedText": "passed",
   "carousel": {
-    "checkedAt": "2026-09-19T21:08:09.038Z",
+    "checkedAt": "2026-09-20T17:08:50.277Z",
     "results": [
       {
         "width": 1440,
+        "threeFlavorButtonStep": "passed",
         "forwardLoop": "passed",
         "reverseLoop": "passed",
         "keyboardLoop": "passed",
@@ -226,6 +227,7 @@
       },
       {
         "width": 768,
+        "threeFlavorButtonStep": "passed",
         "forwardLoop": "passed",
         "reverseLoop": "passed",
         "keyboardLoop": "passed",
@@ -233,6 +235,7 @@
       },
       {
         "width": 390,
+        "threeFlavorButtonStep": "passed",
         "forwardLoop": "passed",
         "reverseLoop": "passed",
         "keyboardLoop": "passed",
@@ -240,6 +243,7 @@
       },
       {
         "width": 320,
+        "threeFlavorButtonStep": "passed",
         "forwardLoop": "passed",
         "reverseLoop": "passed",
         "keyboardLoop": "passed",
@@ -776,20 +780,12 @@
     "keyboardSkipLink": "passed"
   },
   "carouselAutoplay": {
-    "checkedAt": "2026-09-20T16:59:26.953Z",
+    "checkedAt": "2026-09-20T17:07:25.609Z",
     "results": [
       {
         "width": 1440,
-        "pixelsIn1Point6SecondsWhileHovered": 23,
-        "noPauseButton": true,
-        "continuedMovementOnHover": "passed",
-        "resumeAfterArrow": "passed",
-        "reducedMotion": "passed",
-        "overlappingControls": false,
-        "overflow": false
-      },
-      {
-        "width": 390,
+        "immediateStart": "passed",
+        "pixelsInFirst350ms": 5,
         "pixelsIn1Point6SecondsWhileHovered": 22,
         "noPauseButton": true,
         "continuedMovementOnHover": "passed",
@@ -799,7 +795,21 @@
         "overflow": false
       },
       {
+        "width": 390,
+        "immediateStart": "passed",
+        "pixelsInFirst350ms": 5,
+        "pixelsIn1Point6SecondsWhileHovered": 23,
+        "noPauseButton": true,
+        "continuedMovementOnHover": "passed",
+        "resumeAfterArrow": "passed",
+        "reducedMotion": "passed",
+        "overlappingControls": false,
+        "overflow": false
+      },
+      {
         "width": 320,
+        "immediateStart": "passed",
+        "pixelsInFirst350ms": 5,
         "pixelsIn1Point6SecondsWhileHovered": 23,
         "noPauseButton": true,
         "continuedMovementOnHover": "passed",
@@ -820,6 +830,7 @@
       "results": [
         {
           "width": 1440,
+          "threeFlavorButtonStep": "passed",
           "forwardLoop": "passed",
           "reverseLoop": "passed",
           "keyboardLoop": "passed",
@@ -827,6 +838,7 @@
         },
         {
           "width": 768,
+          "threeFlavorButtonStep": "passed",
           "forwardLoop": "passed",
           "reverseLoop": "passed",
           "keyboardLoop": "passed",
@@ -834,6 +846,7 @@
         },
         {
           "width": 390,
+          "threeFlavorButtonStep": "passed",
           "forwardLoop": "passed",
           "reverseLoop": "passed",
           "keyboardLoop": "passed",
@@ -841,6 +854,7 @@
         },
         {
           "width": 320,
+          "threeFlavorButtonStep": "passed",
           "forwardLoop": "passed",
           "reverseLoop": "passed",
           "keyboardLoop": "passed",

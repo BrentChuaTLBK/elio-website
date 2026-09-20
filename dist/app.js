@@ -14,7 +14,9 @@
   const canLoop = catalog.length > 1;
   // Copies buffer native scrolling at both ends. Only the originals enter the
   // accessibility tree and tab order; the full catalog still contains each flavor once.
-  const copyCount = canLoop ? Math.ceil(3 / catalog.length) * catalog.length : 0;
+  const pageSize = 3;
+  // Buffer a visible group plus a full three-card move, including small catalogs.
+  const copyCount = canLoop ? Math.ceil(pageSize * 2 / catalog.length) * catalog.length : 0;
   const copies = Array.from({ length: copyCount }, (_, index) => renderSlide(catalog[index % catalog.length], index % catalog.length, true)).join('');
   track.innerHTML = copies + catalog.map((flavor, index) => renderSlide(flavor, index)).join('') + copies;
 
@@ -60,6 +62,10 @@
     }
   }
   function updateCarousel(announce = false) {
+    if (layout && canLoop && layout.width === track.clientWidth) {
+      const position = (track.scrollLeft - layout.start) / layout.step;
+      layout.index = wrap(track.classList.contains('is-drifting') ? position : Math.round(position));
+    }
     controls.hidden = !canLoop;
     previous.setAttribute('aria-disabled', String(!canLoop));
     next.setAttribute('aria-disabled', String(!canLoop));
@@ -83,12 +89,14 @@
     syncAutoplay();
   }
   function measureCarousel() {
-    const index = layout && canLoop && track.classList.contains('is-drifting') ? wrap((track.scrollLeft - layout.start) / layout.step) : currentIndex();
+    // A browser may adjust scrollLeft during reflow before ResizeObserver runs.
+    // Preserve the last measured flavor, rather than interpreting new pixels using old widths.
+    const index = layout?.index ?? 0;
     const start = slides.length ? slidePosition(slides[0]) : 0;
     const step = allSlides.length > 1 ? slidePosition(allSlides[1]) - slidePosition(allSlides[0]) : track.clientWidth;
     if (layout && Math.abs(layout.step - step) < .1 && layout.width === track.clientWidth) return;
     stopAutoplay();
-    layout = { start, step, cycle: catalog.length * step, width: track.clientWidth };
+    layout = { start, step, cycle: catalog.length * step, width: track.clientWidth, index };
     navigationTarget = null;
     jumpTo(start + index * step);
     updateCarousel();
@@ -114,8 +122,8 @@
     }
     track.scrollTo({ left: navigationTarget, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
   }
-  previous.addEventListener('click', () => { if (previous.getAttribute('aria-disabled') !== 'true') moveCarousel(-1); });
-  next.addEventListener('click', () => { if (next.getAttribute('aria-disabled') !== 'true') moveCarousel(1); });
+  previous.addEventListener('click', () => { if (previous.getAttribute('aria-disabled') !== 'true') moveCarousel(-pageSize); });
+  next.addEventListener('click', () => { if (next.getAttribute('aria-disabled') !== 'true') moveCarousel(pageSize); });
   track.addEventListener('keydown', (event) => {
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -215,7 +223,6 @@
   window.addEventListener('pageshow', () => { pageActive = true; syncAutoplay(); });
   new IntersectionObserver(([entry]) => {
     const visible = entry.isIntersecting && entry.intersectionRatio >= .35;
-    if (visible && !inView) resumeAt = performance.now() + 1000;
     inView = visible;
     syncAutoplay();
   }, { threshold: [0, .35] }).observe(carousel);
