@@ -41,6 +41,7 @@
   let layout;
   let navigationTarget = null;
   let touching = false;
+  let touchSettling = false;
   const wrap = (index) => ((index % catalog.length) + catalog.length) % catalog.length;
   function slidePosition(slide) {
     return slide.getBoundingClientRect().left - track.getBoundingClientRect().left + track.scrollLeft - parseFloat(getComputedStyle(track).paddingLeft);
@@ -83,6 +84,7 @@
   }
   function settleCarousel() {
     if (touching || autoplayFrame) return;
+    touchSettling = false;
     normalizePosition();
     navigationTarget = null;
     updateCarousel(true);
@@ -149,13 +151,15 @@
     settleTimer = setTimeout(settleCarousel, 160);
   }, { passive: true });
   track.addEventListener('scrollend', () => {
-    // Ignore scrollend from an interrupted move; only finish the latest target.
-    if (navigationTarget === null || Math.abs(track.scrollLeft - navigationTarget) > 1) return;
+    // Wait for the finger to lift and ignore the end of an interrupted arrow move.
+    if (touching) return;
+    if (navigationTarget !== null ? Math.abs(track.scrollLeft - navigationTarget) > 1 : !touchSettling) return;
     clearTimeout(settleTimer);
     settleCarousel();
   }, { passive: true });
   track.addEventListener('touchstart', () => {
     touching = true;
+    touchSettling = true;
     prepareManualScroll();
     navigationTarget = null;
     clearTimeout(settleTimer);
@@ -164,7 +168,9 @@
   }, { passive: true });
   const endTouch = () => {
     touching = false;
-    holdAutoplay();
+    // Let native momentum finish, then continue without a timed reading pause.
+    resumeAt = 0;
+    clearTimeout(autoplayTimer);
     normalizePosition();
     clearTimeout(settleTimer);
     settleTimer = setTimeout(settleCarousel, 160);
@@ -193,7 +199,7 @@
     // Keep the fractional position while paused; restoring snap here would jump.
   }
   function canAutoplay() {
-    return !reducedMotion.matches && canLoop && layout && inView && pageActive && !document.hidden && !touching && navigationTarget === null && !document.querySelector('dialog[open]');
+    return !reducedMotion.matches && canLoop && layout && inView && pageActive && !document.hidden && !touching && !touchSettling && navigationTarget === null && !document.querySelector('dialog[open]');
   }
   function animateCarousel(time) {
     if (!canAutoplay()) { stopAutoplay(); return; }

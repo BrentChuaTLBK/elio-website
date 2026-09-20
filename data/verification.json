@@ -510,7 +510,7 @@
     ]
   },
   "repeatedTouch": {
-    "checkedAt": "2026-09-20T16:59:35.122Z",
+    "checkedAt": "2026-09-20T17:28:56.520Z",
     "results": [
       {
         "width": 390,
@@ -780,13 +780,13 @@
     "keyboardSkipLink": "passed"
   },
   "carouselAutoplay": {
-    "checkedAt": "2026-09-20T17:20:44.473Z",
+    "checkedAt": "2026-09-20T17:28:36.070Z",
     "results": [
       {
         "width": 1440,
         "immediateStart": "passed",
         "pixelsInFirst350ms": 5,
-        "pixelsIn1Point6SecondsWhileHovered": 23,
+        "pixelsIn1Point6SecondsWhileHovered": 22,
         "noPauseButton": true,
         "continuedMovementOnHover": "passed",
         "immediateResumeAfterArrow": "passed",
@@ -798,7 +798,7 @@
       {
         "width": 390,
         "immediateStart": "passed",
-        "pixelsInFirst350ms": 5,
+        "pixelsInFirst350ms": 6,
         "pixelsIn1Point6SecondsWhileHovered": 23,
         "noPauseButton": true,
         "continuedMovementOnHover": "passed",
@@ -812,7 +812,7 @@
         "width": 320,
         "immediateStart": "passed",
         "pixelsInFirst350ms": 6,
-        "pixelsIn1Point6SecondsWhileHovered": 23,
+        "pixelsIn1Point6SecondsWhileHovered": 22,
         "noPauseButton": true,
         "continuedMovementOnHover": "passed",
         "immediateResumeAfterArrow": "passed",
@@ -824,10 +824,44 @@
     ],
     "errors": [],
     "interactions": {
-      "checkedAt": "2026-09-20T16:59:06.946Z",
-      "nativeSwipePauseAndResume": "passed",
+      "checkedAt": "2026-09-20T17:29:13.171Z",
+      "nativeSwipeImmediateResume": "passed",
       "offscreenPauseAndResume": "passed",
       "dialogPause": "passed"
+    },
+    "swipeResume": {
+      "checkedAt": "2026-09-20T17:28:21.817Z",
+      "results": [
+        {
+          "width": 390,
+          "direction": "forward",
+          "immediateResume": "passed",
+          "pixelsIn350msAfterSwipe": 5,
+          "fingerHoldRespected": true
+        },
+        {
+          "width": 390,
+          "direction": "backward",
+          "immediateResume": "passed",
+          "pixelsIn350msAfterSwipe": 5,
+          "fingerHoldRespected": true
+        },
+        {
+          "width": 320,
+          "direction": "forward",
+          "immediateResume": "passed",
+          "pixelsIn350msAfterSwipe": 5,
+          "fingerHoldRespected": true
+        },
+        {
+          "width": 320,
+          "direction": "backward",
+          "immediateResume": "passed",
+          "pixelsIn350msAfterSwipe": 5,
+          "fingerHoldRespected": true
+        }
+      ],
+      "errors": []
     },
     "loopRegression": {
       "results": [
