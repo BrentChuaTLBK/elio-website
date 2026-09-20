@@ -506,7 +506,7 @@
     ]
   },
   "repeatedTouch": {
-    "checkedAt": "2026-09-20T16:49:51.059Z",
+    "checkedAt": "2026-09-20T16:59:35.122Z",
     "results": [
       {
         "width": 390,
@@ -776,41 +776,42 @@
     "keyboardSkipLink": "passed"
   },
   "carouselAutoplay": {
-    "checkedAt": "2026-09-20T16:51:30.157Z",
+    "checkedAt": "2026-09-20T16:59:26.953Z",
     "results": [
       {
         "width": 1440,
-        "pixelsIn1Point6Seconds": 23,
-        "automaticLoop": "passed",
-        "pausePlay": "passed",
+        "pixelsIn1Point6SecondsWhileHovered": 23,
+        "noPauseButton": true,
+        "continuedMovementOnHover": "passed",
+        "resumeAfterArrow": "passed",
         "reducedMotion": "passed",
         "overlappingControls": false,
         "overflow": false
       },
       {
         "width": 390,
-        "pixelsIn1Point6Seconds": 23,
-        "automaticLoop": "passed",
-        "pausePlay": "passed",
+        "pixelsIn1Point6SecondsWhileHovered": 22,
+        "noPauseButton": true,
+        "continuedMovementOnHover": "passed",
+        "resumeAfterArrow": "passed",
         "reducedMotion": "passed",
         "overlappingControls": false,
         "overflow": false
       },
       {
         "width": 320,
-        "pixelsIn1Point6Seconds": 23,
-        "automaticLoop": "passed",
-        "pausePlay": "passed",
+        "pixelsIn1Point6SecondsWhileHovered": 23,
+        "noPauseButton": true,
+        "continuedMovementOnHover": "passed",
+        "resumeAfterArrow": "passed",
         "reducedMotion": "passed",
         "overlappingControls": false,
         "overflow": false
       }
     ],
-    "hoverPauseAndResume": "passed",
-    "persistentKeyboardPause": "passed",
     "errors": [],
     "interactions": {
-      "checkedAt": "2026-09-20T16:52:06.046Z",
+      "checkedAt": "2026-09-20T16:59:06.946Z",
       "nativeSwipePauseAndResume": "passed",
       "offscreenPauseAndResume": "passed",
       "dialogPause": "passed"

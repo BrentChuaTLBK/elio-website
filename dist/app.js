@@ -26,17 +26,14 @@
   const carouselStatus = document.querySelector('#carousel-status');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const carousel = document.querySelector('.flavor-carousel');
-  const autoplayButton = document.querySelector('.carousel-autoplay');
   const autoplaySpeed = 14; // Pixels per second, independent of refresh rate.
   const interactionDelay = 4000;
-  let autoplayEnabled = !reducedMotion.matches;
   let autoplayFrame = 0;
   let autoplayTimer;
   let autoplayPosition = 0;
   let lastFrameTime = null;
   let resumeAt = 0;
   let inView = false;
-  let hovered = false;
   let pageActive = true;
   let settleTimer;
   let layout;
@@ -64,7 +61,6 @@
   }
   function updateCarousel(announce = false) {
     controls.hidden = !canLoop;
-    autoplayButton.hidden = !canLoop;
     previous.setAttribute('aria-disabled', String(!canLoop));
     next.setAttribute('aria-disabled', String(!canLoop));
     progress.style.width = `${100 / Math.max(1, catalog.length)}%`;
@@ -166,12 +162,6 @@
     if (event.pointerType === 'mouse' && event.target.closest('[data-carousel-copy] a')) event.preventDefault();
   });
 
-  function updateAutoplayButton() {
-    const label = autoplayEnabled ? 'Pause automatic scrolling' : 'Play automatic scrolling';
-    autoplayButton.setAttribute('aria-label', label);
-    autoplayButton.title = label;
-    autoplayButton.dataset.playing = String(autoplayEnabled);
-  }
   function stopAutoplay() {
     cancelAnimationFrame(autoplayFrame);
     autoplayFrame = 0;
@@ -180,7 +170,7 @@
     // Keep the fractional position while paused; restoring snap here would jump.
   }
   function canAutoplay() {
-    return autoplayEnabled && canLoop && layout && inView && pageActive && !document.hidden && !hovered && !touching && navigationTarget === null && !document.querySelector('dialog[open]');
+    return !reducedMotion.matches && canLoop && layout && inView && pageActive && !document.hidden && !touching && navigationTarget === null && !document.querySelector('dialog[open]');
   }
   function animateCarousel(time) {
     if (!canAutoplay()) { stopAutoplay(); return; }
@@ -218,34 +208,8 @@
     holdAutoplay();
     track.classList.remove('is-drifting');
   }
-  autoplayButton.addEventListener('click', () => {
-    autoplayEnabled = !autoplayEnabled;
-    resumeAt = 0;
-    updateAutoplayButton();
-    syncAutoplay();
-  });
-  carousel.addEventListener('pointerenter', (event) => {
-    if (event.pointerType !== 'mouse') return;
-    hovered = true;
-    syncAutoplay();
-  });
-  carousel.addEventListener('pointerleave', (event) => {
-    if (event.pointerType !== 'mouse') return;
-    hovered = false;
-    holdAutoplay();
-  });
-  carousel.addEventListener('focusin', (event) => {
-    // The rotation control itself can start scrolling; other focus stops it until Play.
-    if (event.target === autoplayButton) return;
-    autoplayEnabled = false;
-    updateAutoplayButton();
-    syncAutoplay();
-  });
-  reducedMotion.addEventListener('change', () => {
-    if (reducedMotion.matches) autoplayEnabled = false;
-    updateAutoplayButton();
-    syncAutoplay();
-  });
+  carousel.addEventListener('focusin', holdAutoplay);
+  reducedMotion.addEventListener('change', syncAutoplay);
   document.addEventListener('visibilitychange', syncAutoplay);
   window.addEventListener('pagehide', () => { pageActive = false; clearTimeout(autoplayTimer); stopAutoplay(); });
   window.addEventListener('pageshow', () => { pageActive = true; syncAutoplay(); });
@@ -256,7 +220,6 @@
     syncAutoplay();
   }, { threshold: [0, .35] }).observe(carousel);
   new MutationObserver(syncAutoplay).observe(document.querySelector('#detail-dialog'), { attributes: true, attributeFilter: ['open'] });
-  updateAutoplayButton();
   new ResizeObserver(measureCarousel).observe(track);
   measureCarousel();
 

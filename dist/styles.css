@@ -42,7 +42,6 @@ dialog{border:1px solid var(--line);padding:0;background:var(--ivory);color:var(
 .carousel-button svg{width:23px;height:23px;stroke:currentColor;stroke-width:1.25}
 .carousel-button:hover:not([aria-disabled=true]){background:var(--brown);color:var(--ivory);border-color:var(--brown)}
 .carousel-button[aria-disabled=true]{opacity:.3;cursor:default}
-.flavor-carousel{position:relative}.carousel-autoplay{position:absolute;right:116px;bottom:0}.carousel-autoplay[hidden]{display:none}.carousel-autoplay[data-playing=true] .play-symbol,.carousel-autoplay[data-playing=false] .pause-symbol{display:none}
 .availability-label{display:table;border:1px solid #bca88f;color:#705b45;font-family:Arial,sans-serif;font-size:12px;line-height:1.4;padding:6px 9px;margin-top:12px;letter-spacing:.02em}
 .dialog-body>.availability-label{margin:0 0 20px}
 .flavor-list .availability-label{font-size:12px;line-height:1.4}
@@ -89,7 +88,6 @@ dialog{border:1px solid var(--line);padding:0;background:var(--ivory);color:var(
 .showcase .carousel-controls{justify-content:space-between;gap:16px;margin-top:12px}.showcase .carousel-controls[hidden]{display:none}
 .showcase .carousel-controls .text-link{font-size:14px;padding:7px 0}
 .showcase .carousel-buttons{gap:7px}.showcase .carousel-button{width:34px;height:34px}.showcase .carousel-button svg{width:18px;height:18px}
-.showcase .carousel-buttons{padding-left:41px}.showcase .carousel-autoplay{right:82px}
 .showcase .product-placeholder{padding:14px;gap:10px}.showcase .product-placeholder:after{inset:8px}.showcase .placeholder-brand{font-size:17px}.showcase .placeholder-name{font-size:24px}.showcase .placeholder-note{font-size:7px;letter-spacing:0}
 .showcase .availability-label{font-size:9px;padding:3px 5px;margin:8px auto 0;text-align:center}
 .showcase-gift{min-width:0;border-left:1px solid var(--line);padding-left:32px}.showcase-card{position:relative;isolation:isolate}
