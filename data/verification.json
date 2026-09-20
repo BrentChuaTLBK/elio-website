@@ -215,7 +215,7 @@
   "deepLinks": "passed",
   "enlargedText": "passed",
   "carousel": {
-    "checkedAt": "2026-09-20T17:08:50.277Z",
+    "checkedAt": "2026-09-20T17:21:19.250Z",
     "results": [
       {
         "width": 1440,
@@ -780,16 +780,17 @@
     "keyboardSkipLink": "passed"
   },
   "carouselAutoplay": {
-    "checkedAt": "2026-09-20T17:07:25.609Z",
+    "checkedAt": "2026-09-20T17:20:44.473Z",
     "results": [
       {
         "width": 1440,
         "immediateStart": "passed",
         "pixelsInFirst350ms": 5,
-        "pixelsIn1Point6SecondsWhileHovered": 22,
+        "pixelsIn1Point6SecondsWhileHovered": 23,
         "noPauseButton": true,
         "continuedMovementOnHover": "passed",
-        "resumeAfterArrow": "passed",
+        "immediateResumeAfterArrow": "passed",
+        "pixelsIn350msAfterArrow": 5,
         "reducedMotion": "passed",
         "overlappingControls": false,
         "overflow": false
@@ -801,7 +802,8 @@
         "pixelsIn1Point6SecondsWhileHovered": 23,
         "noPauseButton": true,
         "continuedMovementOnHover": "passed",
-        "resumeAfterArrow": "passed",
+        "immediateResumeAfterArrow": "passed",
+        "pixelsIn350msAfterArrow": 5,
         "reducedMotion": "passed",
         "overlappingControls": false,
         "overflow": false
@@ -809,11 +811,12 @@
       {
         "width": 320,
         "immediateStart": "passed",
-        "pixelsInFirst350ms": 5,
+        "pixelsInFirst350ms": 6,
         "pixelsIn1Point6SecondsWhileHovered": 23,
         "noPauseButton": true,
         "continuedMovementOnHover": "passed",
-        "resumeAfterArrow": "passed",
+        "immediateResumeAfterArrow": "passed",
+        "pixelsIn350msAfterArrow": 4,
         "reducedMotion": "passed",
         "overlappingControls": false,
         "overflow": false
@@ -870,5 +873,25 @@
       "touchLoopBothDirections": "passed",
       "errors": []
     }
+  },
+  "carouselWheel": {
+    "checkedAt": "2026-09-20T17:20:40.113Z",
+    "results": [
+      {
+        "width": 1440,
+        "verticalPageScroll": "passed",
+        "noCarouselJump": "passed",
+        "autoplayDuringPageScroll": "passed",
+        "horizontalBrowseAndResume": "passed"
+      },
+      {
+        "width": 768,
+        "verticalPageScroll": "passed",
+        "noCarouselJump": "passed",
+        "autoplayDuringPageScroll": "passed",
+        "horizontalBrowseAndResume": "passed"
+      }
+    ],
+    "errors": []
   }
 }

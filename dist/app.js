@@ -111,6 +111,8 @@
   function moveCarousel(direction) {
     if (!canLoop || !layout) return;
     prepareManualScroll();
+    // Resume the gentle glide as soon as arrow navigation finishes.
+    resumeAt = 0;
     normalizePosition();
     const position = navigationTarget ?? (layout.start + Math.round((track.scrollLeft - layout.start) / layout.step) * layout.step);
     navigationTarget = position + direction * layout.step;
@@ -146,6 +148,12 @@
     clearTimeout(settleTimer);
     settleTimer = setTimeout(settleCarousel, 160);
   }, { passive: true });
+  track.addEventListener('scrollend', () => {
+    // Ignore scrollend from an interrupted move; only finish the latest target.
+    if (navigationTarget === null || Math.abs(track.scrollLeft - navigationTarget) > 1) return;
+    clearTimeout(settleTimer);
+    settleCarousel();
+  }, { passive: true });
   track.addEventListener('touchstart', () => {
     touching = true;
     prepareManualScroll();
@@ -163,7 +171,14 @@
   };
   track.addEventListener('touchend', endTouch, { passive: true });
   track.addEventListener('touchcancel', endTouch, { passive: true });
-  track.addEventListener('wheel', () => { prepareManualScroll(); navigationTarget = null; normalizePosition(); }, { passive: true });
+  track.addEventListener('wheel', (event) => {
+    // Vertical page scrolling must not stop autoplay or snap the flavor strip.
+    const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY) || (event.shiftKey && event.deltaY !== 0);
+    if (event.ctrlKey || !horizontal) return;
+    prepareManualScroll();
+    navigationTarget = null;
+    normalizePosition();
+  }, { passive: true });
   // A visible copy remains clickable, but focus must return to its original card.
   track.addEventListener('pointerdown', (event) => {
     holdAutoplay();
