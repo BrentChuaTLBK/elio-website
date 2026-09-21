@@ -40,7 +40,7 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Account and bag icons appear beside the centered wordmark. Compact navigation is used at widths up to 1000 px and includes My account, My orders, and Order a box links.
 - “Order a box” opens `order.html`, a shop preview based on the supplied layout: a photographic hero, Signature Trio, Tea Collection, Discovery Box, and build-your-own cards, followed by flavor details, gifting, and FAQs. These names and combinations are reference-inspired concepts, not confirmed products. Pricing and checkout remain disabled.
-- A calendar and pickup/delivery selector sit above the box collection, following the placement in [TLB Kitchen's shop](https://thelittlebakerkitchen.com/shop.html). The browser's native calendar works with desktop keyboards and phone date pickers. Past dates are rejected. Preferences carry into box details and back through URL parameters; no customer data, browser storage, or submission is involved. Dates are preferences only, not confirmed bookable slots. Elio's availability, lead times, fees, delivery area, and pickup details still need confirmation.
+- A custom calendar and pickup/delivery selector sit above the box collection. The calendar follows [TLB Kitchen's customer calendar](https://github.com/BrentChuaTLBK/bakery-website/blob/main/assets/ordering/customer-calendar.js): a centered month popup, previous/next arrows, selected and unavailable styles, Clear date, and Current month. It supports keyboard navigation, Escape, focus restoration, and phone layouts. Calendar days use Philippine time; past dates are disabled and an open popup refreshes at midnight. Preferences carry into box details and back through URL parameters. Dates remain preview preferences, not confirmed bookable slots. Elio's availability, booking window, lead times, fees, delivery area, and pickup details still need confirmation.
 - Each card opens `box.html?collection=...`, with its matching concept photograph and initial flavor selection. Build your own starts with three empty selectors. A flavor outside the monthly menu stays disabled and leaves an empty choice instead of silently substituting a different flavor. The gallery, quantity controls, unsaved gift-message preview, and box/care details remain available. Price and Add to bag remain coming-soon placeholders.
 - Account, order history, and bag controls open styled “Coming soon” placeholders. Sign-in, registration, and checkout buttons are disabled. No account, cart, payment, order, or customer data is collected or stored.
 - A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
@@ -55,7 +55,8 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 | `dist/content.js` | Structured flavor names, descriptions, and image replacement points |
 | `dist/app.js` | Reusable product rendering, navigation, accessible detail views |
 | `dist/order.html`, `dist/shop.css`, `dist/order.js` | Box collection shop, flavor details, gifting, FAQs, and bag placeholder |
-| `dist/fulfillment.js`, `dist/fulfillment.css` | Shared native calendar and pickup/delivery preference controls |
+| `dist/fulfillment.js`, `dist/fulfillment.css` | Shared pickup/delivery controls and date-preference carryover |
+| `dist/calendar.js`, `dist/calendar.css` | TLB-inspired custom calendar popup and keyboard/date handling |
 | `dist/order.css` | Shared compact header styles retained for box and flavor pages |
 | `dist/flavors.html`, `dist/flavors.css`, `dist/flavors.js` | Monthly lineup, full flavor collection, category filters, and clickable descriptions |
 | `dist/box.html`, `dist/box.css`, `dist/box.js` | Box-detail gallery and non-purchasing flavor, quantity, and gift-message preview |
@@ -115,6 +116,8 @@ The service placeholders can be previewed directly at `#account`, `#orders`, and
 
 This prototype includes `noindex, nofollow` metadata. Review that setting when an actual public launch is authorized. A public source repository is not a live business launch.
 
+The calendar and associated date/inventory backend in [TLB Kitchen's main repository](https://github.com/BrentChuaTLBK/bakery-website) were reviewed as a reference only. The backend performs its own date, product, and quantity validation. Elio has not imported TLB's database, APIs, customer data, booking window, cutoffs, or business rules. A similar system for Elio will need its own specification, especially for three-piece boxes and the rotating flavor menu.
+
 ## Verification
 
 JavaScript syntax checks passed. Chrome visual and interaction checks passed at 1440, 768, 390, and 320 px widths. No page overflow, missing images, failed asset requests, or browser runtime errors were found. Catalog navigation, product details, gifting, prototype bag, mobile menu, Escape handling, focus restoration, and direct detail links were exercised. Loop checks covered repeated forward/backward navigation, keyboard wrapping, native phone swipes across both boundaries, animated rapid clicks, resize behavior, detail/focus handling for visible copies, and the automatic inclusion of an eighth test flavor. A two-flavor catalog was also checked. Unavailable status was verified using test data only.
@@ -137,6 +140,8 @@ The page-scroll regression was reproduced before the fix and checked at 1440 and
 
 The redesigned shop and shared fulfillment controls were checked in Chrome at 1440, 1024, 768, 390, and 320 px. The box grid, centered wordmark, mobile image composition, native date input, pickup/delivery selection, preference carryover, past/invalid dates, flavor dialogs, bag placeholder, FAQs, and custom box choices passed. Rotating and empty menus prevent unavailable flavor selections. Box-gallery keyboard navigation, quantity controls, gift-message clearing, and history restoration also passed. No overflow, missing images, runtime errors, submissions, or browser storage writes were found. Phone layout checks use Chrome emulation, not physical iOS/Android devices.
 
+The custom calendar replacement was checked at 1440, 1024, 768, 390, and 320 px, plus a short landscape viewport. Tests covered opening/closing and focus return, previous/next/current month, selection and clearing, pickup/delivery labels, shop-to-box carryover, keyboard arrows/Home/End/PageUp/PageDown, year and leap-day boundaries, invalid URLs, and Philippine-midnight rollover from a browser in another time zone. No backend calls or browser errors occurred. Desktop and phone screenshots were compared with TLB's actual popup.
+
 Run syntax checks directly:
 
 ```sh
@@ -144,6 +149,7 @@ node --check dist/app.js
 node --check dist/order.js
 node --check dist/box.js
 node --check dist/flavors.js
+node --check dist/calendar.js
 node --check dist/fulfillment.js
 node --check dist/content.js
 node --check server.mjs

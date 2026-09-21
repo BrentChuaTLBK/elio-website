@@ -5,6 +5,6 @@
   "description": "Elio's first website vision — a local, static prototype.",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check dist/app.js && node --check dist/order.js && node --check dist/box.js && node --check dist/flavors.js && node --check dist/fulfillment.js && node --check dist/content.js && node --check server.mjs"
+    "check": "node --check dist/app.js && node --check dist/order.js && node --check dist/box.js && node --check dist/flavors.js && node --check dist/calendar.js && node --check dist/fulfillment.js && node --check dist/content.js && node --check server.mjs"
   }
 }

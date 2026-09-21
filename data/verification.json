@@ -975,5 +975,58 @@
     "liveAvailability": false,
     "liveCheckout": false,
     "conceptPhotography": true
+  },
+  "customCalendar": {
+    "checkedAt": "2026-09-21T04:57:18.020Z",
+    "results": [
+      {
+        "width": 1440,
+        "sameCalendarLayout": "passed",
+        "selection": "passed",
+        "navigation": "passed",
+        "clearAndFocus": "passed",
+        "boxCarryover": "passed"
+      },
+      {
+        "width": 1024,
+        "sameCalendarLayout": "passed",
+        "selection": "passed",
+        "navigation": "passed",
+        "clearAndFocus": "passed",
+        "boxCarryover": "passed"
+      },
+      {
+        "width": 768,
+        "sameCalendarLayout": "passed",
+        "selection": "passed",
+        "navigation": "passed",
+        "clearAndFocus": "passed",
+        "boxCarryover": "passed"
+      },
+      {
+        "width": 390,
+        "sameCalendarLayout": "passed",
+        "selection": "passed",
+        "navigation": "passed",
+        "clearAndFocus": "passed",
+        "boxCarryover": "passed"
+      },
+      {
+        "width": 320,
+        "sameCalendarLayout": "passed",
+        "selection": "passed",
+        "navigation": "passed",
+        "clearAndFocus": "passed",
+        "boxCarryover": "passed"
+      }
+    ],
+    "keyboard": "passed",
+    "yearAndLeapBoundaries": "passed",
+    "manilaTimezoneAndMidnight": "passed",
+    "invalidDates": "passed",
+    "modalFocusAndBackdrop": "passed",
+    "shortLandscape": "passed",
+    "noBackendCalls": true,
+    "errors": []
   }
 }
