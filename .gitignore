@@ -9,3 +9,5 @@ Thumbs.db
 .wrangler/
 design-reference/
 data/image-prompts.json
+supabase/.temp/
+supabase/.branches/

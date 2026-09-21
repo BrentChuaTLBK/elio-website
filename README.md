@@ -1,12 +1,25 @@
 # Elio Website — first vision
 
-A responsive, static prototype of Elio's approved homepage concept. This is the first design step, not a live ordering service.
+A responsive Elio storefront prototype with an independent Supabase ordering backend and team dashboard. Customer checkout remains a preview while business details and integrations are being prepared.
 
 ## Preview
 
 Run `node server.mjs`, then open http://127.0.0.1:4173. No package installation is needed. You can also open `dist/index.html` directly in a browser. The local server binds only to this computer.
 
-For a static host, the publish directory is `dist` and no build command is needed. All asset URLs are relative so the prototype also works under a repository subpath. There is no backend or required environment variable.
+For a static host, the publish directory is `dist` and no compilation is needed. All asset URLs are relative. The storefront remains a static preview; the admin dashboard connects to Elio's separate Supabase project using a publishable browser key. No server secrets belong in the static files.
+
+## Elio administration
+
+- `/manage.html?preview=1`: read-only dashboard preview; no private data or backend requests.
+- `/manage.html`: connected dashboard, requiring a verified and authorized Elio account.
+- `/admin-account.html`: Elio team registration, sign-in, and password recovery.
+- [Backend setup and implementation](docs/BACKEND.md): project separation, inventory rules, tests, and remaining integrations.
+
+Overview, Orders, Daily quantities, Analytics, Promo codes, Shop settings, and Team access are adapted from TLB. Flavors & boxes manages the Elio catalog. Custom boxes reserve three individual flavor pieces per box and add per-flavor surcharges; fixed sets reserve only their own set inventory. Seven flavors and four box concepts are seeded as unconfirmed drafts. Ordering starts paused.
+
+The live database is installed in `dzxyhckkkrzqpwpavngn`, separate from TLB's project within the same organization. Resend/SMTP, verification of the initial owner, customer checkout, payment-proof functions, and the email worker/scheduler still need integration setup before customer launch. Website visitor analytics is not connected; order analytics is available in the dashboard.
+
+Backend validation: `cd tests/backend`, `npm ci`, then `npm test`. See the backend guide for local PostgreSQL-compatible test details and limitations.
 
 ## Cloudflare deployment
 
@@ -42,7 +55,7 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - “Order a box” opens `order.html`, a shop preview based on the supplied layout: a photographic hero, Signature Trio, Tea Collection, Discovery Box, and build-your-own cards, followed by flavor details, gifting, and FAQs. These names and combinations are reference-inspired concepts, not confirmed products. Pricing and checkout remain disabled.
 - A custom calendar and pickup/delivery selector sit above the box collection. The calendar follows [TLB Kitchen's customer calendar](https://github.com/BrentChuaTLBK/bakery-website/blob/main/assets/ordering/customer-calendar.js): a centered month popup, previous/next arrows, selected and unavailable styles, Clear date, and Current month. It supports keyboard navigation, Escape, focus restoration, and phone layouts. Calendar days use Philippine time; past dates are disabled and an open popup refreshes at midnight. Preferences carry into box details and back through URL parameters. Dates remain preview preferences, not confirmed bookable slots. Elio's availability, booking window, lead times, fees, delivery area, and pickup details still need confirmation.
 - Each card opens `box.html?collection=...`, with its matching concept photograph and initial flavor selection. Build your own starts with three empty selectors. A flavor outside the monthly menu stays disabled and leaves an empty choice instead of silently substituting a different flavor. The gallery, quantity controls, unsaved gift-message preview, and box/care details remain available. Price and Add to bag remain coming-soon placeholders.
-- Account, order history, and bag controls open styled “Coming soon” placeholders. Sign-in, registration, and checkout buttons are disabled. No account, cart, payment, order, or customer data is collected or stored.
+- Public storefront account, order-history, and bag controls remain “Coming soon” placeholders. Customer checkout is disabled. The separate team account page and dashboard now use Elio's Supabase backend.
 - A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
 - Immediately above the newsletter, an editorial block introduces the three-piece box, a gifting banner, and three everyday Elio moments. “Build your trio” opens the box preview, “Explore gifting” opens the existing packaging details, and the Instagram handle links to Elio. The copy and controls are real HTML; the photographs are replaceable concept assets.
 

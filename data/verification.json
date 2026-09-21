@@ -1028,5 +1028,81 @@
     "shortLandscape": "passed",
     "noBackendCalls": true,
     "errors": []
+  },
+  "backend": {
+    "checkedAt": "2026-09-21T06:02:28.055Z",
+    "project": "dzxyhckkkrzqpwpavngn",
+    "migrations": 3,
+    "contractChecks": 17,
+    "runner": "PGlite 0.5.8; serial, isolated local database",
+    "hostedConcurrencyTest": false,
+    "inventoryModel": "Custom boxes reserve three flavor pieces and per-piece surcharges; fixed sets reserve separate set stock",
+    "ui": {
+      "checks": [
+        "Desktop analytics",
+        "Desktop orders",
+        "Desktop inventory",
+        "Desktop promos",
+        "Desktop settings",
+        "Desktop team",
+        "Desktop products",
+        "Flavor surcharge, confirmation, and rotation persist",
+        "Daily piece limit saves through RPC",
+        "Mobile overview",
+        "Mobile analytics",
+        "Mobile orders",
+        "Mobile products",
+        "Mobile inventory",
+        "Mobile promos",
+        "Mobile settings",
+        "Mobile team"
+      ],
+      "errors": [],
+      "fixture": "Local PGlite; browser authentication mocked for UI checks only"
+    },
+    "live": {
+      "catalog": 200,
+      "paused": true,
+      "sellableProducts": 0,
+      "anonymousAdmin": 401,
+      "anonymousService": 401,
+      "browser": "Real Supabase SDK, signed-out dashboard and account page",
+      "errors": []
+    },
+    "readOnlyPreview": {
+      "checkedAt": "2026-09-21T06:01:57.805Z",
+      "checks": [
+        {
+          "width": 1440,
+          "allEightViews": true,
+          "noOverflow": true,
+          "savingDisabled": true,
+          "stockItems": 10
+        },
+        {
+          "width": 390,
+          "allEightViews": true,
+          "noOverflow": true,
+          "savingDisabled": true,
+          "stockItems": 10
+        }
+      ],
+      "errors": [],
+      "externalRequests": []
+    },
+    "securityAdvisor": {
+      "warnings": 0,
+      "errors": 0,
+      "notes": "Private deny-by-default tables intentionally have RLS without browser policies."
+    },
+    "launchPending": [
+      "Resend and Auth SMTP",
+      "Owner account email verification",
+      "Confirmed prices, policies, and stock",
+      "Customer checkout integration",
+      "Payment-proof Edge Functions",
+      "Email worker and scheduled maintenance",
+      "Website visitor analytics"
+    ]
   }
 }

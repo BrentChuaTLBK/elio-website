@@ -2,9 +2,11 @@
   "name": "elio-website-vision",
   "version": "0.1.0",
   "private": true,
-  "description": "Elio's first website vision — a local, static prototype.",
+  "description": "Elio website and independent Supabase ordering administration.",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check dist/app.js && node --check dist/order.js && node --check dist/box.js && node --check dist/flavors.js && node --check dist/calendar.js && node --check dist/fulfillment.js && node --check dist/content.js && node --check server.mjs"
-  }
+    "check": "node scripts/check.mjs",
+    "test:backend": "node tests/backend/run.mjs"
+  },
+  "type": "module"
 }
