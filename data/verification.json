@@ -1032,7 +1032,15 @@
   "backend": {
     "checkedAt": "2026-09-21T06:02:28.055Z",
     "project": "dzxyhckkkrzqpwpavngn",
-    "migrations": 3,
+    "migrations": 4,
+    "ownerClaimFix": {
+      "migration": "20260921062708_elio_owner_claim_scoped_cleanup",
+      "contractChecks": 17,
+      "hostedBootstrap": "Owner role and 11 catalog items returned with transaction-local authenticated claims; rolled back after verification.",
+      "browserSignInTest": false,
+      "securityAdvisor": "No database warnings or errors. Auth reports leaked-password protection disabled; see https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection .",
+      "safeupdateReproduction": "Not run: management SQL role cannot load the safeupdate library. API role configuration and the reported error identify the unfiltered DELETE; replacement uses a scoped WHERE clause."
+    },
     "contractChecks": 17,
     "runner": "PGlite 0.5.8; serial, isolated local database",
     "hostedConcurrencyTest": false,

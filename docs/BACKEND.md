@@ -4,6 +4,8 @@ Elio uses project `dzxyhckkkrzqpwpavngn` in the existing TLB Supabase organizati
 
 The admin entry point is `/manage.html`; team accounts use `/admin-account.html`. Owner access is assigned to an explicitly allowed, email-verified Elio user. It is not granted to the first person who registers. The initial owner allowlist is stored privately in the database, not in this public repository.
 
+First-owner activation consumes only that verified account's pending reservation, using a filtered delete compatible with Supabase API sessions' `safeupdate` protection. Other reservations remain untouched and cannot grant access after the initial owner exists. The regression covers verified-email checks, preservation of unrelated reservations, repeated dashboard access, and denial of a subsequent owner claim. Hosted bootstrap was also checked using transaction-local authenticated claims with rollback; this is a database check, not a browser sign-in test.
+
 `/manage.html?preview=1` provides a read-only dashboard preview using the existing public catalog. It makes no backend requests, loads no private records, and cannot save changes. Remove the preview parameter to sign in to the connected admin.
 
 ## Adaptation from TLB

@@ -132,11 +132,14 @@ export default async function({db,check,state}) {
   try{
    await db.exec("delete from elio.staff; insert into elio.pending_owners(email) values ('unverified@example.test')");
    await rejects(()=>api('admin_bootstrap',{},ids.unverified),/Authorized/);
-   await db.exec("delete from elio.pending_owners; insert into elio.pending_owners(email) values ('customer@example.test')");
+   await db.exec("delete from elio.pending_owners; insert into elio.pending_owners(email) values ('customer@example.test'), ('future-owner@example.test')");
    await db.query("update auth.users set raw_user_meta_data='{}'::jsonb||jsonb_build_object('role','owner') where id=$1",[ids.stranger]);
    await rejects(()=>api('admin_bootstrap',{},ids.stranger),/Authorized/);
    assert.equal((await api('admin_bootstrap',{},ids.customer)).role,'owner');
-   assert.equal(await scalar('select count(*) from elio.pending_owners'),0);
+   assert.equal(await scalar("select count(*) from elio.pending_owners where email='customer@example.test'"),0);
+   assert.equal(await scalar("select count(*) from elio.pending_owners where email='future-owner@example.test'"),1);
+   assert.equal((await api('admin_bootstrap',{},ids.customer)).role,'owner');
+   await db.exec("insert into elio.pending_owners(email) values ('stranger@example.test')");
    await rejects(()=>api('admin_bootstrap',{},ids.stranger),/Authorized/);
   }finally{await db.exec('delete from elio.pending_owners; delete from elio.staff');await db.query("insert into elio.staff(user_id,role) values ($1,'owner')",[ids.owner]);}
  })();
