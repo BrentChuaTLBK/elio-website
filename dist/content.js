@@ -5,6 +5,13 @@
    Replace image paths here and in index.html. Concept images are not final product photography. */
 window.ELIO_CONTENT = {
   productImage: 'assets/flavors-concept.webp',
+  // Reference-inspired box concepts. Prices and final combinations are unconfirmed.
+  boxCollections: [
+    { id: 'signature', name: 'The Signature Trio', flavors: ['vanilla', 'chocolate', 'matcha'], line: 'Three favorites, beautifully boxed.', image: 'assets/trio-story-concept.webp' },
+    { id: 'tea', name: 'The Tea Collection', flavors: ['vanilla', 'matcha', 'hojicha'], line: 'A little calm. A lovely trio.', image: 'assets/shop-tea-box-concept.webp' },
+    { id: 'discovery', name: 'The Discovery Box', flavors: ['ube', 'gorgonzola', 'speculoos'], line: 'Something a little unexpected.', image: 'assets/shop-discovery-box-concept.webp' },
+    { id: 'your-own', name: 'Build your own box', flavors: [], line: 'Choose your three favorites.', image: 'assets/shop-custom-box-concept.webp', customizable: true }
+  ],
   // All current flavors are in the initial lineup, as confirmed by Elio.
   monthlyMenu: ['vanilla', 'matcha', 'chocolate', 'gorgonzola', 'ube', 'hojicha', 'speculoos'],
   flavors: [

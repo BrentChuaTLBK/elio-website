@@ -547,7 +547,7 @@
     "errors": []
   },
   "boxDetail": {
-    "checkedAt": "2026-09-19T21:04:37.313Z",
+    "checkedAt": "2026-09-21T04:45:15.948Z",
     "results": [
       {
         "width": 1440,
@@ -927,5 +927,53 @@
       }
     ],
     "errors": []
+  },
+  "shopCollection": {
+    "checkedAt": "2026-09-21T04:46:15.530Z",
+    "results": [
+      {
+        "width": 1440,
+        "layout": "pass",
+        "dateAndMethodCarryOver": "pass",
+        "boxesAndDialogs": "pass"
+      },
+      {
+        "width": 1024,
+        "layout": "pass",
+        "dateAndMethodCarryOver": "pass",
+        "boxesAndDialogs": "pass"
+      },
+      {
+        "width": 768,
+        "layout": "pass",
+        "dateAndMethodCarryOver": "pass",
+        "boxesAndDialogs": "pass"
+      },
+      {
+        "width": 390,
+        "layout": "pass",
+        "dateAndMethodCarryOver": "pass",
+        "boxesAndDialogs": "pass"
+      },
+      {
+        "width": 320,
+        "layout": "pass",
+        "dateAndMethodCarryOver": "pass",
+        "boxesAndDialogs": "pass"
+      }
+    ],
+    "rotation": "pass",
+    "emptyMenu": "pass",
+    "errors": [],
+    "missing": [],
+    "submissions": [],
+    "storage": {
+      "local": 0,
+      "session": 0
+    },
+    "nativeCalendar": true,
+    "liveAvailability": false,
+    "liveCheckout": false,
+    "conceptPhotography": true
   }
 }

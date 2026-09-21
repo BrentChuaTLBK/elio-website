@@ -39,8 +39,9 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - The carousel glides automatically at a gentle 14 pixels per second, with the first flavor following the last seamlessly. It keeps moving while the cursor is over it. The previous/next buttons move three flavors at a time on desktop and mobile; keyboard arrows move one flavor, with Home/End jumping to the first/last. Native touch/trackpad scrolling remains available.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Account and bag icons appear beside the centered wordmark. Compact navigation is used at widths up to 1000 px and includes My account, My orders, and Order a box links.
-- “Order a box” opens `order.html`, an Elio order-page preview modeled on [TLB Kitchen's product-grid and bag-summary layout](https://thelittlebakerkitchen.com/shop.html). It has searchable flavor cards, accessible detail views, a box hero, and a bag summary. Checkout remains disabled; no prices, box combinations, or delivery policies have been invented.
-- Selecting the Elio box opens `box.html`, with a large image gallery and thumbnail navigation, three flavor selectors, quantity controls, an unsaved gift-message preview, and expandable box/care details. Price and Add to bag remain coming-soon placeholders. The reference's sample price and product name have not been adopted as business facts.
+- “Order a box” opens `order.html`, a shop preview based on the supplied layout: a photographic hero, Signature Trio, Tea Collection, Discovery Box, and build-your-own cards, followed by flavor details, gifting, and FAQs. These names and combinations are reference-inspired concepts, not confirmed products. Pricing and checkout remain disabled.
+- A calendar and pickup/delivery selector sit above the box collection, following the placement in [TLB Kitchen's shop](https://thelittlebakerkitchen.com/shop.html). The browser's native calendar works with desktop keyboards and phone date pickers. Past dates are rejected. Preferences carry into box details and back through URL parameters; no customer data, browser storage, or submission is involved. Dates are preferences only, not confirmed bookable slots. Elio's availability, lead times, fees, delivery area, and pickup details still need confirmation.
+- Each card opens `box.html?collection=...`, with its matching concept photograph and initial flavor selection. Build your own starts with three empty selectors. A flavor outside the monthly menu stays disabled and leaves an empty choice instead of silently substituting a different flavor. The gallery, quantity controls, unsaved gift-message preview, and box/care details remain available. Price and Add to bag remain coming-soon placeholders.
 - Account, order history, and bag controls open styled “Coming soon” placeholders. Sign-in, registration, and checkout buttons are disabled. No account, cart, payment, order, or customer data is collected or stored.
 - A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
 - Immediately above the newsletter, an editorial block introduces the three-piece box, a gifting banner, and three everyday Elio moments. “Build your trio” opens the box preview, “Explore gifting” opens the existing packaging details, and the Instagram handle links to Elio. The copy and controls are real HTML; the photographs are replaceable concept assets.
@@ -53,7 +54,9 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 | `dist/styles.css` | Responsive components and shared design tokens |
 | `dist/content.js` | Structured flavor names, descriptions, and image replacement points |
 | `dist/app.js` | Reusable product rendering, navigation, accessible detail views |
-| `dist/order.html`, `dist/order.css`, `dist/order.js` | Standalone order-page preview, searchable catalog, and flavor detail dialogs |
+| `dist/order.html`, `dist/shop.css`, `dist/order.js` | Box collection shop, flavor details, gifting, FAQs, and bag placeholder |
+| `dist/fulfillment.js`, `dist/fulfillment.css` | Shared native calendar and pickup/delivery preference controls |
+| `dist/order.css` | Shared compact header styles retained for box and flavor pages |
 | `dist/flavors.html`, `dist/flavors.css`, `dist/flavors.js` | Monthly lineup, full flavor collection, category filters, and clickable descriptions |
 | `dist/box.html`, `dist/box.css`, `dist/box.js` | Box-detail gallery and non-purchasing flavor, quantity, and gift-message preview |
 | `dist/assets/` | Original logo, optimized logo icons and concept images, licensed heading font |
@@ -70,13 +73,19 @@ The hero, featured flavor images, and gifting image are AI-generated **concept p
 | --- | --- |
 | `dist/assets/hero-concept.webp` | Hero image and preload in `dist/index.html` |
 | `dist/assets/flavors-concept.webp` | Shared vanilla/matcha/chocolate triptych in `dist/content.js` |
-| `dist/assets/gifting-concept.webp` | Homepage showcase, shop and flavor-catalog heroes, box gallery, and gifting dialog |
-| `dist/assets/trio-story-concept.webp` | Open three-piece box photograph above the newsletter in `dist/index.html` |
-| `dist/assets/thoughtful-gift-concept.webp`, `dist/assets/thoughtful-gift-wide-concept.webp` | Mobile and desktop gifting banner photographs in `dist/index.html` |
+| `dist/assets/gifting-concept.webp` | Homepage showcase, flavor-catalog hero, box gallery, and gifting dialog |
+| `dist/assets/trio-story-concept.webp` | Homepage editorial photograph and Signature Trio card/gallery |
+| `dist/assets/shop-hero-concept.webp` | Shop hero image and preload in `dist/order.html` |
+| `dist/assets/shop-tea-box-concept.webp` | Tea Collection card/gallery through `boxCollections` in `dist/content.js` |
+| `dist/assets/shop-discovery-box-concept.webp` | Discovery Box card/gallery through `boxCollections` |
+| `dist/assets/shop-custom-box-concept.webp` | Build-your-own card/gallery through `boxCollections` |
+| `dist/assets/thoughtful-gift-concept.webp`, `dist/assets/thoughtful-gift-wide-concept.webp` | Mobile and desktop gifting banners in the homepage and shop |
 | `dist/assets/unboxing-moment-concept.webp` | Unboxing lifestyle photograph in `dist/index.html` |
 | `dist/assets/coffee-moment-concept.webp` | Cheesecake and coffee lifestyle photograph in `dist/index.html` |
 
 To use separate product photos, add `image: 'assets/your-photo.webp'` to the relevant flavor in `dist/content.js`. Gorgonzola, Ube, Hojicha, and Speculoos currently use clearly labeled typographic photo placeholders throughout the catalog; their product photography remains open. The box gallery uses existing concept photographs, including crops of the bag and carton, rather than new production photos.
+
+The four new shop photographs were generated with `image_gen.imagegen` in reference-guided mode using the existing trio photograph, then resized and compressed to WebP. Their originals and full prompts are retained in the local `work/generated-assets/` handoff. Replace the web assets above with final photography when ready. Add or edit `boxCollections` to maintain the proposed box range independently from the rotating flavor menu.
 
 ## Growing the flavor catalog
 
@@ -102,7 +111,7 @@ Still unconfirmed: prices, stock, box combinations/mix-and-match rules, ordering
 
 The newsletter section is visual only. It has no submitting form, email capture, storage, or email-provider integration. Final signup copy and privacy/consent details need to be supplied before enabling it.
 
-The service placeholders can be previewed directly at `#account`, `#orders`, and `#bag`. The legacy `#ordering` link redirects to `order.html`. Account authentication/registration, order history and tracking, a persistent shopping bag, and checkout/payments still need their actual systems and business rules. These placeholders contain no credential fields, fake customer information, sample orders, or active purchase flow. TLB Kitchen is a visual template only: its backend, customer data, prices, and fulfillment settings are not connected or copied.
+The service placeholders can be previewed directly at `#account`, `#orders`, and `#bag`. The legacy `#ordering` link redirects to `order.html`, whose bag preview is `order.html#your-bag`. Account authentication/registration, order history and tracking, a persistent shopping bag, and checkout/payments still need their actual systems and business rules. These placeholders contain no credential fields, fake customer information, sample orders, or active purchase flow. TLB Kitchen is a visual template only: its backend, customer data, prices, and fulfillment settings are not connected or copied.
 
 This prototype includes `noindex, nofollow` metadata. Review that setting when an actual public launch is authorized. A public source repository is not a live business launch.
 
@@ -126,6 +135,8 @@ Slow autoplay was checked in Chrome at 1440, 390, and 320 px, including movement
 
 The page-scroll regression was reproduced before the fix and checked at 1440 and 768 px: vertical wheel input scrolls the page without a sideways carousel jump, while horizontal browsing still works and resumes autoplay. At 1440, 390, and 320 px, the gentle glide resumed within 350 milliseconds after the arrow destination aligned, without the previous four-second wait. The three-flavor steps, loop, rapid clicks, resize, keyboard, and native touch boundary checks also passed again.
 
+The redesigned shop and shared fulfillment controls were checked in Chrome at 1440, 1024, 768, 390, and 320 px. The box grid, centered wordmark, mobile image composition, native date input, pickup/delivery selection, preference carryover, past/invalid dates, flavor dialogs, bag placeholder, FAQs, and custom box choices passed. Rotating and empty menus prevent unavailable flavor selections. Box-gallery keyboard navigation, quantity controls, gift-message clearing, and history restoration also passed. No overflow, missing images, runtime errors, submissions, or browser storage writes were found. Phone layout checks use Chrome emulation, not physical iOS/Android devices.
+
 Run syntax checks directly:
 
 ```sh
@@ -133,6 +144,7 @@ node --check dist/app.js
 node --check dist/order.js
 node --check dist/box.js
 node --check dist/flavors.js
+node --check dist/fulfillment.js
 node --check dist/content.js
 node --check server.mjs
 ```
