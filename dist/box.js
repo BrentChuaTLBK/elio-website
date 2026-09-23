@@ -2,6 +2,7 @@
   'use strict';
   const { flavors, featuredOrder, productImage, boxCollections, isAvailable } = window.ELIO_CONTENT;
   const collection = boxCollections.find((box) => box.id === new URLSearchParams(location.search).get('collection'));
+  const fixed = Boolean(collection && !collection.customizable);
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map((id) => flavors.find((flavor) => flavor.id === id)).filter(Boolean);
   const hasPhoto = (flavor) => Boolean(flavor.image || flavor.imagePosition);
@@ -36,29 +37,33 @@
 
   // These controls preview the design only; no cart or customer data is persisted.
   const available = catalog.filter((flavor) => isAvailable(flavor));
-  const defaults = Array.from({ length: 3 }, (_, index) => collection ? (available.some((flavor) => flavor.id === collection.flavors[index]) ? collection.flavors[index] : '') : available[index % available.length]?.id || '');
+  const defaults = Array.from({ length: 3 }, (_, index) => fixed ? collection.flavors[index] || '' : available[index % available.length]?.id || '');
   if (collection) {
     document.querySelector('#box-title').textContent = collection.name;
     document.querySelector('.box-breadcrumb [aria-current]').textContent = collection.name;
     document.querySelector('.box-subtitle').textContent = collection.line;
     document.title = `${collection.name} — Elio Basque Cheesecake`;
     document.querySelector('.box-gallery').setAttribute('aria-label', `${collection.name} photo gallery`);
-    if (defaults.includes('')) {
+    if (!fixed && defaults.includes('')) {
       document.querySelector('#box-flavor-picker').open = true;
       document.querySelector('#box-flavor-picker summary').textContent = 'Choose your flavors';
-      if (!collection.customizable) {
-        const note = document.createElement('p');
-        note.className = 'box-preview-note';
-        note.textContent = 'Some flavors in this box are outside this month’s menu. Explore another combination below.';
-        document.querySelector('#box-flavor-picker').before(note);
-      }
     }
   }
   const selects = document.querySelector('#box-flavor-selects');
-  selects.insertAdjacentHTML('beforeend', defaults.map((id, index) => `<div class="box-flavor-row"><label for="box-flavor-${index}">Cheesecake ${index + 1}</label><select id="box-flavor-${index}"${available.length ? '' : ' disabled'}><option value=""${id ? '' : ' selected'}>${available.length ? 'Choose a flavor' : 'Coming soon'}</option>${catalog.map((flavor) => `<option value="${escape(flavor.id)}"${flavor.id === id ? ' selected' : ''}${!isAvailable(flavor) ? ' disabled' : ''}>${escape(flavor.name)}${!isAvailable(flavor) ? ' — currently unavailable' : ''}</option>`).join('')}</select></div>`).join(''));
+  document.querySelector('#box-flavor-picker').hidden = fixed;
+  if (fixed) {
+    document.querySelector('.box-flavor-label').textContent = 'Inside your box';
+    const note = document.createElement('p');
+    note.className = 'box-preview-note';
+    const soldOut = defaults.some(id => !available.some(flavor => flavor.id === id));
+    note.textContent = soldOut ? 'This set is currently sold out because an included flavor is unavailable.' : 'A curated set of three. To choose different flavors, build your own box.';
+    document.querySelector('#box-flavor-picker').after(note);
+    if (soldOut) document.querySelector('.box-add-button').textContent = 'Sold out';
+  } else selects.insertAdjacentHTML('beforeend', defaults.map((id, index) => `<div class="box-flavor-row"><label for="box-flavor-${index}">Cheesecake ${index + 1}</label><select id="box-flavor-${index}"${available.length ? '' : ' disabled'}><option value=""${id ? '' : ' selected'}>${available.length ? 'Choose a flavor' : 'Coming soon'}</option>${catalog.map((flavor) => `<option value="${escape(flavor.id)}"${flavor.id === id ? ' selected' : ''}${!isAvailable(flavor) ? ' disabled' : ''}>${escape(flavor.name)}${!isAvailable(flavor) ? ' — currently unavailable' : ''}</option>`).join('')}</select></div>`).join(''));
   function updateFlavors() {
-    document.querySelector('#box-flavor-chips').innerHTML = [...selects.querySelectorAll('select')].map((select) => {
-      const flavor = available.find((item) => item.id === select.value);
+    const selected = fixed ? defaults : [...selects.querySelectorAll('select')].map(select => select.value);
+    document.querySelector('#box-flavor-chips').innerHTML = selected.map((id) => {
+      const flavor = catalog.find((item) => item.id === id);
       return flavor ? `<span class="box-flavor-chip">${hasPhoto(flavor) ? photo(flavor) : `<span class="box-flavor-initial" aria-hidden="true">${escape(flavor.name[0])}</span>`}<span>${escape(flavor.name)}</span></span>` : `<span class="box-flavor-chip"><span>${available.length ? 'Choose a flavor' : 'Coming soon'}</span></span>`;
     }).join('');
   }

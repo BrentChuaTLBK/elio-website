@@ -25,6 +25,10 @@
 .account-recovery { display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--line); margin-top:18px; padding-top:18px; }
 .account-recovery .button { font-size:12px; padding-inline:15px; }
 .account-back { margin-top:18px; }
+#account-orders { margin:24px 0; padding-top:18px; border-top:1px solid var(--line); }
+#account-orders h2 { font:400 26px Georgia,serif; margin:0 0 12px; }
+.account-order { display:flex; flex-direction:column; gap:4px; padding:14px 0; font-size:13px; border-bottom:1px solid var(--line); text-decoration:none; overflow-wrap:anywhere; }
+.account-order span:last-child { color:var(--brown); text-decoration:underline; margin-top:6px; }
 .admin-account button:focus-visible { outline:2px solid #a37943; outline-offset:3px; }
 @media(max-width:600px) {
   .admin-account { margin:20px auto; padding:24px; }

@@ -34,7 +34,7 @@ export async function handle(request: Request): Promise<Response> {
         const rendered = renderEmail(current.payload);
         const response = await fetch("https://api.resend.com/emails", {
           method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "Idempotency-Key": `elio/${current.event_key}` },
-          body: JSON.stringify({ from: sender, to: [current.to_email], subject: String(current.subject || "Elio order update").replace(/[\r\n]/g, " "), ...rendered }),
+          body: JSON.stringify({ from: sender, to: [current.to_email], reply_to: "elio.cheesecakes@gmail.com", subject: String(current.subject || "Elio order update").replace(/[\r\n]/g, " "), ...rendered }),
           signal: AbortSignal.timeout(12000),
         });
         const result = await response.json().catch(() => null);

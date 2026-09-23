@@ -1,24 +1,24 @@
 # Elio Website — first vision
 
-A responsive Elio storefront prototype with an independent Supabase ordering backend and team dashboard. Customer checkout remains a preview while business details and integrations are being prepared.
+A responsive Elio storefront prototype with an independent Supabase ordering backend and team dashboard. The shop connects to live catalog, basket, pickup/delivery checkout, private payment proofs, and order updates. New ordering remains paused until the owner confirms the draft catalog and launch settings.
 
 ## Preview
 
 Run `node server.mjs`, then open http://127.0.0.1:4173. No package installation is needed. You can also open `dist/index.html` directly in a browser. The local server binds only to this computer.
 
-For a static host, the publish directory is `dist` and no compilation is needed. All asset URLs are relative. The storefront remains a static preview; the admin dashboard connects to Elio's separate Supabase project using a publishable browser key. No server secrets belong in the static files.
+For a static host, the publish directory is `dist` and no compilation is needed. All asset URLs are relative. The storefront and dashboard connect to Elio's separate Supabase project using a publishable browser key. No server secrets belong in the static files.
 
 ## Elio administration
 
 - `/manage.html?preview=1`: read-only dashboard preview; no private data or backend requests.
 - `/manage.html`: connected dashboard, requiring a verified and authorized Elio account.
 - `/admin-account.html`: Elio team registration, sign-in, and password recovery.
-- `/account.html`: customer registration, sign-in, and password recovery. Accounts are separate from checkout and do not subscribe customers to marketing email.
+- `/account.html`: customer registration, sign-in, and password recovery. Signed-in customers can view their order history. Registration does not subscribe anyone to marketing email.
 - [Backend setup and implementation](docs/BACKEND.md): project separation, inventory rules, tests, and remaining integrations.
 
-Overview, Orders, Daily quantities, Analytics, Promo codes, Shop settings, and Team access are adapted from TLB. Flavors & boxes manages the Elio catalog. Custom boxes reserve three individual flavor pieces per box and add per-flavor surcharges; fixed sets reserve only their own set inventory. Seven flavors and four box concepts are seeded as unconfirmed drafts. Ordering starts paused.
+Overview, Orders, Daily quantities, Analytics, Promo codes, Shop settings, and Team access are adapted from TLB. Flavors and Boxes & sets have separate catalog areas. All boxes share individual flavor inventory. Owners choose the three flavors inside a fixed set and enter its total price; customers can change flavors only in custom boxes, which add per-flavor surcharges. Seven flavors and four box concepts are seeded as unconfirmed drafts. Ordering starts paused.
 
-The live database is installed in `dzxyhckkkrzqpwpavngn`, separate from TLB's project within the same organization. The initial owner is verified. Customer checkout, payment-proof functions, and the email worker/scheduler still need integration setup before customer launch. Verify Resend/SMTP deliverability before relying on account emails. Website visitor analytics is not connected; order analytics is available in the dashboard.
+The live database is installed in `dzxyhckkkrzqpwpavngn`, separate from TLB's project within the same organization. The initial owner is verified. The checkout and private proof functions are connected. The email worker runs every minute; complete a controlled real-delivery check before launching. Verify Resend/SMTP deliverability before relying on account emails. Website visitor analytics is not connected; order analytics is available in the dashboard.
 
 Backend validation: `cd tests/backend`, `npm ci`, then `npm test`. See the backend guide for local PostgreSQL-compatible test details and limitations.
 
@@ -53,10 +53,10 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - The carousel glides automatically at a gentle 14 pixels per second, with the first flavor following the last seamlessly. It keeps moving while the cursor is over it. The previous/next buttons move three flavors at a time on desktop and mobile; keyboard arrows move one flavor, with Home/End jumping to the first/last. Native touch/trackpad scrolling remains available.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Account and bag icons appear beside the centered wordmark. Compact navigation is used at widths up to 1000 px and includes My account, My orders, and Order a box links.
-- “Order a box” opens `order.html`, a shop preview based on the supplied layout: a photographic hero, Signature Trio, Tea Collection, Discovery Box, and build-your-own cards, followed by flavor details, gifting, and FAQs. These names and combinations are reference-inspired concepts, not confirmed products. Pricing and checkout remain disabled.
-- A custom calendar and pickup/delivery selector sit above the box collection. The calendar follows [TLB Kitchen's customer calendar](https://github.com/BrentChuaTLBK/bakery-website/blob/main/assets/ordering/customer-calendar.js): a centered month popup, previous/next arrows, selected and unavailable styles, Clear date, and Current month. It supports keyboard navigation, Escape, focus restoration, and phone layouts. Calendar days use Philippine time; past dates are disabled and an open popup refreshes at midnight. Preferences carry into box details and back through URL parameters. Dates remain preview preferences, not confirmed bookable slots. Elio's availability, booking window, lead times, fees, delivery area, and pickup details still need confirmation.
-- Each card opens `box.html?collection=...`, with its matching concept photograph and initial flavor selection. Build your own starts with three empty selectors. A flavor outside the monthly menu stays disabled and leaves an empty choice instead of silently substituting a different flavor. The gallery, quantity controls, unsaved gift-message preview, and box/care details remain available. Price and Add to bag remain coming-soon placeholders.
-- Public account and team account pages use Elio's Supabase Auth for email/password registration, sign-in, verification, password reset, and sign-out. Google sign-in controls activate automatically when the Elio Google provider is enabled; see [Google sign-in setup](docs/GOOGLE-SIGN-IN.md). Only users with an Elio staff role can open the dashboard. Order history and bag controls remain “Coming soon” placeholders, and customer checkout is disabled.
+- “Order a box” opens `order.html`: the existing photographic shop layout now loads active boxes from the dashboard and includes Your basket. Fixed-set recipes cannot be changed; custom boxes require exactly three available flavor pieces. Prices and shared stock are revalidated by the server. Draft concepts remain previews until activated.
+- The shop uses TLB’s calendar UI, restricted to the current and following month in Philippine time. On initial load, Pickup and the earliest available date are selected, accounting for production rules, closures, and shared flavor stock. A saved basket is checked as a whole. Customers can then change the date or choose Delivery.
+- Listed box cards open a product dialog with photographs, included flavors or custom choices, quantity, price, and Add to basket. Legacy `box.html?collection=...` links open the matching live product when listed; unlisted concepts retain their gallery preview.
+- Public account and team account pages use Elio's Supabase Auth for email/password registration, sign-in, verification, password reset, and sign-out. Google sign-in controls activate automatically when the Elio Google provider is enabled; see [Google sign-in setup](docs/GOOGLE-SIGN-IN.md). Only users with an Elio staff role can open the dashboard. Signed-in customers see their own order history; guests use a private order link. Payment approval remains a staff action.
 - A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
 - Immediately above the newsletter, an editorial block introduces the three-piece box, a gifting banner, and three everyday Elio moments. “Build your trio” opens the box preview, “Explore gifting” opens the existing packaging details, and the Instagram handle links to Elio. The copy and controls are real HTML; the photographs are replaceable concept assets.
 
@@ -68,12 +68,13 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 | `dist/styles.css` | Responsive components and shared design tokens |
 | `dist/content.js` | Structured flavor names, descriptions, and image replacement points |
 | `dist/app.js` | Reusable product rendering, navigation, accessible detail views |
-| `dist/order.html`, `dist/shop.css`, `dist/order.js` | Box collection shop, flavor details, gifting, FAQs, and bag placeholder |
+| `dist/order.html`, `dist/shop.css`, `dist/order.js` | Connected shop shell, flavor details, gifting, and FAQs |
 | `dist/fulfillment.js`, `dist/fulfillment.css` | Shared pickup/delivery controls and date-preference carryover |
 | `dist/calendar.js`, `dist/calendar.css` | TLB-inspired custom calendar popup and keyboard/date handling |
 | `dist/order.css` | Shared compact header styles retained for box and flavor pages |
 | `dist/flavors.html`, `dist/flavors.css`, `dist/flavors.js` | Monthly lineup, full flavor collection, category filters, and clickable descriptions |
 | `dist/box.html`, `dist/box.css`, `dist/box.js` | Box-detail gallery and non-purchasing flavor, quantity, and gift-message preview |
+| `dist/assets/shop/` | Live catalog, shared-stock rules, calendar, basket, checkout, and private order/proof view |
 | `dist/assets/` | Original logo, optimized logo icons and concept images, licensed heading font |
 | `server.mjs` | Dependency-free local preview server |
 | `data/verification.json` | Desktop, tablet, and mobile check results |
@@ -104,9 +105,11 @@ The four new shop photographs were generated with `image_gen.imagegen` in refere
 
 ## Growing the flavor catalog
 
+The live ordering menu is managed in **Flavors** and **Boxes & sets** in the dashboard. Daily quantities are individual pieces shared by every set and custom box. The editorial homepage/gallery content below remains maintained in `content.js`; it is separate from bookable stock.
+
 Add a flavor object to `flavors` in `dist/content.js` with a unique `id`, `name`, `line`, and `description`. It appears automatically in the homepage carousel, full catalog, order page, and its own `#flavor-id` detail view. Add `image` when its photograph is ready. Optional `category` values are `classic`, `tea`, and `rich`; flavors without a category still appear under All flavors. `featuredOrder` only controls which flavors lead; every other flavor follows automatically. Public copy uses “Explore all flavors” without a fixed count.
 
-Update the `monthlyMenu` array in `dist/content.js` with the IDs in the current rotation. All current flavors are included initially. Removing an ID moves that flavor to “More to discover,” keeps its description accessible, and marks it “Currently unavailable” across the homepage, catalog, and shop. It also disables that option in the box preview. Adding an ID brings it back into the monthly lineup. A newly added flavor stays outside the menu until its ID is included; adding catalog entries never silently makes them selectable.
+For the editorial homepage and flavor gallery, update the `monthlyMenu` array in `dist/content.js` with the IDs in the current rotation. All current flavors are included initially. Removing an ID moves that flavor to “More to discover,” keeps its description accessible, and marks it “Currently unavailable” across the homepage, catalog, and shop. It also disables that option in the box preview. Adding an ID brings it back into the monthly lineup. A newly added flavor stays outside the menu until its ID is included; adding catalog entries never silently makes them selectable.
 
 `available: false` is an optional override that keeps a flavor unavailable even when its ID is in `monthlyMenu`. Remove that override and include the ID in `monthlyMenu` to make it selectable again. An empty monthly list displays a coming-soon message and leaves the full collection browsable. The shared `isAvailable` helper keeps all pages consistent. This is an editorial menu, not live inventory or an enabled order service.
 
@@ -122,17 +125,19 @@ The header, footer, and story use a live-text wordmark reading “ELIO / BASQUE 
 
 The heading font is **Libre Caslon Display**, chosen to approximate the reference; it is not claimed to be Elio's official font. Its SIL Open Font License is included in `dist/assets/FONT-LICENSE.txt`. Body text uses the visitor's Georgia/system serif font.
 
-Still unconfirmed: prices, stock, box combinations/mix-and-match rules, ordering channel, checkout/payment, inventory, delivery/pickup policies, launch timing, and any longer brand history. There are no invented reviews, awards, scarcity claims, or delivery promises. The provided Instagram and email are contact links only.
+Still awaiting launch configuration: actual prices, active products, flavor quantities, final photography, and opening date. Pickup, delivery, and manual-payment defaults were copied from TLB at the owner’s request and are editable in Elio’s dashboard.
 
 The newsletter section is visual only. It has no submitting form, email capture, storage, or email-provider integration. Final signup copy and privacy/consent details need to be supplied before enabling it.
 
-The old `#account` link leads to the working account page. `#orders` and `#bag` remain service previews. The legacy `#ordering` link redirects to `order.html`, whose bag preview is `order.html#your-bag`. Order history and tracking, a persistent shopping bag, and checkout/payments still need their actual systems and business rules. TLB Kitchen is a visual template only: its backend, customer data, prices, and fulfillment settings are not connected or copied.
+Account and My orders links open `account.html`; bag links open `order.html#your-bag`. The basket and checkout draft are retained in sessionStorage for up to 24 hours in the same tab. Final orders are stored only in Elio. TLB customer data, accounts, and credentials are never copied.
 
 This prototype includes `noindex, nofollow` metadata. Review that setting when an actual public launch is authorized. A public source repository is not a live business launch.
 
-The calendar and associated date/inventory backend in [TLB Kitchen's main repository](https://github.com/BrentChuaTLBK/bakery-website) were reviewed as a reference only. The backend performs its own date, product, and quantity validation. Elio has not imported TLB's database, APIs, customer data, booking window, cutoffs, or business rules. A similar system for Elio will need its own specification, especially for three-piece boxes and the rotating flavor menu.
+The ordering flow is adapted from TLB’s system for Elio’s three-piece boxes and shared flavor inventory. Each order receives a short reference such as `ELIO-K7M4P9`, suitable for courier notes. References have six random symbols, retry collisions, and can expand if needed. They grant no order access: the private token or authorized signed-in account is still required.
 
 ## Verification
+
+Current ordering checks cover shared flavor stock, fixed recipes, custom surcharges, server date bounds, product-photo permissions, short references and access denial, pickup/delivery checkout, proof submission, manual approval, and confirmation outbox events. Browser flows use a local database and mocked platform calls; no real payments or emails were sent. The following earlier checks describe the visual prototype revisions.
 
 JavaScript syntax checks passed. Chrome visual and interaction checks passed at 1440, 768, 390, and 320 px widths. No page overflow, missing images, failed asset requests, or browser runtime errors were found. Catalog navigation, product details, gifting, prototype bag, mobile menu, Escape handling, focus restoration, and direct detail links were exercised. Loop checks covered repeated forward/backward navigation, keyboard wrapping, native phone swipes across both boundaries, animated rapid clicks, resize behavior, detail/focus handling for visible copies, and the automatic inclusion of an eighth test flavor. A two-flavor catalog was also checked. Unavailable status was verified using test data only.
 

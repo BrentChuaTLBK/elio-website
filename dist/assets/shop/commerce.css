@@ -1,0 +1,292 @@
+/* TLB checkout components scoped with class selectors for mobile browser support. */
+
+
+
+
+.elio-commerce{--cream: #fefaef; --paper: #fffdf8; --ink: #2f2624; --brown: #764b25; --rose: #dda292; --rose-light: #f8e8df; --line: #e8dfd3; --muted: #786d66; --green: #386149; --red: #a33a32; --shadow: 0 12px 42px #34251a0a; --radius: 18px; color-scheme: light;}
+:where(.elio-commerce) *{box-sizing: border-box;}
+.elio-commerce{margin: 0px; background: var(--cream); color: var(--ink); font: 14px / 1.65 Inter, Arial, sans-serif;}
+:where(.elio-commerce) a{color: var(--brown); text-underline-offset: 4px;}
+:where(.elio-commerce) button,:where(.elio-commerce) input,:where(.elio-commerce) select,:where(.elio-commerce) textarea{font: inherit;}
+:where(.elio-commerce) button,:where(.elio-commerce) a,:where(.elio-commerce) input,:where(.elio-commerce) select,:where(.elio-commerce) textarea{touch-action: manipulation;}
+:where(.elio-commerce) button{cursor: pointer;}
+:where(.elio-commerce) button:disabled{cursor: not-allowed; opacity: 0.5;}
+:where(.elio-commerce) button:focus-visible,:where(.elio-commerce) a:focus-visible{outline: 3px solid var(--rose); outline-offset: 4px;}
+:where(.elio-commerce) h1,:where(.elio-commerce) h2,:where(.elio-commerce) h3,:where(.elio-commerce) h4,:where(.elio-commerce) p{margin: 0px 0px 0.7em;}
+:where(.elio-commerce) h1,:where(.elio-commerce) h2,:where(.elio-commerce) h3{line-height: 1.25;}
+:where(.elio-commerce) h1{font-size: 2.5rem; letter-spacing: -1.4px;}
+:where(.elio-commerce) h2{font-size: 1.4rem; letter-spacing: -0.5px;}
+:where(.elio-commerce) h3{font-size: 1rem;}
+:where(.elio-commerce) small{font-size: 0.78rem;}
+:where(.elio-commerce) .muted{color: var(--muted);}
+:where(.elio-commerce) .eyebrow{font-size: 10px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--brown);}
+:where(.elio-commerce) .topbar{min-height: 82px; display: flex; align-items: center; justify-content: space-between; padding: 14px max(24px, -640px + 50vw); gap: 18px; background: var(--ink); color: white;}
+:where(.elio-commerce) .brand{display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; font: 18px Chelsea, serif; white-space: nowrap;}
+:where(.elio-commerce) .brand img{width: 40px; height: 40px; object-fit: contain;}
+:where(.elio-commerce) .nav-links{display: flex; gap: 24px; align-items: center;}
+:where(.elio-commerce) .nav-links a{color: inherit; text-decoration: none; font-size: 13px;}
+:where(.elio-commerce) .nav-links a[aria-current="page"]{color: rgb(244, 198, 180);}
+:where(.elio-commerce) .nav-links .nav-account{padding: 8px 16px; border: 1px solid rgb(118, 104, 95); border-radius: 30px;}
+:where(.elio-commerce) .page-shell{max-width: 1280px; padding: 32px 24px 64px; margin: auto;}
+:where(.elio-commerce) .panel{background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow);}
+:where(.elio-commerce) .button,:where(.elio-commerce) .button-secondary,:where(.elio-commerce) .button-quiet{display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; padding: 11px 18px; border: 1px solid transparent; font-size: 13px; font-weight: 700; text-decoration: none; line-height: 1.4; transition: background 0.15s, transform 0.15s;}
+:where(.elio-commerce) .button{background: var(--brown); color: white;}
+:where(.elio-commerce) .button:hover:not(:disabled){background: rgb(96, 59, 28);}
+:where(.elio-commerce) .button-secondary{background: var(--rose-light); color: var(--ink); border-color: rgb(235, 206, 192);}
+:where(.elio-commerce) .button-quiet{background: transparent; border-color: var(--line); color: var(--ink);}
+:where(.elio-commerce) .button-quiet:hover{background: var(--rose-light);}
+:where(.elio-commerce) .button.danger,:where(.elio-commerce) .danger.button{background: var(--red); color: white;}
+:where(.elio-commerce) .block{width: 100%;}
+:where(.elio-commerce) .field{display: flex; flex-direction: column; gap: 6px; margin: 0px 0px 16px; font-size: 12px; font-weight: 700;}
+:where(.elio-commerce) .field input,:where(.elio-commerce) .field select,:where(.elio-commerce) .field textarea,:where(.elio-commerce) input.control,:where(.elio-commerce) select.control,:where(.elio-commerce) textarea.control{width: 100%; padding: 11px 13px; border: 1px solid rgb(217, 207, 194); border-radius: 9px; background: rgb(255, 255, 255); color: var(--ink); font-size: 14px; font-weight: 400; min-height: 44px;}
+:where(.elio-commerce) .field input:focus,:where(.elio-commerce) .field select:focus,:where(.elio-commerce) .field textarea:focus{outline: 2px solid var(--rose); outline-offset: 1px;}
+:where(.elio-commerce) .field textarea{min-height: 92px; resize: vertical;}
+:where(.elio-commerce) .field small{font-weight: 400; color: var(--muted);}
+:where(.elio-commerce) .field-row{display: grid; grid-template-columns: 1fr 1fr; gap: 16px;}
+:where(.elio-commerce) .notice{border: 1px solid rgb(232, 213, 184); background: rgb(255, 245, 228); color: rgb(121, 88, 45); padding: 14px 18px; border-radius: 10px; font-size: 12px; margin-bottom: 20px;}
+:where(.elio-commerce) .notice.danger,:where(.elio-commerce) .error{color: var(--red); background: rgb(253, 240, 237); border-color: rgb(236, 198, 191);}
+:where(.elio-commerce) .notice.success{color: var(--green); background: rgb(237, 245, 236); border-color: rgb(206, 224, 203);}
+:where(.elio-commerce) .badge{display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; background: var(--rose-light); border-radius: 6px; font-size: 10px; font-weight: 700; line-height: 1.6; white-space: nowrap;}
+:where(.elio-commerce) .badge.success{background: rgb(232, 242, 230); color: var(--green);}
+:where(.elio-commerce) .badge.danger{background: rgb(251, 231, 227); color: var(--red);}
+:where(.elio-commerce) .empty-state{text-align: center; padding: 48px 20px; color: var(--muted);}
+:where(.elio-commerce) .empty-state .empty-icon{width: 58px; height: 58px; display: grid; place-items: center; margin: 0px auto 18px; border: 1px solid var(--line); border-radius: 50%; font-size: 22px; color: var(--brown);}
+:where(.elio-commerce) .empty-state h2,:where(.elio-commerce) .empty-state h3{color: var(--ink);}
+:where(.elio-commerce) .section-heading{display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px;}
+:where(.elio-commerce) .section-heading h1,:where(.elio-commerce) .section-heading h2{margin: 0px;}
+:where(.elio-commerce) .table-wrap{overflow: auto;}
+:where(.elio-commerce) .data-table{border-collapse: collapse; width: 100%; font-size: 12px;}
+:where(.elio-commerce) .data-table th,:where(.elio-commerce) .data-table td{text-align: left; border-bottom: 1px solid var(--line); padding: 13px 12px; vertical-align: top;}
+:where(.elio-commerce) .data-table th{color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap;}
+:where(.elio-commerce) .dialog-actions{display: flex; justify-content: flex-end; gap: 12px; padding-top: 18px; border-top: 1px solid var(--line); margin-top: 18px;}
+dialog.elio-commerce{color: var(--ink); background: var(--paper); padding: 0px; border: 1px solid var(--line); border-radius: 22px; max-width: min(920px, -28px + 100vw); width: 100%; max-height: 90dvh; box-shadow: rgba(36, 24, 14, 0.2) 0px 30px 100px;}
+dialog.elio-commerce::backdrop{background: rgba(36, 26, 20, 0.42); backdrop-filter: blur(4px);}
+:where(.elio-commerce) .modal-head{display: flex; justify-content: space-between; align-items: center; padding: 20px 26px; border-bottom: 1px solid var(--line);}
+:where(.elio-commerce) .modal-head h2{margin: 0px;}
+:where(.elio-commerce) .close-button{border: 1px solid var(--line); background: var(--paper); border-radius: 50%; width: 34px; height: 34px; font-size: 23px; line-height: 1;}
+:where(.elio-commerce) .modal-content{padding: 26px;}
+:where(.elio-commerce) .sr-only{position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0px, 0px, 0px, 0px); white-space: nowrap;}
+:where(.elio-commerce) #toast-region{position: fixed; right: 22px; bottom: 22px; z-index: 3000; max-width: min(420px, 90vw);}
+:where(.elio-commerce) .toast{padding: 14px 20px; background: var(--ink); color: white; box-shadow: var(--shadow); border-radius: 12px; margin-top: 8px; font-size: 13px;}
+:where(.elio-commerce) .toast.error{background: var(--red); color: white;}
+:where(.elio-commerce) .footer{border-top: 1px solid var(--line); padding: 25px 24px; display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 11px; max-width: 1280px; margin: auto;}
+:where(.elio-commerce) .footer a{color: inherit;}
+:where(.elio-commerce) .loading{padding: 60px; text-align: center; color: var(--muted);}
+:where(.elio-commerce) .loading::before{content: ""; display: block; width: 26px; height: 26px; border-top-style: ; border-top-width: ; border-right-color: ; border-right-style: ; border-right-width: ; border-bottom-color: ; border-bottom-style: ; border-bottom-width: ; border-left-color: ; border-left-style: ; border-left-width: ; border-image-source: ; border-image-slice: ; border-image-width: ; border-image-outset: ; border-image-repeat: ; border-top-color: var(--brown); border-radius: 50%; margin: 0px auto 18px; animation: 0.7s linear 0s infinite normal none running spin;}
+@keyframes spin { 
+  100% { transform: rotate(360deg); }
+}
+:where(.elio-commerce) .shop-hero{display: grid; grid-template-columns: 1.15fr 1fr; min-height: 320px; background: rgb(240, 223, 208); border-radius: 22px; overflow: hidden; margin: 0px 0px 26px;}
+:where(.elio-commerce) .hero-copy{padding: 45px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; position: relative;}
+:where(.elio-commerce) .hero-copy h1{font-family: Lobster, serif; font-weight: 400; font-size: 48px; letter-spacing: -1px; max-width: 370px; margin: 10px 0px 14px;}
+:where(.elio-commerce) .hero-copy p{max-width: 360px; color: rgb(112, 88, 74); font-size: 13px;}
+:where(.elio-commerce) .hero-photo{min-height: 250px; background: var(--rose-light); position: relative;}
+:where(.elio-commerce) .hero-photo img{width: 100%; height: 100%; object-fit: cover; position: absolute;}
+:where(.elio-commerce) .hero-stamp{position: absolute; bottom: 23px; left: 22px; background: var(--cream); padding: 10px 16px; border-radius: 8px; font-family: Chelsea; font-size: 10px; box-shadow: var(--shadow);}
+:where(.elio-commerce) .shop-layout{display: grid; grid-template-columns: minmax(0px, 1fr) 338px; gap: 28px; align-items: start;}
+:where(.elio-commerce) .fulfillment-bar{display: flex; gap: 20px; align-items: center; flex-wrap: wrap; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; margin-bottom: 28px;}
+:where(.elio-commerce) .fulfillment-bar .date-field{display: flex; gap: 12px; align-items: center; flex: 1 1 0%; font-size: 12px; font-weight: 700;}
+:where(.elio-commerce) .date-field input{padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: rgb(255, 255, 255); max-width: 170px;}
+:where(.elio-commerce) .method-toggle{display: flex; border: 1px solid var(--line); border-radius: 9px; padding: 3px; background: rgb(247, 242, 233);}
+:where(.elio-commerce) .method-toggle button{border: 0px; background: transparent; color: var(--muted); padding: 8px 16px; border-radius: 6px; font-size: 12px;}
+:where(.elio-commerce) .method-toggle button.selected{background: white; color: var(--brown); box-shadow: rgba(47, 38, 36, 0.047) 0px 2px 5px; font-weight: 700;}
+:where(.elio-commerce) .category-row{display: flex; flex-wrap: wrap; gap: 8px; padding: 0px 0px 18px;}
+:where(.elio-commerce) .category-chip{max-width: 100%; white-space: normal; overflow-wrap: anywhere; border-radius: 30px; border: 1px solid var(--line); background: transparent; padding: 9px 17px; font-size: 12px; color: var(--muted);}
+:where(.elio-commerce) .category-chip.active{background: var(--ink); color: white; border-color: var(--ink);}
+:where(.elio-commerce) .product-grid{display: grid; grid-template-columns: repeat(2, minmax(0px, 1fr)); gap: 22px;}
+:where(.elio-commerce) .product-card{background: var(--paper); border: 1px solid var(--line); border-radius: 15px; overflow: hidden; display: flex; flex-direction: column; text-align: left; width: 100%; padding: 0px; color: inherit;}
+:where(.elio-commerce) .product-card:hover .product-image img{transform: scale(1.035);}
+:where(.elio-commerce) .product-image{width: 100%; height: 224px; overflow: hidden; background: rgb(240, 231, 218); position: relative;}
+:where(.elio-commerce) .product-image img{width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s;}
+:where(.elio-commerce) .product-image .badge{position: absolute; left: 12px; top: 12px; background: var(--paper);}
+:where(.elio-commerce) .product-card-body{padding: 18px 20px; flex: 1 1 0%; display: flex; flex-direction: column;}
+:where(.elio-commerce) .product-card h3,:where(.elio-commerce) .product-card h4{font-size: 15px; margin-bottom: 6px;}
+:where(.elio-commerce) .product-card p{font-size: 11px; color: var(--muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;}
+:where(.elio-commerce) .product-meta{display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: auto; padding-top: 12px;}
+:where(.elio-commerce) .product-price{font-size: 14px; font-weight: 700;}
+:where(.elio-commerce) .plus-circle{width: 31px; height: 31px; display: grid; place-items: center; background: var(--rose-light); color: var(--brown); border-radius: 50%; font-size: 20px;}
+:where(.elio-commerce) .availability{font-size: 10px; color: var(--green); padding-top: 7px;}
+:where(.elio-commerce) .availability.unavailable{color: var(--red);}
+:where(.elio-commerce) .cart-panel{position: sticky; top: 22px; padding: 23px;}
+:where(.elio-commerce) .cart-panel h2{font-size: 18px;}
+:where(.elio-commerce) .cart-head{display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 16px;}
+:where(.elio-commerce) .cart-count{display: grid; place-items: center; min-width: 26px; height: 26px; background: var(--rose-light); border-radius: 50%; font-size: 11px;}
+:where(.elio-commerce) .cart-line{padding: 18px 0px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 8px;}
+:where(.elio-commerce) .cart-line h3{font-size: 12px; margin-bottom: 3px;}
+:where(.elio-commerce) .cart-options{font-size: 10px; color: var(--muted); white-space: pre-line;}
+:where(.elio-commerce) .line-price{font-size: 12px; font-weight: 700;}
+:where(.elio-commerce) .quantity-control{display: inline-flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; min-width: 87px; justify-content: space-between; background: rgb(255, 255, 255); font-size: 12px;}
+:where(.elio-commerce) .quantity-control button{border: 0px; padding: 3px 9px; background: transparent; font-size: 16px; color: var(--brown);}
+:where(.elio-commerce) .remove-line{font-size: 10px; border: 0px; background: transparent; color: var(--muted); text-decoration: underline; padding: 0px; margin-left: 9px;}
+:where(.elio-commerce) .totals{font-size: 12px; padding: 17px 0px;}
+:where(.elio-commerce) .totals > div{display: flex; justify-content: space-between; gap: 18px; margin-bottom: 9px;}
+:where(.elio-commerce) .totals .grand-total{border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; font-size: 16px; font-weight: 700;}
+:where(.elio-commerce) .cart-footnote{text-align: center; font-size: 10px; color: var(--muted); margin: 12px 0px 0px;}
+:where(.elio-commerce) .help-card{margin-top: 18px; background: rgb(244, 234, 220); padding: 18px; border-radius: 12px; color: rgb(112, 93, 75); font-size: 11px;}
+:where(.elio-commerce) .help-card strong{display: block; margin-bottom: 3px;}
+:where(.elio-commerce) .product-dialog-layout{display: grid; grid-template-columns: 1fr 1fr; gap: 28px;}
+:where(.elio-commerce) .product-dialog-image{width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 12px;}
+:where(.elio-commerce) .photo-thumbs{display: flex; gap: 8px; margin-top: 10px;}
+:where(.elio-commerce) .photo-thumbs button{width: 54px; height: 54px; padding: 0px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden;}
+:where(.elio-commerce) .photo-thumbs img{width: 100%; height: 100%; object-fit: cover;}
+:where(.elio-commerce) .option-group{border: 0px; margin: 22px 0px 0px; padding: 0px;}
+:where(.elio-commerce) .option-group legend{font-weight: 700; font-size: 12px; margin-bottom: 10px;}
+:where(.elio-commerce) .option-choice{display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 0px; font-size: 12px; border-bottom: 1px solid var(--line);}
+:where(.elio-commerce) .option-choice label{display: flex; gap: 9px; align-items: center;}
+:where(.elio-commerce) .option-choice small{color: var(--muted);}
+:where(.elio-commerce) .option-count{width: 56px; border: 1px solid var(--line); border-radius: 6px; padding: 5px; text-align: center; background: white; color: var(--ink);}
+:where(.elio-commerce) .product-dialog-bottom{display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 20px; margin-top: 25px; gap: 12px;}
+:where(.elio-commerce) .checkout-grid{display: grid; grid-template-columns: minmax(0px, 1.2fr) minmax(240px, 0.8fr); gap: 30px;}
+:where(.elio-commerce) .checkout-section{padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--line);}
+:where(.elio-commerce) .checkout-section h3{margin-bottom: 18px;}
+:where(.elio-commerce) .checkout-aside{background: rgb(247, 240, 230); border-radius: 12px; padding: 20px; height: fit-content;}
+:where(.elio-commerce) .promo-row{display: flex; gap: 8px;}
+:where(.elio-commerce) .promo-row input{min-width: 0px;}
+:where(.elio-commerce) .order-layout{display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 24px;}
+:where(.elio-commerce) .order-title{display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 30px;}
+:where(.elio-commerce) .order-title h1{font-size: 30px; margin: 8px 0px;}
+:where(.elio-commerce) .order-statuses{display: flex; gap: 8px; flex-wrap: wrap;}
+:where(.elio-commerce) .order-section{margin-bottom: 24px;}
+:where(.elio-commerce) .order-section h2{font-size: 17px; border-bottom: 1px solid var(--line); padding-bottom: 14px;}
+:where(.elio-commerce) .info-grid{display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 12px;}
+:where(.elio-commerce) .info-grid strong{display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 5px;}
+:where(.elio-commerce) .payment-details{white-space: pre-wrap; padding: 16px; border: 1px dashed rgb(203, 184, 160); border-radius: 9px; background: rgb(251, 244, 233); font-size: 12px; margin: 16px 0px;}
+:where(.elio-commerce) .timeline{list-style: none; padding: 0px; margin: 0px; font-size: 12px;}
+:where(.elio-commerce) .timeline li{padding: 0px 0px 20px 18px; border-left: 1px solid var(--line); position: relative;}
+:where(.elio-commerce) .timeline li::before{content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--rose); position: absolute; left: -4px; top: 6px;}
+:where(.elio-commerce) .timeline small{display: block; color: var(--muted);}
+:where(.elio-commerce) .mobile-cart{display: none;}
+:where(.elio-commerce) .auth-shell{max-width: 520px; margin: 40px auto;}
+:where(.elio-commerce) .auth-tabs{display: flex; gap: 10px; margin: 20px 0px;}
+:where(.elio-commerce) .auth-tabs button{flex: 1 1 0%;}
+:where(.elio-commerce) .auth-form h1{font-size: 28px;}
+:where(.elio-commerce) .account-history{max-width: 950px; margin: 25px auto;}
+:where(.elio-commerce) .checkbox-field{display: flex; align-items: flex-start; gap: 10px; font-size: 12px; margin: 14px 0px;}
+:where(.elio-commerce) .checkbox-field input{margin-top: 5px;}
+:where(.elio-commerce) .setup-note{max-width: 600px; margin: auto;}
+:where(.elio-commerce) .demo-ribbon{background: rgb(247, 223, 183); padding: 10px 24px; text-align: center; font-size: 11px; color: rgb(105, 80, 39);}
+:where(.elio-commerce) .demo-ribbon a{font-weight: 700;}
+:where(.elio-commerce) .search-wrap{position: relative; margin-bottom: 20px;}
+:where(.elio-commerce) .search-wrap input{padding: 10px 14px; width: 100%; border: 1px solid var(--line); background: var(--paper); border-radius: 10px;}
+:where(.elio-commerce) .no-margin{margin: 0px;}
+:where(.elio-commerce) [hidden]{display: none !important;}
+@media (min-width: 1450px) {:where(.elio-commerce) .product-grid{grid-template-columns: repeat(3, minmax(0px, 1fr));}
+:where(.elio-commerce) .shop-layout{grid-template-columns: minmax(0px, 1fr) 338px;}
+:where(.elio-commerce) .page-shell{max-width: 1440px;}
+:where(.elio-commerce) .product-image{height: 206px;}
+:where(.elio-commerce) .topbar{padding-left: max(24px, -696px + 50vw); padding-right: max(24px, -696px + 50vw);}}
+@media (max-width: 950px) {:where(.elio-commerce) .shop-layout{grid-template-columns: minmax(0px, 1fr) 290px; gap: 20px;}
+:where(.elio-commerce) .hero-copy{padding: 32px;}
+:where(.elio-commerce) .hero-copy h1{font-size: 39px;}
+:where(.elio-commerce) .product-image{height: 180px;}
+:where(.elio-commerce) .product-card-body{padding: 15px;}
+:where(.elio-commerce) .cart-panel{padding: 18px;}
+:where(.elio-commerce) .checkout-grid{grid-template-columns: 1fr;}
+:where(.elio-commerce) .order-layout{grid-template-columns: 1fr;}}
+@media (max-width: 720px) {.elio-commerce{font-size: 13px;}
+:where(.elio-commerce) .topbar{min-height: 68px; padding: 13px 18px; gap: 10px;}
+:where(.elio-commerce) .brand{font-size: 14px;}
+:where(.elio-commerce) .brand img{width: 29px; height: 29px;}
+:where(.elio-commerce) .nav-links{gap: 15px;}
+:where(.elio-commerce) .nav-links a{font-size: 11px;}
+:where(.elio-commerce) .nav-links .nav-home{display: none;}
+:where(.elio-commerce) .nav-links .nav-account{padding: 5px 11px;}
+:where(.elio-commerce) .page-shell{padding: 22px 16px 85px;}
+:where(.elio-commerce) .shop-hero{grid-template-columns: 1fr; min-height: auto; position: relative;}
+:where(.elio-commerce) .hero-copy{padding: 28px; z-index: 1; background: linear-gradient(90deg, rgb(239, 223, 211) 20%, rgba(239, 223, 211, 0.9) 65%, rgba(239, 223, 211, 0.667)); min-height: 250px;}
+:where(.elio-commerce) .hero-copy h1{font-size: 35px; max-width: 270px;}
+:where(.elio-commerce) .hero-copy p{max-width: 235px; font-size: 11px;}
+:where(.elio-commerce) .hero-photo{position: absolute; right: 0px; top: 0px; width: 55%; height: 100%;}
+:where(.elio-commerce) .hero-stamp{display: none;}
+:where(.elio-commerce) .shop-layout{grid-template-columns: minmax(0px, 1fr);}
+:where(.elio-commerce) .fulfillment-bar{padding: 13px; gap: 12px;}
+:where(.elio-commerce) .fulfillment-bar .date-field{justify-content: space-between; min-width: 100%;}
+:where(.elio-commerce) .method-toggle{flex: 1 1 0%;}
+:where(.elio-commerce) .method-toggle button{flex: 1 1 0%;}
+:where(.elio-commerce) .product-grid{gap: 12px;}
+:where(.elio-commerce) .product-image{height: 190px;}
+:where(.elio-commerce) .product-card-body{padding: 13px;}
+:where(.elio-commerce) .product-card h3,:where(.elio-commerce) .product-card h4{font-size: 13px;}
+:where(.elio-commerce) .product-card p{font-size: 10px;}
+:where(.elio-commerce) .cart-panel{position: static;}
+:where(.elio-commerce) .cart-panel .empty-state{padding: 22px;}
+:where(.elio-commerce) .mobile-cart{position: fixed; display: flex; justify-content: space-between; align-items: center; bottom: 16px; left: 16px; right: 16px; background: var(--brown); color: white; z-index: 10; border: 0px; border-radius: 12px; padding: 16px 20px; font-weight: 700; box-shadow: rgba(71, 40, 22, 0.2) 0px 8px 24px;}
+:where(.elio-commerce) .product-dialog-layout{grid-template-columns: 1fr;}
+:where(.elio-commerce) .product-dialog-image{max-height: 260px; aspect-ratio: 1.3 / 1;}
+:where(.elio-commerce) .modal-head{padding: 16px 20px;}
+:where(.elio-commerce) .modal-content{padding: 20px;}
+:where(.elio-commerce) .field-row{grid-template-columns: 1fr; gap: 0px;}
+:where(.elio-commerce) .info-grid{gap: 14px;}
+:where(.elio-commerce) .order-title{flex-wrap: wrap;}
+:where(.elio-commerce) .footer{padding-bottom: 90px; flex-wrap: wrap;}
+:where(.elio-commerce) .section-heading{align-items: flex-start;}
+:where(.elio-commerce) .panel{padding: 20px;}
+:where(.elio-commerce) .checkout-aside{order: -1;}
+:where(.elio-commerce) .product-dialog-bottom{position: sticky; bottom: -20px; background: var(--paper); padding: 15px 0px;}
+:where(.elio-commerce) .hero-copy .eyebrow{font-size: 9px;}}
+@media (max-width: 380px) {:where(.elio-commerce) .product-image{height: 150px;}
+:where(.elio-commerce) .nav-links{gap: 9px;}
+:where(.elio-commerce) .brand{font-size: 12px;}
+:where(.elio-commerce) .product-price{font-size: 12px;}
+:where(.elio-commerce) .product-card-body{padding: 10px;}
+:where(.elio-commerce) .plus-circle{width: 26px; height: 26px;}}
+@media (prefers-reduced-motion: reduce) {:where(.elio-commerce) *{animation: auto ease 0s 1 normal none running none !important; transition: none !important; scroll-behavior: auto !important;}}
+@media print {:where(.elio-commerce) .topbar,:where(.elio-commerce) .footer,:where(.elio-commerce) .button,:where(.elio-commerce) .button-secondary,:where(.elio-commerce) .button-quiet,:where(.elio-commerce) .no-print,:where(.elio-commerce) .mobile-cart,:where(.elio-commerce) .demo-ribbon{display: none !important;}
+:where(.elio-commerce) .page-shell{padding: 0px; max-width: none;}
+:where(.elio-commerce) .order-layout{display: block;}
+:where(.elio-commerce) .panel{box-shadow: none; break-inside: avoid;}
+:where(.elio-commerce) .order-section{margin-bottom: 16px;}
+.elio-commerce{background: white;}}
+:where(.elio-commerce) .account-layout{display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: start; max-width: 1000px; margin: 35px auto;}
+:where(.elio-commerce) .account-card{max-width: 520px;}
+:where(.elio-commerce) .account-tabs{display: flex; gap: 8px; margin-bottom: 22px;}
+:where(.elio-commerce) .account-tabs button{flex: 1 1 0%;}
+:where(.elio-commerce) .account-header{display: flex; justify-content: space-between; gap: 18px; align-items: center; margin: 25px 0px;}
+:where(.elio-commerce) .account-orders{margin-top: 25px;}
+:where(.elio-commerce) .account-intro h1{font-family: Lobster; font-weight: 400; font-size: 45px;}
+:where(.elio-commerce) .account-intro p{color: var(--muted); max-width: 380px;}
+:where(.elio-commerce) .account-orders .order-card{margin-bottom: 16px;}
+@media (max-width: 720px) {:where(.elio-commerce) .account-layout{grid-template-columns: 1fr; gap: 22px; margin: 5px auto;}
+:where(.elio-commerce) .account-card{max-width: none;}
+:where(.elio-commerce) .account-header{align-items: flex-start; flex-wrap: wrap;}
+:where(.elio-commerce) .account-intro h1{font-size: 34px;}}
+:where(.elio-commerce) [data-product="demo-cookie"] .product-image img{object-position: 50% 100%;}
+:where(.elio-commerce) .product-label{display: inline-block; padding: 4px 9px; border-radius: 6px; font-size: 10px; font-weight: 700; line-height: 1.6; white-space: normal; overflow-wrap: anywhere; text-align: left;}
+:where(.elio-commerce) .product-image .product-label{max-width: calc(100% - 24px); box-sizing: border-box;}
+:where(.elio-commerce) .pickup-text{white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0px;}
+:where(.elio-commerce) .pickup-details .pickup-text + .pickup-text{margin-top: 8px;}
+:where(.elio-commerce) .info-grid > div{min-width: 0px;}
+:where(.elio-commerce) #checkout-form input[name="social_username"]:disabled{background: rgb(243, 238, 231); color: var(--muted); cursor: not-allowed;}
+:where(.elio-commerce) .delivery-zone-text{white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0px;}
+:where(.elio-commerce) .delivery-zone-note{margin: 14px 0px;}
+:where(.elio-commerce) .pickup-only-badge{margin: 0px 0px 8px;}
+:where(.elio-commerce) .method-toggle button:disabled{opacity: 0.5; cursor: not-allowed;}
+:where(.elio-commerce) .social-contact-row > .field > input,:where(.elio-commerce) .social-contact-row > .field > select{height: 48px; margin-top: auto;}
+:where(.elio-commerce) .promo-code-controls{display: grid; grid-template-columns: minmax(0px, 1fr) auto; gap: 10px; align-items: end;}
+:where(.elio-commerce) .promo-code-controls .field{margin: 0px; min-width: 0px;}
+:where(.elio-commerce) .promo-code-controls input{min-width: 0px; text-transform: uppercase;}
+:where(.elio-commerce) .promo-code-controls .button{min-height: 44px; white-space: nowrap;}
+:where(.elio-commerce) .promo-help{font-size: 11px; line-height: 1.6; margin: 10px 0px;}
+:where(.elio-commerce) .promo-status{margin: 12px 0px; overflow-wrap: anywhere;}
+:where(.elio-commerce) .promo-status[hidden],:where(.elio-commerce) .promo-remove[hidden]{display: none;}
+:where(.elio-commerce) .promo-remove{font-size: 11px; padding: 7px 12px;}
+@media (max-width: 480px) {:where(.elio-commerce) .promo-code-controls{grid-template-columns: 1fr;}
+:where(.elio-commerce) .promo-code-controls .button{width: 100%;}}
+:where(.elio-commerce) .shop-category{min-width: 0px;}
+:where(.elio-commerce) .shop-category + .shop-category{margin-top: 34px; padding-top: 26px; border-top: 1px solid var(--line);}
+:where(.elio-commerce) .shop-category-heading{font-size: 20px; line-height: 1.4; margin: 0px 0px 16px; color: var(--ink); overflow-wrap: anywhere;}
+@media (max-width: 560px) {:where(.elio-commerce) .shop-category-heading{font-size: 18px;}
+:where(.elio-commerce) .shop-category + .shop-category{margin-top: 26px; padding-top: 22px;}}
+:where(.elio-commerce) .option-choice > label{min-width: 0px; overflow-wrap: anywhere;}
+:where(.elio-commerce) .option-choice-controls{display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0;}
+:where(.elio-commerce) .option-choice-controls > small{white-space: nowrap;}
+:where(.elio-commerce) .option-stepper{display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 7px; background: white;}
+:where(.elio-commerce) .option-stepper button{width: 32px; min-height: 36px; padding: 0px; border: 0px; border-radius: 6px; background: transparent; color: var(--brown); font-size: 20px; line-height: 1;}
+:where(.elio-commerce) .option-stepper button:hover:not(:disabled){background: var(--rose-light);}
+:where(.elio-commerce) .option-stepper button:disabled{background: rgb(243, 238, 231); cursor: not-allowed; opacity: 0.4;}
+:where(.elio-commerce) .option-stepper .option-count{width: 36px; min-height: 36px; border: 0px; border-radius: 0px; padding: 4px 0px; appearance: textfield;}
+:where(.elio-commerce) .option-stepper .option-count::-webkit-inner-spin-button,:where(.elio-commerce) .option-stepper .option-count::-webkit-outer-spin-button{appearance: none; margin: 0px;}
+:where(.elio-commerce) .option-stepper .option-count:disabled{background: rgb(243, 238, 231); color: var(--muted); cursor: not-allowed;}
+@media (max-width: 380px) {:where(.elio-commerce) .option-choice{gap: 8px;}
+:where(.elio-commerce) .option-choice-controls{flex-direction: column; gap: 3px; align-items: flex-end;}}
+:where(.elio-commerce) .product-description{white-space: pre-wrap; overflow-wrap: anywhere;}

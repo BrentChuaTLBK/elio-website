@@ -57,7 +57,9 @@ const amount = cents => (Number(cents || 0) / 100).toFixed(2);
 const cents = value => Math.round(Number(value || 0) * 100);
 const safeImage = value => typeof value === 'string' && (/^https?:\/\//.test(value) || /^assets\//.test(value)) ? value : '';
 const list = value => String(value || '').split(/\r?\n/).map(v => v.trim()).filter(Boolean);
-const stockProducts = () => state.products.filter(p => p.kind !== 'custom_box');
+const stockProducts = () => state.products.filter(p => p.kind === 'flavor');
+const areaProducts = () => state.products.filter(p => state.view === 'flavors' ? p.kind === 'flavor' : p.kind !== 'flavor');
+const productNoun = (plural = false) => state.view === 'flavors' ? (plural ? 'flavors' : 'flavor') : (plural ? 'boxes' : 'box');
 const owner = () => !state.connected || state.role === 'owner';
 const readonly = () => state.connected && state.role !== 'owner' ? '<p class="notice">Only an owner can change this section. Your staff role can manage orders and daily quantities.</p>' : '';
 const locked = () => !state.connected ? 'disabled title="Connect the backend before saving"' : '';
@@ -124,7 +126,7 @@ async function refresh() {
 }
 function render() {
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
-  const views = { overview: overviewView, analytics: analyticsView, orders: ordersView, products: productsView, inventory: inventoryView, promos: promosView, settings: settingsView, team: teamView };
+  const views = { overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, boxes: productsView, inventory: inventoryView, promos: promosView, settings: settingsView, team: teamView };
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
   syncVisitorPolling();
   syncPromoStatuses();
@@ -146,7 +148,7 @@ function overviewView() {
       ['Active products', activeProducts, 'Availability set by product and date']
     ].map(([title, value, note]) => `<div class="panel metric-card"><div class="metric-label">${title}<span aria-hidden="true">↗</span></div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></div>`).join('')}</div>
     <div class="overview-grid"><section class="panel"><div class="section-heading"><h2>Coming out of the kitchen</h2><button class="button button-quiet" data-action="upcoming">View all →</button></div>${upcoming.length ? orderTable(upcoming.slice(0, 7), true) : empty('Your next bake starts here', 'Scheduled orders will appear here as customers check out. Set up your products and daily quantities to get started.')}</section>
-    <section class="panel"><div class="section-heading"><h2>Make the shop your own</h2><span class="badge">Getting started</span></div><ol class="setup-steps"><li><div><strong>Add your menu</strong><p>Photos, prices, categories, and the little details that make each bake yours.</p><button class="button button-quiet" data-view="products">Manage products →</button></div></li><li><div><strong>Plan your baking dates</strong><p>Choose how many of each product can be collected or delivered on each date.</p><button class="button button-quiet" data-view="inventory">Set daily quantities →</button></div></li><li><div><strong>Finish your shop details</strong><p>Add payment details, pickup information, delivery zones, and your production schedule.</p><button class="button button-quiet" data-view="settings">Shop settings →</button></div></li></ol></section></div>
+    <section class="panel"><div class="section-heading"><h2>Make the shop your own</h2><span class="badge">Getting started</span></div><ol class="setup-steps"><li><div><strong>Add your menu</strong><p>Photos, prices, categories, and the little details that make each bake yours.</p><button class="button button-quiet" data-view="flavors">Manage flavors →</button></div></li><li><div><strong>Plan your baking dates</strong><p>Choose how many of each product can be collected or delivered on each date.</p><button class="button button-quiet" data-view="inventory">Set daily quantities →</button></div></li><li><div><strong>Finish your shop details</strong><p>Add payment details, pickup information, delivery zones, and your production schedule.</p><button class="button button-quiet" data-view="settings">Shop settings →</button></div></li></ol></section></div>
     ${state.settings.paused ? '<p class="notice" style="margin-top:22px">New orders are paused. Existing order links and valid payment-proof uploads remain available.</p>' : ''}
     ${state.connected ? emailStatusCard() : ''}`;
 }
@@ -199,7 +201,7 @@ function filteredProducts() {
   const { search, status, category } = state.productFilters;
   const query = search.trim().toLowerCase();
   const categoryIds = new Set(state.categories.map(c => c.id));
-  return state.products.filter(product =>
+  return areaProducts().filter(product =>
     (!query || product.name.toLowerCase().includes(query)) &&
     (!status || Boolean(product.active) === (status === 'active')) &&
     (!category || (category === '__uncategorized__' ? !categoryIds.has(product.category_id) : product.category_id === category))
@@ -210,38 +212,39 @@ function productFiltersActive() {
   return Boolean(f.search || f.status || f.category);
 }
 function productResults(products) {
-  if (!state.products.length) return `<section class="panel">${empty('Room for something delicious', 'Your ordering catalog starts empty. Add your own products, photos, and prices when you’re ready.', `<button class="button" data-action="new-product" ${owner() ? '' : 'disabled'}>+ Add your first product</button>`)}</section>`;
-  return products.length ? `<div class="product-grid">${products.map(product => `<article class="panel product-card"><div class="product-photo">${safeImage(product.photos?.[0]) ? `<img src="${esc(safeImage(product.photos[0]))}" alt="${esc(product.name)}" loading="lazy">` : '<span aria-hidden="true">♧</span>'}</div><div class="product-card-body"><h3>${esc(product.name)}</h3><p class="muted">${esc(state.categories.find(c => c.id === product.category_id)?.name || 'Uncategorized')}</p><div class="product-card-meta"><span>${product.lead_days} full production day${product.lead_days === 1 ? '' : 's'}</span><span>${product.allow_same_day === true ? '<span class="badge">Same-day eligible</span> ' : ''}${product.pickup_only ? '<span class="badge">Pickup only</span> ' : ''}${badge(product.active ? 'active' : 'hidden')}</span></div><div class="product-card-bottom"><strong>${money(product.price_cents)}${product.kind === 'flavor' ? ' / piece extra' : ''}${product.price_confirmed ? '' : ' · unconfirmed'}</strong><button class="button button-quiet" data-action="edit-product" data-id="${esc(product.id)}">${owner() ? 'Edit product' : 'View product'} →</button></div></div></article>`).join('')}</div>` : `<section class="panel">${empty('No matching products', 'Try another product name, status, or category, or clear the filters.')}</section>`;
+  if (!areaProducts().length) return `<section class="panel">${empty('Room for something delicious', 'Your ordering catalog starts empty. Add your own products, photos, and prices when you’re ready.', `<button class="button" data-action="new-product" ${owner() ? '' : 'disabled'}>+ Add your first ${productNoun()}</button>`)}</section>`;
+  return products.length ? `<div class="product-grid">${products.map(product => `<article class="panel product-card"><div class="product-photo">${safeImage(product.photos?.[0]) ? `<img src="${esc(safeImage(product.photos[0]))}" alt="${esc(product.name)}" loading="lazy">` : '<span aria-hidden="true">♧</span>'}</div><div class="product-card-body"><h3>${esc(product.name)}</h3><p class="muted">${esc(state.categories.find(c => c.id === product.category_id)?.name || 'Uncategorized')}</p><div class="product-card-meta"><span>${product.kind === 'flavor' ? (product.in_rotation ? 'On this month’s menu' : 'Outside this month’s menu') : product.kind === 'custom_box' ? 'Uses flavor-piece inventory' : 'Uses included flavors’ inventory'}</span><span>${product.allow_same_day === true ? '<span class="badge">Same-day eligible</span> ' : ''}${product.pickup_only ? '<span class="badge">Pickup only</span> ' : ''}${badge(product.active ? 'active' : 'hidden')}</span></div><div class="product-card-bottom"><strong>${money(product.price_cents)}${product.kind === 'flavor' ? ' / piece extra' : ''}${product.price_confirmed ? '' : ' · unconfirmed'}</strong><button class="button button-quiet" data-action="edit-product" data-id="${esc(product.id)}">${owner() ? (product.kind === 'flavor' ? 'Edit flavor' : 'Edit box') : 'View item'} →</button></div></div></article>`).join('')}</div>` : `<section class="panel">${empty('No matching products', 'Try another product name, status, or category, or clear the filters.')}</section>`;
 }
 function updateProductResults() {
   const products = filteredProducts();
   $('#product-results').innerHTML = productResults(products);
-  $('#product-count').textContent = `Showing ${products.length} of ${state.products.length} product${state.products.length === 1 ? '' : 's'}`;
+  $('#product-count').textContent = `Showing ${products.length} of ${areaProducts().length} ${productNoun(areaProducts().length !== 1)}`;
   $('[data-action="clear-product-filters"]').disabled = !productFiltersActive();
 }
 function productsView() {
   const f = state.productFilters;
   if (f.category && f.category !== '__uncategorized__' && !state.categories.some(c => c.id === f.category)) f.category = '';
   const products = filteredProducts();
-  return heading('Flavors & boxes', 'Manage rotating flavors, per-piece surcharges, and fixed sets.', `<button class="button button-secondary" data-action="categories">Categories</button><button class="button" data-action="new-product" ${owner() ? '' : 'disabled'}>+ Add product</button>`) + readonly() +
+  return heading(state.view === 'flavors' ? 'Flavors' : 'Boxes & sets', state.view === 'flavors' ? 'Your flavor collection, rotating menu, and per-piece surcharges.' : 'Fixed sets and custom boxes, each beautifully boxed.', `<button class="button button-secondary" data-action="categories">Categories</button><button class="button" data-action="new-product" ${owner() ? '' : 'disabled'}>+ Add ${productNoun()}</button>`) + readonly() +
     `<div class="product-filters" role="search" aria-label="Filter products"><label class="field product-search">Search products<input id="product-search" type="search" data-product-filter="search" placeholder="Search by product name" value="${esc(f.search)}" aria-controls="product-results" autocomplete="off"></label>${select('product-status', 'Status', option('', 'All statuses', f.status) + option('active', 'Active', f.status) + option('hidden', 'Hidden', f.status), 'data-product-filter="status" aria-controls="product-results"')}${select('product-category', 'Category', option('', 'All categories', f.category) + state.categories.map(c => option(c.id, c.name, f.category)).join('') + option('__uncategorized__', 'Uncategorized', f.category), 'data-product-filter="category" aria-controls="product-results"')}</div>` +
-    `<div class="product-filter-summary"><p class="muted no-margin" id="product-count" role="status">Showing ${products.length} of ${state.products.length} product${state.products.length === 1 ? '' : 's'}</p><button type="button" class="button button-quiet" data-action="clear-product-filters" ${productFiltersActive() ? '' : 'disabled'}>Clear filters</button></div><div id="product-results">${productResults(products)}</div>`;
+    `<div class="product-filter-summary"><p class="muted no-margin" id="product-count" role="status">Showing ${products.length} of ${areaProducts().length} ${productNoun(areaProducts().length !== 1)}</p><button type="button" class="button button-quiet" data-action="clear-product-filters" ${productFiltersActive() ? '' : 'disabled'}>Clear filters</button></div><div id="product-results">${productResults(products)}</div>`;
 }
 function inventoryView() {
   return heading('Daily quantities', 'Choose your dates, then set only the limits you need.') +
-    `<form data-form="inventory">${formError}<div class="quantity-layout"><aside class="panel quantity-calendar">${dateCalendar('inventory_dates', 'Select dates', state.inventoryDates, 'Choose one or more fulfillment dates.', manilaDate(), !state.connected, { saveLabel: 'Save quantities', selectionLabel: 'Apply quantities to these dates', minDate: manilaDate() })}<p class="quantity-explainer">Flavor quantities count pieces. Fixed-set quantities count boxes / sets. Custom boxes use flavor stock. Pickup and delivery share the daily stock.</p></aside><section class="panel quantity-products"><div class="quantity-products-heading"><div><h2>Flavors & fixed sets</h2><p>Blank = no limit · 0 = no stock</p></div><span>${stockProducts().length} stock items</span></div><p class="quantity-help">Totals include quantities already ordered. Clearing a saved quantity removes its limit. Product availability and shop schedules still apply.</p><div id="quantity-products">${inventoryProducts()}</div><div class="quantity-save"><p id="quantity-save-summary" aria-live="polite">${inventorySaveSummary()}</p><button type="button" class="button button-secondary" data-action="reset-quantities">Reset edits</button><button type="submit" class="button" ${locked()}>Save quantities</button></div></section></div></form>`;
+    `<form data-form="inventory">${formError}<div class="quantity-layout"><aside class="panel quantity-calendar">${dateCalendar('inventory_dates', 'Select dates', state.inventoryDates, 'Choose one or more fulfillment dates.', manilaDate(), !state.connected, { saveLabel: 'Save quantities', selectionLabel: 'Apply quantities to these dates', minDate: manilaDate() })}<p class="quantity-explainer">Count individual cheesecake pieces. Fixed sets and custom boxes both use these quantities. Pickup and delivery share the same daily stock.</p></aside><section class="panel quantity-products"><div class="quantity-products-heading"><div><h2>Flavor quantities</h2><p>Blank = no limit · 0 = no stock</p></div><span>${stockProducts().length} stock items</span></div><p class="quantity-help">Totals include quantities already ordered. Clearing a saved quantity removes its limit. Product availability and shop schedules still apply.</p><div id="quantity-products">${inventoryProducts()}</div><div class="quantity-save"><p id="quantity-save-summary" aria-live="polite">${inventorySaveSummary()}</p><button type="button" class="button button-secondary" data-action="reset-quantities">Reset edits</button><button type="submit" class="button" ${locked()}>Save quantities</button></div></section></div></form>`;
 }
 function inventorySaveSummary() {
   const count = Object.keys(state.inventoryDrafts).length, dates = state.inventoryDates.length;
   return count ? `${count} edited product${count === 1 ? '' : 's'} will apply to ${dates} selected date${dates === 1 ? '' : 's'}.` : dates ? `${dates} date${dates === 1 ? '' : 's'} selected. Saved limits are shown; mixed limits stay unchanged until edited.` : 'Select at least one date to begin.';
 }
 function inventoryProducts() {
-  return stockProducts().length ? stockProducts().map(product => {
+  const rows = products => products.map(product => {
     const value = quantitySelection(product.id, state.inventoryDates, state.inventory, state.inventoryDrafts);
     const id = `quantity-${product.id}`, disabled = !state.connected || !state.inventoryDates.length;
     const photo = safeImage(product.photos?.[0]);
     return `<div class="quantity-product" data-quantity-product="${esc(product.id)}"><div class="quantity-photo">${photo ? `<img src="${esc(photo)}" alt="" loading="lazy">` : '<span>No photo</span>'}</div><div class="quantity-product-name"><label for="${esc(id)}">${esc(product.name)}</label><small>${product.kind === 'flavor' ? 'Individual pieces' : 'Boxes / sets'}</small>${product.active ? '' : '<span class="quantity-hidden">Hidden from menu</span>'}</div><div class="quantity-control-field"><label class="sr-only" for="${esc(id)}">${esc(product.name)} total quantity per date</label><div class="quantity-input-row"><input id="${esc(id)}" data-quantity-id="${esc(product.id)}" type="number" min="0" max="1000000" step="1" inputmode="numeric" value="${esc(value.value)}" placeholder="${value.mixed ? 'Mixed' : 'No limit'}" aria-describedby="${esc(id)}-status" ${disabled ? 'disabled' : ''}><button type="button" class="button button-quiet" data-action="unlimit-quantity" data-id="${esc(product.id)}" aria-label="Remove limit for ${esc(product.name)}" ${disabled ? 'disabled' : ''}>No limit</button></div><small id="${esc(id)}-status" data-quantity-status>${esc(quantityStatus(value, state.inventoryDates))}</small></div></div>`;
-  }).join('') : empty('No products yet', 'Add products to your menu to set daily quantities.');
+  }).join('');
+  return stockProducts().length ? rows(stockProducts()) : empty('No flavors yet', 'Add flavors before setting daily piece quantities.');
 }
 function updateInventoryProducts() {
   $('#quantity-products').innerHTML = inventoryProducts();
@@ -299,13 +302,15 @@ function teamView() {
 }
 
 function openProduct(id) {
-  productDraft = clone(state.products.find(p => p.id === id) || { kind: 'set', price_confirmed: false, in_rotation: true, name: '', description: '', category_id: '', price_cents: 0, min_quantity: 1, lead_days: 1, active: false, pickup_only: false, allow_same_day: false, photos: [], option_groups: [], sort_order: 0 });
+  productDraft = clone(state.products.find(p => p.id === id) || { kind: state.view === 'flavors' ? 'flavor' : 'set', box_flavors: [], price_confirmed: false, in_rotation: true, name: '', description: '', category_id: '', price_cents: 0, min_quantity: 1, lead_days: 1, active: false, pickup_only: false, allow_same_day: false, photos: [], option_groups: [], sort_order: 0 });
   renderProductDialog();
 }
 function captureProduct() {
   const form = $('[data-form="product"]');
   if (!form) return;
-  Object.assign(productDraft, { kind: fieldValue(form, 'kind') || productDraft.kind, price_confirmed: fieldChecked(form, 'price_confirmed'), in_rotation: fieldChecked(form, 'in_rotation'), photos: list(fieldValue(form, 'photo_urls')), name: fieldValue(form, 'name'), description: fieldValue(form, 'description'), category_id: fieldValue(form, 'category_id') || null, price_cents: cents(fieldValue(form, 'price')), min_quantity: Number(fieldValue(form, 'min_quantity')), lead_days: Number(fieldValue(form, 'lead_days')), sort_order: Number(fieldValue(form, 'sort_order')), active: fieldChecked(form, 'active'), pickup_only: fieldChecked(form, 'pickup_only'), allow_same_day: fieldChecked(form, 'allow_same_day'), label: productLabelSettings({ enabled: fieldChecked(form, 'label_enabled'), text: fieldValue(form, 'label_text'), color: fieldValue(form, 'label_color') }) });
+  Object.assign(productDraft, { kind: fieldValue(form, 'kind') || productDraft.kind, price_confirmed: fieldChecked(form, 'price_confirmed'), in_rotation: form.elements.namedItem('in_rotation') ? fieldChecked(form, 'in_rotation') : productDraft.in_rotation, name: fieldValue(form, 'name'), description: fieldValue(form, 'description'), category_id: fieldValue(form, 'category_id') || null, price_cents: cents(fieldValue(form, 'price')), min_quantity: Number(fieldValue(form, 'min_quantity')), lead_days: Number(fieldValue(form, 'lead_days')), sort_order: Number(fieldValue(form, 'sort_order')), active: fieldChecked(form, 'active'), pickup_only: fieldChecked(form, 'pickup_only'), allow_same_day: fieldChecked(form, 'allow_same_day'), label: productLabelSettings({ enabled: fieldChecked(form, 'label_enabled'), text: fieldValue(form, 'label_text'), color: fieldValue(form, 'label_color') }) });
+  if (productDraft.kind === 'set') productDraft.box_flavors = $$('[data-box-flavor]', form).map(select => select.value).filter(Boolean);
+  if (productDraft.kind === 'flavor') Object.assign(productDraft, { min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
   productDraft.option_groups = [];
 }
 function productLabelEditor(value) {
@@ -349,25 +354,31 @@ function bindPhotoOrder() {
 }
 function renderProductDialog() {
   const p = productDraft;
-  const kind=p.kind || 'set';
-  showDialog(p.id ? 'Edit '+p.name : 'Add to Elio', `<form data-form="product">${formError}
-    <div class="field-row">${select('kind','Item type',option('set','Fixed box / set',kind)+option('custom_box','Custom box of three',kind)+option('flavor','Individual flavor',kind), p.id ? 'disabled' : '')}${input('name','Name',p.name,'text','required maxlength="160"')}</div>
-    <p class="notice">${kind==='flavor' ? 'Flavor stock is counted in individual pieces. The surcharge is added for each piece selected in a custom box.' : kind==='custom_box' ? 'A custom box always contains three pieces. Its price is the base price plus the selected flavor surcharges. It reserves individual flavor stock.' : 'A fixed box or set has its own quantity. Selling it does not deduct from the individual flavor stock used by custom boxes.'}</p>
-    ${textarea('description','Description',p.description,'','maxlength="6000"')}
-    <div class="field-row">${input('price',kind==='flavor' ? 'Surcharge per piece · PHP' : 'Base price per box / set · PHP',amount(p.price_cents),'number','required min="0" max="1000000" step="0.01"')}${select('category_id','Category',option('','Uncategorized',p.category_id||'')+state.categories.map(c=>option(c.id,c.name,p.category_id)).join(''))}</div>
-    ${check('price_confirmed','I have confirmed this price / surcharge',p.price_confirmed===true)}
-    ${check('active',kind==='flavor'?'Available for custom boxes':'Available for ordering',p.active)}
-    ${kind==='flavor'?check('in_rotation','Include in this month’s menu',p.in_rotation!==false):''}
-    <div class="field-row three">${input('min_quantity','Minimum boxes per order',p.min_quantity||1,'number','required min="1" max="9999" step="1"')}${input('lead_days','Full production days',p.lead_days||0,'number','required min="0" max="365" step="1"')}${input('sort_order','Display order',p.sort_order||0,'number','required step="1"')}</div>
-    ${check('pickup_only','Pickup only',p.pickup_only===true)}${check('allow_same_day','Allow same-day orders (requires 0 production days)',p.allow_same_day===true)}
+  const kind = p.kind || 'set';
+  const flavor = kind === 'flavor';
+  const names = { flavor: 'flavor', set: 'fixed box', custom_box: 'custom box' };
+  const boxChoices = state.products.filter(item => item.kind === 'flavor');
+  const savedFlavor = value => boxChoices.find(item => item.id === value || item.slug === value)?.id || '';
+  showDialog(p.id ? 'Edit ' + p.name : 'Add ' + names[kind], `<form data-form="product">${formError}
+    ${flavor ? '<input type="hidden" name="kind" value="flavor">' : select('kind', 'Box type', option('set', 'Fixed box / set', kind) + option('custom_box', 'Custom box of three', kind), p.id ? 'disabled' : '')}
+    ${input('name', flavor ? 'Flavor name' : 'Box name', p.name, 'text', 'required maxlength="160"')}
+    ${textarea('description', 'Description', p.description, 'Describe the flavor or what makes this box special.', 'maxlength="6000"')}
+    <div class="field-row">${input('price', flavor ? 'Surcharge per piece · PHP' : kind === 'set' ? 'Fixed price per box · PHP' : 'Base price per box · PHP', amount(p.price_cents), 'number', 'required min="0" max="1000000" step="0.01"', flavor ? 'Use 0 for flavors included in the base box price.' : kind === 'set' ? 'The full set price. Flavor surcharges apply only to custom boxes.' : '')}${select('category_id', 'Category', option('', 'Uncategorized', p.category_id || '') + state.categories.map(c => option(c.id, c.name, p.category_id)).join(''))}</div>
+    ${check('price_confirmed', 'I have confirmed this price / surcharge', p.price_confirmed === true)}
+    ${check('active', flavor ? 'Available for boxes' : 'List this box for ordering', p.active)}
+    ${flavor ? check('in_rotation', 'Include in this month’s menu', p.in_rotation !== false) : ''}
+    ${kind === 'set' ? `<section class="subsection"><h3>Inside this box</h3><p class="muted">Choose a flavor for each of the three pieces. Repeats are welcome. Each box uses these flavors’ stock. If any required flavor is unavailable, the set is sold out.</p><div class="field-row three">${[0,1,2].map(i => select('box_flavor_' + i, 'Cheesecake ' + (i + 1), option('', 'Choose a flavor', savedFlavor(p.box_flavors?.[i])) + boxChoices.map(f => option(f.id, f.name, savedFlavor(p.box_flavors?.[i]))).join(''), 'data-box-flavor required')).join('')}</div></section>` : ''}
+    ${kind === 'custom_box' ? '<p class="notice">Customers choose exactly three pieces. Each flavor adds its own surcharge and uses its own daily stock. Manage those choices in Flavors.</p>' : ''}
+    ${flavor ? '<p class="notice">Inventory is counted in individual pieces and shared across all boxes. Set a quantity for each date in Daily quantities. Unavailable flavors also make their fixed sets unavailable.</p>' : `<section class="subsection"><h3>Ordering & fulfillment</h3><div class="field-row">${input('min_quantity', 'Minimum boxes per order', p.min_quantity || 1, 'number', 'required min="1" max="9999" step="1"')}${input('lead_days', 'Full production days', p.lead_days || 0, 'number', 'required min="0" max="365" step="1"')}</div>${check('pickup_only', 'Pickup only', p.pickup_only === true)}${check('allow_same_day', 'Allow same-day orders (requires 0 production days)', p.allow_same_day === true)}</section>`}
+    ${input('sort_order', 'Display order', p.sort_order || 0, 'number', 'required step="1"')}
     ${productLabelEditor(p.label)}
-    <div class="subsection"><h3>Photos</h3>${textarea('photo_urls','Image paths / URLs',(p.photos||[]).join('\n'),'One assets/ path or HTTPS image URL per line. Concept images remain placeholders.','rows="3"')}<div id="product-photo-order">${renderProductPhotos(p.photos,{escapeHtml:esc,safeImage,disabled:true})}</div><p id="photo-order-status" class="sr-only" role="status"></p></div>
-    ${kind==='custom_box'?'<p class="notice">Flavor choices, availability, and surcharges come from the individual flavor records. Update those records to change the custom-box menu.</p>':''}
-    ${actions(p.id?'Save changes':'Create item')}
+    <section class="subsection"><h3>Photos</h3><p class="muted">JPEG, PNG, or WebP · up to 5 MB each. Product photos are public. The first photo is the cover.</p><p class="help-text" id="photo-order-help">Drag photos to rearrange them, or focus a photo and use the arrow keys. Save the item to publish changes.</p><div id="product-photo-order">${renderProductPhotos(p.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) })}</div><p id="photo-order-status" class="sr-only" role="status" aria-live="polite"></p>${input('photos', 'Upload photos', '', 'file', 'accept="image/jpeg,image/png,image/webp" multiple id="product-photos" ' + ownerLocked())}</section>
+    ${actions(p.id ? 'Save changes' : 'Create ' + names[kind])}
   </form>`);
+  bindPhotoOrder();
   updateProductLabelPreview();
-  for (const name of ['label_enabled','label_text','label_color']) $('[data-form="product"]').elements.namedItem(name).addEventListener('input',updateProductLabelPreview);
-  $('[data-form="product"]').elements.namedItem('kind').addEventListener('change',()=>{captureProduct();renderProductDialog();});
+  for (const name of ['label_enabled', 'label_text', 'label_color']) $('[data-form="product"]').elements.namedItem(name).addEventListener('input', updateProductLabelPreview);
+  $('[data-form="product"]').elements.namedItem('kind').addEventListener('change', () => { captureProduct(); renderProductDialog(); });
 }
 
 function categoriesDialog() {
@@ -389,6 +400,7 @@ function promoDialog(id) {
 
 function selectionText(item) {
   if (Array.isArray(item.selection_labels) && item.selection_labels.length) return item.selection_labels.map(v => typeof v === 'string' ? v : `${v.group ? v.group + ': ' : ''}${v.quantity || v.count ? `${v.quantity || v.count} × ` : ''}${v.label || v.name || ''}${Number(v.surcharge_cents) > 0 ? ` (+${money(v.surcharge_cents)} each; +${money(v.surcharge_cents * (v.quantity || v.count || 1))} per unit)` : ''}`).join(' · ');
+  if (item.flavor_contents?.length) return item.flavor_contents.map(f => `${f.quantity} × ${f.name}`).join(' · ');
   const product = state.products.find(p => p.id === item.product_id);
   return Object.entries(item.selections || {}).flatMap(([groupId, choices]) => Object.entries(choices).filter(([, count]) => Number(count) > 0).map(([choiceId, count]) => { const group = product?.option_groups?.find(g => g.id === groupId); const choice = group?.choices.find(c => c.id === choiceId); return `${choice?.label || choiceId} × ${count}${Number(choice?.surcharge_cents) > 0 ? ` (+${money(choice.surcharge_cents)} each; +${money(choice.surcharge_cents * count)} per unit)` : ''}`; })).join(' · ');
 }
@@ -481,7 +493,7 @@ function renderEditOrder() {
     <p class="notice">Admin edits bypass product lead times. Changes to items or the date must still fit the affected daily quantities and fulfillment availability. Saved unit prices stay with unchanged configurations.</p>
     <div class="field-row">${input('fulfillment_date', 'Fulfillment date', d.fulfillment_date, 'date', 'required')}${select('method', 'Method', option('pickup', 'Pickup', d.method) + option('delivery', 'Delivery', d.method), 'id="edit-method"')}</div>
     <h3>Items & configurations</h3>${d.items.map(editItemMarkup).join('')}
-    <button type="button" class="button button-secondary" data-action="add-edit-item" ${state.products.length ? '' : 'disabled'}>+ Add product</button>
+    <button type="button" class="button button-secondary" data-action="add-edit-item" ${state.products.length ? '' : 'disabled'}>+ Add ${productNoun()}</button>
     <div class="subsection"><h3>Buyer details</h3><div class="field-row three">${input('buyer_name', 'Name', d.buyer.name, 'text', 'required')}${input('buyer_email', 'Email', d.buyer.email, 'email', 'required')}${input('buyer_phone', 'Contact number', d.buyer.phone, 'tel', 'required')}</div>${socialFields(d.buyer)}</div>
     <div class="subsection" id="edit-delivery" ${d.method === 'pickup' ? 'hidden' : ''}><h3>Delivery recipient & address</h3><div class="field-row">${input('recipient_name', 'Recipient name', d.recipient?.name, 'text', d.method === 'delivery' ? 'required' : '')}${input('recipient_phone', 'Recipient contact number', d.recipient?.phone, 'tel', d.method === 'delivery' ? 'required' : '')}</div>${select('locality', 'Covered city / barangay', option('', 'Select location', d.address?.locality) + localityOptions.map(locality => option(locality, locality, d.address?.locality)).join(''), `id="edit-locality" ${d.method === 'delivery' ? 'required' : ''}`)}${input('line1', 'Street address / building', d.address?.line1, 'text', d.method === 'delivery' ? 'required' : '')}<div class="field-row">${input('line2', 'Unit / floor / additional address', d.address?.line2)}${input('postal_code', 'Postal code', d.address?.postal_code)}</div></div>
     <div class="subsection">${textarea('instructions', 'Fulfillment instructions', d.instructions)}${input('delivery_fee', 'Delivery fee override · PHP', amount(d.method === 'pickup' ? 0 : d.delivery_cents), 'number', 'required min="0" step="0.01" data-edit-value', 'The zone fee is suggested when the location changes. You may adjust it for this order.')}<div id="edit-totals"></div><p class="help-text">The total shown is an estimate. Save changes checks prices and availability automatically. If the total changes, you’ll be asked to confirm the old and new totals. Paid-order differences are settled directly with the customer.</p><div id="edit-save-notice"></div>${textarea('reason', 'Reason for these changes · optional', d.reason, 'Leave blank if no note is needed. N/A will be recorded; the changes, staff member, and time are still kept in history.', 'maxlength="4000"')}</div>
@@ -632,7 +644,7 @@ function exportOrders() {
 
 document.addEventListener('click', async event => {
   const view = event.target.closest('[data-view]');
-  if (view) { state.view = view.dataset.view; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
+  if (view) { state.view = view.dataset.view; state.productFilters = { search: '', status: '', category: '' }; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
   const button = event.target.closest('[data-action]');
   if (!button) return;
   event.preventDefault();
@@ -707,24 +719,39 @@ document.addEventListener('change', async event => {
       if (target.value === 'percent') value.max = '100'; else value.removeAttribute('max');
     }
     if (target.id === 'product-photos') {
-      captureProduct();
-      const files = [...target.files];
-      if (files.length + productDraft.photos.length > 12) throw new Error('Use up to 12 photos per product.');
       const form = target.closest('form');
-      const errorBox = $('.form-error', form); errorBox.textContent = '';
-      target.disabled = true;
-      const saveButton = $('button[type="submit"]', form); saveButton.disabled = true;
+      if (form.dataset.busy === 'true' || ownerLocked()) return;
+      captureProduct();
+      const draft = productDraft, files = [...target.files];
+      if (!files.length) return;
+      if (files.length + draft.photos.length > 20) throw new Error('Use up to 20 photos per item.');
+      for (const file of files) {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Use a JPEG, PNG, or WebP image.');
+        if (file.size > 5 * 1024 * 1024) throw new Error('Each image must be 5 MB or smaller.');
+      }
+      form.dataset.busy = 'true';
+      const controls = [...form.querySelectorAll('input,select,textarea,button')];
+      const disabled = controls.map(control => control.disabled);
+      controls.forEach(control => { control.disabled = true; });
+      let failure = '';
       try {
         for (const file of files) {
-          if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Use a JPEG, PNG, or WebP image.');
-          if (file.size > 5 * 1024 * 1024) throw new Error('Each image must be 5 MB or smaller.');
-          toast(`Uploading ${file.name}…`);
+          toast('Uploading ' + file.name + '…');
           const result = await upload(file, { kind: 'product' });
           if (!safeImage(result.url)) throw new Error('The upload service did not return a valid image URL.');
-          productDraft.photos.push(result.url);
+          draft.photos.push(result.url);
         }
-        renderProductDialog(); toast('Photos uploaded. Save the product to publish your changes.');
-      } catch (error) { errorBox.textContent = error.message; } finally { target.disabled = !state.connected; saveButton.disabled = !state.connected || state.role !== 'owner'; }
+      } catch (error) { failure = error.message; }
+      finally {
+        form.dataset.busy = 'false';
+        controls.forEach((control, index) => { control.disabled = disabled[index]; });
+        // Closing or switching dialogs during upload must not reopen an old editor.
+        if (modal.open && productDraft === draft && form.isConnected) {
+          renderProductDialog();
+          if (failure) $('.form-error', modal).textContent = failure + ' Successfully uploaded photos remain in this draft.';
+          else toast('Photos uploaded. Save the item to publish your changes.');
+        }
+      }
     }
     if (target.hasAttribute('data-edit-product')) {
       captureEdit();
@@ -784,6 +811,7 @@ async function submitForm(form) {
   switch (type) {
     case 'product': {
       captureProduct();
+      if (productDraft.kind === 'set' && productDraft.box_flavors.length !== 3) throw new Error('Choose three flavors for this fixed box.');
       if (productDraft.allow_same_day && productDraft.lead_days !== 0) throw new Error('Same-day orders require 0 full production days. Set full production days to 0, or turn off Allow same-day orders.');
       if (productDraft.label.enabled && !productDraft.label.text) throw new Error('Enter text for your product label, or turn the label off.');
       if (productDraft.option_groups.some(group => !group.choices.length || !group.choices.some(choice => choice.active))) throw new Error('Every option group needs at least one available choice.');

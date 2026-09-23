@@ -10,18 +10,21 @@ First-owner activation consumes only that verified account's pending reservation
 
 ## Adaptation from TLB
 
-Source: `BrentChuaTLBK/bakery-website`, commit `7e81baa1a6ef9ae179662aeea7cc238e59e37764`. The foundation consolidates its ordering migration and subsequent contact, payment-window, delivery, booking-calendar, same-day, promo, cutoff, email-outbox, and daily-quantity fixes. The admin reuses its overview, orders, analytics, promos, settings, daily-quantity calendar, team permissions, order amendments, and print summaries. No TLB customer records, accounts, API keys, business settings, or payment instructions are copied.
+Source: `BrentChuaTLBK/bakery-website`, commit `7e81baa1a6ef9ae179662aeea7cc238e59e37764`. The foundation consolidates its ordering migration and subsequent contact, payment-window, delivery, booking-calendar, same-day, promo, cutoff, email-outbox, and daily-quantity fixes. The admin reuses its overview, orders, analytics, promos, settings, daily-quantity calendar, team permissions, order amendments, and print summaries. No TLB customer records, accounts, or API keys are copied. At the owner’s explicit request, pickup information, delivery zones/fees, production weekdays/cutoff, and manual-payment instructions were copied into Elio as editable defaults. Account numbers remain in the private database, outside this repository.
 
 Elio changes:
 
-- `kind=flavor`: price is the extra charge per individual piece; active and in-rotation flags determine custom-box availability.
+- `kind=flavor`: price is the extra charge per individual piece in custom boxes; active and in-rotation flags determine availability for every box that uses that flavor.
 - `kind=custom_box`: base price plus exactly three flavor surcharges per box. Each flavor's piece count is multiplied by the number of boxes.
-- `kind=set`: one set consumes one unit of its own stock. It does not consume flavor-piece stock.
-- Saved line items include trusted stock requirements and price snapshots. Unchanged configurations retain their saved unit prices during amendments. New configurations use current prices.
+- `kind=set`: the owner selects three flavor IDs in `box_flavors` (repeats allowed) and enters one fixed total price. Customers cannot substitute flavors. Each set consumes the included flavors’ piece quantities; no separate box inventory exists. Any unavailable component makes the set unavailable.
+- Saved line items include trusted per-box `stock_requirements`, `flavor_contents` (IDs, names, quantities), and price snapshots. Multiply flavor quantities by ordered boxes for production totals. Unchanged configurations retain their saved recipes and unit prices during amendments. New configurations use current prices and recipes.
 - Reservations aggregate all cart lines. A database transaction lock serializes stock, promo, cancellation, and amendment mutations. Failed updates roll back all stock changes.
 - Unpaid cancellation/expiry releases holds. Paid cancellation explicitly chooses whether to restore stock. Redeemed promo usage remains counted after paid cancellation.
 - Prices start as unconfirmed drafts. The shop starts paused, with no payment account, pickup address, delivery fees, or stock limits assumed.
-- Blank daily quantities mean unlimited, as in TLB. Zero means sold out. Flavors and fixed sets have separate quantity rows; custom boxes do not have a quantity row.
+- Blank daily quantities mean unlimited, as in TLB. Zero means sold out. Daily quantities contains only individual flavors; all boxes share these limits.
+- `catalog` accepts optional `fulfillment_date` and returns `stock_available`, `remaining_boxes`, and flavor stock for that date. These are stock indicators; the quote still enforces lead time, closures, pickup/delivery rules, and paused ordering.
+- Customer date selection and server quotes are limited to this month and next month in Asia/Manila. Staff calendars and authorized amendments retain their separate date rules.
+- Owners can upload JPEG/PNG/WebP product photos up to 5 MB in the public `product-images` bucket. An INSERT-only Storage policy checks the current database owner role and their own UUID folder. Removing a photo from a product detaches it; it does not delete the stored object.
 
 ## Security
 
@@ -35,16 +38,22 @@ The customer account page shows a Staff dashboard link only after `shop_api('acc
 
 1. Verify Elio Resend/SMTP delivery and add both customer and staff account redirect URLs in hosted Supabase Auth settings. Follow [Google sign-in setup](GOOGLE-SIGN-IN.md) to create Elio's own Google OAuth client and enable its provider. Never reuse TLB keys or store secrets in `dist`.
 2. The privately designated owner account is verified and has claimed its role. Future staff accounts still require explicit authorization in Team access.
-3. Set confirmed prices, flavor surcharges, stock limits, production policy, pickup details, delivery zones, and payment instructions.
-4. Connect the customer storefront and proof-upload/proof-read Edge Functions to the tested RPC contract. The existing shop remains a preview; this change does not enable checkout.
-5. Configure Elio's email worker secrets and verify delivery before opening orders. The worker and private scheduler use a one-minute interval. Follow [email setup](EMAIL-SETUP.md) for the Auth confirmation template, worker configuration, and remaining customer-order link integration. The existing lazy expiry check also frees overdue holds on subsequent API calls.
+3. Confirm actual prices and flavor surcharges, activate the intended flavors and boxes, set daily piece quantities, and review the copied fulfillment/payment defaults before unpausing orders.
+4. Sync the deployment fork to publish the connected storefront. `proof-upload` and `proof-url` are deployed independently to Elio. Keep new orders paused while confirming the catalog and testing a real email delivery.
+5. Configure Elio's email worker secrets and verify delivery before opening orders. The worker and private scheduler use a one-minute interval. Follow [email setup](EMAIL-SETUP.md) for the Auth confirmation template, worker configuration, and secure customer-order links. The existing lazy expiry check also frees overdue holds on subsequent API calls.
 6. Connect an Elio analytics property if website visitor reporting is wanted. Sales/order analytics already reads only Elio orders.
 
 Supabase Auth Site URL: `https://eliocheesecakes.com`. Allowed redirect URLs: `https://eliocheesecakes.com/admin-account.html`, `https://eliocheesecakes.com/account.html`, and their `http://127.0.0.1:4173` counterparts for local testing. Set these in the hosted dashboard; editing `supabase/config.toml` alone does not change the hosted project.
 
+## Checkout and order references
+
+The shop defaults to Pickup and the earliest date with sufficient stock, including all saved basket lines. It supports custom and fixed boxes, delivery address/fee review, full manual payment, private receipt upload within 15 minutes, and staff approval. Proof storage is private; upload authorization is checked before storage and again at commit. Staff proof URLs expire after five minutes. Order emails distinguish awaiting payment from payment approved.
+
+The visible reference uses `ELIO-` plus six random characters from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ`. After five collisions it tries a longer length (up to nine), under the existing order transaction lock and unique reference index. Existing references remain unchanged. The separate UUID and 256-bit guest access token remain the authorization mechanism; references cannot view orders or upload proof.
+
 ## Local checks
 
-Run `npm run check`. In `tests/backend`, run `npm ci` then `npm test`. PGlite is pinned at 0.5.8. A scratch dependency install can be selected with `PGLITE_PACKAGE_ROOT`. Tests execute the real migrations with mocked Supabase platform roles, including permission-denial checks. PGlite executes serially and does not prove cross-connection locking performance; a concurrent hosted smoke test is documented separately when run.
+Run `npm run check`, `node tests/shop-rules.test.mjs`, `node --experimental-transform-types tests/proof-functions.test.mjs`, and `node --experimental-transform-types tests/email-worker.test.mjs`. In `tests/backend`, run `npm ci` then `npm test`. PGlite is pinned at 0.5.8. A scratch dependency install can be selected with `PGLITE_PACKAGE_ROOT`. Tests execute the real migrations with mocked Supabase platform roles, including permission-denial checks. PGlite executes serially and does not prove cross-connection locking performance; a concurrent hosted smoke test is documented separately when run.
 
 The global transaction lock follows the TLB implementation. Measure response time and lock waits before increasing throughput; per-resource locking can be introduced if measured traffic warrants it.
 

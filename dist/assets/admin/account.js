@@ -1,4 +1,4 @@
-import { auth, ready, initializationError, authLink, api } from './client.js';
+import { auth, ready, initializationError, authLink, api, escapeHtml as esc, money, formatDate } from './client.js';
 import { config } from './config.js';
 
 const form = document.querySelector('#account-form');
@@ -16,6 +16,19 @@ let mode = 'signin';
 let busy = false;
 let googleAvailable = false;
 let resendAfter = 0;
+
+async function loadOrders() {
+  const section = document.querySelector('#account-orders');
+  if (!section) return;
+  section.textContent = 'Loading your orders…';
+  try {
+    const orders = await api('my_orders');
+    section.innerHTML = '<h2>Your orders</h2>' + (orders.length ? orders.map(order => `<a class="account-order" href="order.html#order=${encodeURIComponent(order.id)}"><strong>${esc(order.reference)}</strong><span>${esc(formatDate(order.fulfillment_date))} · ${esc(order.method)}</span><span>${esc(money(order.total_cents))} · ${esc(String(order.payment_status).replaceAll('_', ' '))}</span><span>View order →</span></a>`).join('') : '<p>No orders yet. A little Elio awaits.</p>');
+  } catch {
+    section.innerHTML = '<p>Your order history could not load.</p><button class="button button-secondary" type="button">Try again</button>';
+    section.querySelector('button').onclick = loadOrders;
+  }
+}
 
 function updateControls() {
   document.querySelectorAll('#account-tabs button, #account-recovery button, #account-back').forEach(button => { button.disabled = busy; });
@@ -69,7 +82,7 @@ function setMode(value) {
   heading.textContent = { signin: 'Sign in to Elio.', signup: 'Make yourself at home.', reset: 'Reset your password.', recovery: 'Choose a new password.', resend: 'Confirm your email.' }[value];
   intro.textContent = {
     signin: customer ? 'A little Elio, just for you. Sign in to your account.' : 'Use your Elio account. Dashboard access is granted separately by an owner.',
-    signup: customer ? 'Create your Elio account. Online ordering and order history are coming soon.' : 'Create your Elio account. An owner will need to grant you dashboard access.',
+    signup: customer ? 'Create your Elio account to keep your orders together and use eligible promo codes.' : 'Create your Elio account. An owner will need to grant you dashboard access.',
     reset: 'Enter your email address and we’ll send you a link to reset your password.',
     recovery: 'Choose a password for your Elio account, then enter it again to confirm.',
     resend: 'Enter the email address you used to create your Elio account.',
@@ -209,6 +222,7 @@ else if (auth) {
     document.querySelector('#account-provider').hidden = true;
     document.querySelector('#signed-in').hidden = false;
     message(`Signed in as ${data.session.user.email}.`);
+    if (customer) loadOrders();
     const dashboardLink = document.querySelector('#staff-dashboard');
     if (dashboardLink) {
       try {

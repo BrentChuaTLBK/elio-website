@@ -31,15 +31,15 @@ export default async function({db,check,state}) {
   await api('save_settings',{settings:{paused:false,payment_instructions:'QA only',pickup_address:'QA pickup',contact_email:'owner@example.test',site_url:'https://example.test'}},ids.owner);
   v=await product({kind:'flavor',name:'Vanilla',price_cents:0,in_rotation:true});
   m=await product({kind:'flavor',name:'Matcha',price_cents:5000,in_rotation:true});
-  s=await product({kind:'set',name:'Signature Trio',price_cents:99000});
+  s=await product({kind:'set',name:'Signature Trio',price_cents:99000,box_flavors:[v.id,v.id,m.id]});
   custom=await product({kind:'custom_box',name:'Custom Box',price_cents:90000});
   date=await h.day(5);
-  for(const [p,n] of [[v,20],[m,20],[s,4]])await inventory(p,date,n);
+  for(const [p,n] of [[v,20],[m,20]])await inventory(p,date,n);
  })();
  await check('Prices require explicit confirmation; stock types are immutable',async()=>{
   await rejects(()=>product({price_confirmed:false}),/Confirm this price/);
-  await rejects(()=>api('save_product',{product:{...v,kind:'set'}},ids.owner),/cannot change/);
-  await rejects(()=>inventory(custom,date,10),/Custom boxes use flavor stock/);
+  await rejects(()=>api('save_product',{product:{...v,kind:'set',box_flavors:[v.id,v.id,v.id]}},ids.owner),/cannot change/);
+  await rejects(()=>inventory(custom,date,10),/All boxes use flavor stock/);
   await rejects(()=>product({price_cents:1.1}),/whole centavos|integer/);
  })();
  const mixed=(quantity=1, counts={[v.id]:1,[m.id]:2})=>item(custom,quantity,{flavors:counts});
@@ -62,25 +62,26 @@ export default async function({db,check,state}) {
   await rejects(()=>api('quote',checkout(custom,date,{items:[mixed()]})),/unavailable/);
   await api('save_product',{product:{...m,in_rotation:true}},ids.owner);
  })();
- await check('Checkout reserves flavors for custom boxes and independent set stock in one transaction',async()=>{
+ await check('Checkout reserves shared flavor pieces for custom boxes and fixed sets atomically',async()=>{
   const p=checkout(custom,date,{items:[mixed(2),item(s)]});o=await api('create_order',p,ids.customer);
   assert.equal(o.total_cents,299000);assert.match(o.reference,/^ELIO-/);
-  assert.deepEqual((await allocations(o.id)).map(a=>[a.product_id,a.quantity]).sort(),[[v.id,2],[m.id,4],[s.id,1]].sort());
-  assert.equal(await h.remaining(m,date),16);assert.equal(await h.remaining(s,date),3);
+  assert.deepEqual((await allocations(o.id)).map(a=>[a.product_id,a.quantity]).sort(),[[v.id,4],[m.id,5]].sort());
+  assert.equal(await h.remaining(m,date),15);assert.equal(await h.remaining(v,date),16);
   const retry=await api('create_order',p,ids.customer);assert.equal(retry.id,o.id);
   await rejects(()=>api('create_order',{...p,instructions:'different'},ids.customer),/different checkout/);
   await rejects(()=>api('get_order',{order_id:o.id},ids.stranger),/not authorized/);
   assert.equal((await api('get_order',{order_id:o.id},null,o.access_token)).id,o.id);
  })();
  await check('Stock checks aggregate repeated cart lines and do not oversell the last piece',async()=>{
-  await inventory(m,date,5);
+  await inventory(m,date,6);
   await rejects(()=>api('quote',checkout(custom,date,{items:[mixed(),mixed()]})),/Only 1 pieces/);
   const before=await scalar('select count(*) from elio.orders');
   await rejects(()=>api('create_order',checkout(custom,date,{items:[mixed()]})),/Only 1 pieces/);
   assert.equal(await scalar('select count(*) from elio.orders'),before);
-  // Sets can still sell even when the corresponding flavor pool is exhausted.
-  const setOrder=await api('create_order',checkout(s,date));assert.equal(await h.remaining(m,date),1);
-  await action('cancel_order',setOrder,{reason:'QA cancel'});assert.equal(await h.remaining(s,date),3);
+  // The final Matcha can make one fixed set; both box types then share sold-out stock.
+  const setOrder=await api('create_order',checkout(s,date));assert.equal(await h.remaining(m,date),0);
+  await rejects(()=>api('create_order',checkout(s,date)),/Only 0 pieces/);
+  await action('cancel_order',setOrder,{reason:'QA cancel'});assert.equal(await h.remaining(m,date),1);
   await inventory(m,date,20);
  })();
  await check('Staff can set quantities but cannot reduce a limit below existing reservations',async()=>{
@@ -91,18 +92,18 @@ export default async function({db,check,state}) {
  await check('Edits preserve saved custom prices and move the flavor reservations atomically',async()=>{
   await api('save_product',{product:{...m,price_cents:9000}},ids.owner);
   o=await action('edit_order',o,{reason:'QA quantity',changes:{items:[mixed(3),item(s)]}});
-  assert.equal(o.items[0].unit_price_cents,100000);assert.equal(await h.remaining(m,date),14);
-  const next=await h.day(6);await inventory(m,next,1);await inventory(v,next,20);await inventory(s,next,4);
+  assert.equal(o.items[0].unit_price_cents,100000);assert.equal(await h.remaining(m,date),13);
+  const next=await h.day(6);await inventory(m,next,1);await inventory(v,next,20);
   await rejects(()=>action('edit_order',o,{reason:'QA move',changes:{fulfillment_date:next}}),/Only 1 pieces/);
-  assert.equal((await order(o.id)).fulfillment_date,date);assert.equal(await h.remaining(m,date),14);
+  assert.equal((await order(o.id)).fulfillment_date,date);assert.equal(await h.remaining(m,date),13);
   await inventory(m,next,20);
   o=await action('edit_order',o,{reason:'QA move',changes:{fulfillment_date:next}});
-  assert.equal(await h.remaining(m,date),20);assert.equal(await h.remaining(m,next),14);date=next;
+  assert.equal(await h.remaining(m,date),20);assert.equal(await h.remaining(m,next),13);date=next;
   await rejects(()=>action('edit_order',{...o,revision:o.revision-1},{reason:'QA',changes:{instructions:'stale'}}),/order changed/);
  })();
- await check('Unpaid cancellation releases both stock pools exactly once',async()=>{
+ await check('Unpaid cancellation releases every shared flavor reservation exactly once',async()=>{
   o=await action('cancel_order',o,{reason:'QA cancel'});
-  assert.equal(await h.remaining(m,date),20);assert.equal(await h.remaining(s,date),4);
+  assert.equal(await h.remaining(m,date),20);assert.equal(await h.remaining(v,date),20);
   await rejects(()=>action('cancel_order',o,{reason:'QA repeated'}),/already closed/);
  })();
  await check('Promo limits count reservations and payment approval; paid cancellation keeps a redeemed use',async()=>{

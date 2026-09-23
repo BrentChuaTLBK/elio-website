@@ -281,8 +281,8 @@
     if (id === 'box') return boxView();
     if (id === 'story') return storyView();
     if (id === 'account') return accountView();
-    if (id === 'orders') return ordersView();
-    if (id === 'bag') return orderView(true);
+    if (id === 'orders') { location.assign('account.html'); return null; }
+    if (id === 'bag') { location.assign('order.html#your-bag'); return null; }
     if (id.startsWith('flavor-')) { const flavor = byId(id.slice(7)); if (flavor) return flavorView(flavor); }
     return null;
   }

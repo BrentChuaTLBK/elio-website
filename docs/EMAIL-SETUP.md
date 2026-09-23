@@ -17,17 +17,19 @@ The `email-worker` Edge Function runs on Elio's project (`dzxyhckkkrzqpwpavngn`)
 Required Elio Edge Function secrets:
 
 - `RESEND_API_KEY`: an Elio-only Resend key with Sending access, restricted to the verified Elio domain.
-- `EMAIL_FROM`: a sender on that verified domain, for example `Elio Basque Cheesecake <hello@eliocheesecakes.com>`.
+- `EMAIL_FROM`: a sender on that verified domain, `Elio Basque Cheesecake <orders@eliocheesecakes.com>`.
+
+Order emails set Reply-To to `elio.cheesecakes@gmail.com`. Their main action links to the secure order page for proof uploads and status updates. A separate orders mailbox is not required for outbound sending through a verified Resend domain.
 
 The scheduler credential is generated privately in Supabase Vault by the migration. It is not stored in GitHub, browser code, or the cron command. The worker verifies it through a service-role-only RPC before maintenance, claims, or sending. Gateway JWT verification is disabled because the handler implements this separate private credential check. Browser publishable keys and user sessions cannot authorize it.
 
 Missing Resend configuration returns HTTP 503 **before claiming messages**. Check the pg_net HTTP response and Edge Function logs as well as the cron status: a successful SQL invocation alone does not prove that a message was accepted or delivered. No emails are sent by deployment tests.
 
-Before opening customer ordering, finish the secure order view and payment proof integration at `/order.html`; the worker's customer links target that route. Checkout remains paused. Test real delivery with an explicitly authorized test order once that integration is ready. The newsletter is not handled by this worker.
+The secure order view and payment proof integration use `/order.html`; the worker’s customer links target that route. Checkout remains paused until the catalog is confirmed. Test real delivery with an explicitly authorized test order before opening customer orders. The newsletter is not handled by this worker.
 
 ## Verification
 
-Run `node --experimental-strip-types tests/email-worker.test.mjs` on Node 24 for mocked worker checks. The regular PGlite backend suite intentionally skips the hosted-only scheduling migration because PGlite does not supply pg_cron, pg_net, or Supabase Vault.
+Run `node --experimental-transform-types tests/email-worker.test.mjs` on Node 24 for mocked worker checks. The regular PGlite backend suite intentionally skips the hosted-only scheduling migration because PGlite does not supply pg_cron, pg_net, or Supabase Vault.
 
 On hosted Supabase, verify the schedule and execution without selecting Vault values or HTTP request headers:
 

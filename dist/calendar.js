@@ -1,5 +1,5 @@
-/* Elio's preview date picker. UI reference: TLB Kitchen's customer calendar.
-   No booking windows, cutoff times, closures, inventory, or backend are imported. */
+/* Elio's customer date picker. UI reference: TLB Kitchen's calendar.
+   Bookings are limited to the current and next Manila calendar months. */
 (() => {
   'use strict';
   const pad = value => String(value).padStart(2, '0');
@@ -14,7 +14,12 @@
     const date = dateObject(value);
     return !Number.isNaN(date.getTime()) && iso(date) === value;
   };
-  const isSelectable = value => isDate(value) && value >= today();
+  const bookingEnd = () => {
+    const date = dateObject(`${today().slice(0, 7)}-01`);
+    date.setUTCMonth(date.getUTCMonth() + 2, 0);
+    return iso(date);
+  };
+  const isSelectable = value => isDate(value) && value >= today() && value <= bookingEnd();
   const format = (value, options) => new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', ...options }).format(dateObject(value));
   const labelDate = value => format(value, { day: 'numeric', month: 'long', year: 'numeric' });
   const addDays = (value, amount) => { const date = dateObject(value); date.setUTCDate(date.getUTCDate() + amount); return iso(date); };
@@ -45,13 +50,14 @@
     function render({ focusDate, focusControl, focus = false } = {}) {
       const current = today();
       if (month < current.slice(0, 7)) month = current.slice(0, 7);
-      if (month > '9999-12') month = '9999-12';
+      const lastMonth = bookingEnd().slice(0, 7);
+      if (month > lastMonth) month = lastMonth;
       const first = `${month}-01`;
       const preferred = [focusDate, selected, current, first].find(date => date && date.startsWith(month) && isSelectable(date));
       const cells = Array(dateObject(first).getUTCDay()).fill('');
       for (let day = 1; day <= daysInMonth(month); day++) {
         const date = `${month}-${pad(day)}`;
-        const disabled = date < current;
+        const disabled = !isSelectable(date);
         cells.push(`<button type="button" class="calendar-day" data-date="${date}" aria-label="${labelDate(date)}${disabled ? '. Past date, unavailable.' : ''}" aria-pressed="${date === selected}"${date === current ? ' aria-current="date"' : ''}${disabled ? ' disabled' : ''} tabindex="${date === preferred ? '0' : '-1'}">${day}</button>`);
       }
       while (cells.length % 7) cells.push('');
@@ -60,10 +66,10 @@
       const methodLabel = fulfillment === 'delivery' ? 'Delivery dates' : fulfillment === 'pickup' ? 'Pickup dates' : 'Your preferred date';
       popup.innerHTML = `<div class="calendar-heading"><h2 id="calendar-title">Choose a date</h2><button type="button" class="calendar-close" data-close aria-label="Close calendar">×</button></div>
         <p id="calendar-guidance" class="calendar-guidance">${methodLabel} · Preview only.</p>
-        <div class="calendar-toolbar"><button type="button" class="calendar-nav" data-month="-1" aria-label="Previous month"${month === current.slice(0, 7) ? ' disabled' : ''}>‹</button><strong id="calendar-month" aria-live="polite">${format(first, { month: 'long', year: 'numeric' })}</strong><button type="button" class="calendar-nav" data-month="1" aria-label="Next month"${month === '9999-12' ? ' disabled' : ''}>›</button></div>
+        <div class="calendar-toolbar"><button type="button" class="calendar-nav" data-month="-1" aria-label="Previous month"${month === current.slice(0, 7) ? ' disabled' : ''}>‹</button><strong id="calendar-month" aria-live="polite">${format(first, { month: 'long', year: 'numeric' })}</strong><button type="button" class="calendar-nav" data-month="1" aria-label="Next month"${month === lastMonth ? ' disabled' : ''}>›</button></div>
         <table class="calendar-month" aria-labelledby="calendar-month" aria-describedby="calendar-guidance"><thead><tr>${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => `<th scope="col">${day}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>
         <div class="calendar-legend"><span><i class="calendar-selected-key" aria-hidden="true"></i>Selected</span><span><i class="calendar-unavailable-key" aria-hidden="true"></i>Unavailable</span></div>
-        <p class="calendar-help">Past dates are unavailable. Dates use Philippine time. Available dates will be confirmed before ordering opens.</p>
+        <p class="calendar-help">Choose a date this month or next month. Dates use Philippine time. Availability will be confirmed before ordering opens.</p>
         <div class="calendar-footer"><button type="button" data-clear${selected ? '' : ' disabled'}>Clear date</button><button type="button" data-current>Current month</button></div>`;
       if (focus && popup.open) {
         const control = focusControl && popup.querySelector(focusControl);
@@ -133,6 +139,7 @@
       event.preventDefault();
       if (!isDate(target)) target = '9999-12-31';
       if (target < today()) target = today();
+      if (target > bookingEnd()) target = bookingEnd();
       month = target.slice(0, 7);
       render({ focusDate: target, focus: true });
     });
@@ -145,5 +152,5 @@
       if (popup.open) render({ focus: true });
     } };
   }
-  window.ELIO_CALENDAR = { mount, isSelectable, labelDate };
+  window.ELIO_CALENDAR = { mount, isSelectable, labelDate, bookingEnd };
 })();

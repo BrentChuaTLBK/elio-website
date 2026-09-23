@@ -8,7 +8,8 @@
     ? `<span class="product-photo" style="--image-left:-${parseFloat(flavor.imagePosition || '0') * 2}%"><img src="${escape(flavor.image || productImage)}" width="2172" height="724" alt="${escape(flavor.name)} square Basque cheesecake — concept photograph" loading="lazy"${flavor.image ? ' style="left:0;width:100%;height:100%;object-fit:cover"' : ''}></span>`
     : `<span class="product-photo product-placeholder" aria-label="${escape(flavor.name)} — photograph coming soon"><span class="placeholder-brand" aria-hidden="true">ELIO</span><span class="placeholder-name" aria-hidden="true">${escape(flavor.name)}</span><span class="placeholder-note" aria-hidden="true">Photo coming soon</span></span>`;
   const availability = (flavor) => !isAvailable(flavor) ? '<p class="availability-label">Currently unavailable</p>' : '';
-  document.querySelector('#shop-boxes').innerHTML = boxCollections.map((box) => {
+  const boxGrid = document.querySelector('#shop-boxes');
+  if (boxGrid) boxGrid.innerHTML = boxCollections.map((box) => {
     const selected = box.flavors.map((id) => flavors.find((flavor) => flavor.id === id));
     const unavailable = selected.some((flavor) => !flavor || !isAvailable(flavor));
     const names = selected.filter(Boolean).map((flavor) => flavor.name).join(' · ');
@@ -21,14 +22,15 @@
   let trigger = null;
   function syncDialog() {
     const flavor = catalog.find((item) => `#flavor-${item.id}` === location.hash);
-    const isBag = location.hash === '#your-bag';
+    const isBag = false;
+    if (location.hash === '#your-bag') (document.querySelector('#cart') || document.querySelector('#your-basket'))?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     if (!flavor && !isBag) {
       if (dialog.open) { dialog.close(); if (trigger?.isConnected) trigger.focus({ preventScroll: true }); }
       return;
     }
     content.innerHTML = isBag
       ? '<div class="dialog-body simple-dialog shop-bag-dialog"><p class="eyebrow">A little room for something sweet</p><h2 id="dialog-title" tabindex="-1">Your bag</h2><p>Our online shop is coming soon.</p><p class="shop-bag-note">For now, explore our boxes and try choosing your flavors, date, and pickup or delivery preference. Your selections don’t reserve a box or place an order.</p><button class="button" type="button" disabled>Checkout · Coming soon</button></div>'
-      : `<div class="${hasPhoto(flavor) ? 'detail-layout' : ''}">${hasPhoto(flavor) ? photo(flavor) : ''}<div class="dialog-body${hasPhoto(flavor) ? '' : ' simple-dialog'}"><p class="eyebrow">The collection</p><h2 id="dialog-title" tabindex="-1">${escape(flavor.name)}</h2>${availability(flavor)}<p class="detail-line">${escape(flavor.line)}</p><p class="detail-description">${escape(flavor.description)}</p><p class="detail-meta">INDIVIDUAL SQUARE BASQUE CHEESECAKE<br>Three pieces per box</p><p class="order-detail-availability">Online ordering is coming soon. Box options and pricing are still to be confirmed.</p>${hasPhoto(flavor) ? '<p class="asset-note">Concept photography. Final product appearance may vary.</p>' : ''}</div></div>`;
+      : `<div class="${hasPhoto(flavor) ? 'detail-layout' : ''}">${hasPhoto(flavor) ? photo(flavor) : ''}<div class="dialog-body${hasPhoto(flavor) ? '' : ' simple-dialog'}"><p class="eyebrow">The collection</p><h2 id="dialog-title" tabindex="-1">${escape(flavor.name)}</h2>${availability(flavor)}<p class="detail-line">${escape(flavor.line)}</p><p class="detail-description">${escape(flavor.description)}</p><p class="detail-meta">INDIVIDUAL SQUARE BASQUE CHEESECAKE<br>Three pieces per box</p><p class="order-detail-availability">Browse the shop for boxes, current prices, and availability for your selected date.</p>${hasPhoto(flavor) ? '<p class="asset-note">Concept photography. Final product appearance may vary.</p>' : ''}</div></div>`;
     if (!dialog.open) dialog.showModal();
     dialog.scrollTop = 0;
     document.querySelector('#dialog-title').focus({ preventScroll: true });

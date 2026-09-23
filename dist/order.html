@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="stylesheet" href="basket.css">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#3d251c">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="Good things come in threes. Explore Elio's square Basque cheesecake boxes, discover your flavors, and preview a trio of your own. Online ordering is coming soon.">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Good things come in threes. Explore Elio's square Basque cheesecake boxes, discover your flavors, and build a trio of your own. Choose pickup or delivery and an available date.">
   <title>Shop — Elio Basque Cheesecake</title>
   <link rel="icon" type="image/png" sizes="64x64" href="assets/elio-favicon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/elio-apple-touch-icon.png">
@@ -17,7 +19,8 @@
   <script src="content.js" defer></script>
   <script src="order.js" defer></script>
   <script src="calendar.js" defer></script>
-  <script src="fulfillment.js" defer></script>
+
+<link rel="stylesheet" href="assets/shop/commerce.css"><link rel="stylesheet" href="assets/shop/customer-calendar.css"><link rel="stylesheet" href="assets/shop/elio-commerce.css"><script type="module" src="assets/shop/shop.js"></script>
 </head>
 <body class="shop-page">
   <a class="skip-link" href="#main">Skip to content</a>
@@ -29,17 +32,26 @@
   <main id="main">
     <section class="shop-hero" aria-labelledby="shop-title">
       <img src="assets/shop-hero-concept.webp" width="1920" height="640" alt="Three individual square Basque cheesecakes in vanilla, chocolate, and matcha on warm stone — concept photograph" fetchpriority="high">
-      <div class="shop-hero-copy"><p class="eyebrow">A little Elio, just for you</p><h1 id="shop-title">Good things<br>come in threes.</h1><p>Three little cheesecakes.<br>A kinder day awaits.</p><div class="shop-hero-actions"><a class="button" href="#cheesecake-boxes">Explore our boxes <span aria-hidden="true">→</span></a><a class="button button-outline" href="box.html?collection=your-own">Make your own <span aria-hidden="true">→</span></a></div></div>
+      <div class="shop-hero-copy"><p class="eyebrow">A little Elio, just for you</p><h1 id="shop-title">Good things<br>come in threes.</h1><p>Three little cheesecakes.<br>A kinder day awaits.</p><div class="shop-hero-actions"><a class="button" href="#cheesecake-boxes">Explore our boxes <span aria-hidden="true">→</span></a><a class="button button-outline" href="order.html?product=your-own">Make your own <span aria-hidden="true">→</span></a></div></div>
     </section>
     <div class="shop-shell">
       <nav class="shop-breadcrumb" aria-label="Breadcrumb"><a href="index.html">Home</a><span aria-hidden="true">/</span><span aria-current="page">Shop</span></nav>
-      <section class="fulfillment" data-fulfillment aria-label="Choose a date and pickup or delivery"></section>
+      <div id="app" class="elio-commerce"><section class="fulfillment" data-fulfillment aria-label="Choose a date and pickup or delivery"></section>
+      <div class="shop-order-layout">
       <section id="cheesecake-boxes" aria-labelledby="boxes-title">
         <div class="shop-section-heading"><h2 id="boxes-title">Our Cheesecake Boxes</h2><p>A box for every craving.</p></div>
         <p class="shop-preview-note">Explore the box collection preview. Online ordering and pricing are coming soon.</p>
         <div class="shop-box-grid" id="shop-boxes"></div>
         <noscript><p>Enable JavaScript to explore the box collection, or <a class="text-link" href="box.html">view the Elio box</a>. Online ordering is coming soon.</p></noscript>
       </section>
+      <aside class="shop-basket" id="your-basket" aria-labelledby="basket-title">
+        <div class="basket-heading"><h2 id="basket-title">Your basket</h2><span class="basket-count" aria-label="0 items">0</span></div>
+        <div class="basket-empty"><span class="basket-icon" aria-hidden="true"><svg viewBox="0 0 32 36" fill="none"><path d="M7 10h18l2 22H5L7 10Z"/><path d="M11 14V8a5 5 0 0 1 10 0v6"/></svg></span><h3>A little room for something sweet</h3><p>Find your favorite box.<br>A little Elio awaits.</p></div>
+        <button class="button basket-checkout" type="button" disabled>Continue to checkout <span aria-hidden="true">→</span></button>
+        <p class="basket-note">Online ordering is coming soon.<br>Your selections don’t reserve stock yet.</p>
+      </aside>
+      </div>
+      </div>
       <section class="shop-flavor-section" id="catalog" aria-labelledby="shop-flavors-title">
         <div class="shop-section-heading"><div><h2 id="shop-flavors-title">Not sure which flavors to choose?</h2><p>Meet the collection. Each one a little moment of happiness.</p></div><a class="text-link" href="flavors.html">Explore the flavors <span aria-hidden="true">→</span></a></div>
         <div class="shop-flavor-strip" id="order-products"></div>
@@ -52,7 +64,7 @@
         <h2 id="faq-title">Frequently asked questions</h2>
         <div class="shop-faq-grid">
           <details><summary>What flavors are available?</summary><p>Our menu rotates, while the full collection stays here to explore. See <a href="flavors.html#monthly-flavors">flavors of the month</a> for the current lineup.</p></details>
-          <details><summary>Can I customize a box?</summary><p>You can explore three flavor choices in our <a href="box.html?collection=your-own">build-your-own preview</a>. Final combinations and ordering options will be confirmed before the shop opens.</p></details>
+          <details><summary>Can I customize a box?</summary><p>Choose three available flavors in our <a href="order.html?product=your-own">build-your-own box</a>. Flavor surcharges are shown before you add it to your basket. Fixed sets come with their listed flavors.</p></details>
           <details><summary>How should I store the cheesecakes?</summary><p>Storage and serving instructions will be added before ordering opens.</p></details>
           <details><summary>Do you offer gift packaging?</summary><p>Elio's packaging concept pairs a brown three-piece box with a matching paper bag. Final gifting options will be confirmed before ordering opens.</p></details>
         </div>
@@ -61,5 +73,6 @@
   </main>
   <footer class="shop-footer"><div class="shop-footer-inner"><a class="wordmark footer-wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home"><span class="wordmark-name">ELIO</span><span class="wordmark-description">Basque Cheesecake</span><span class="wordmark-byline">by TLB Kitchen</span></a><p>Burnt beautifully. Soft within.</p><div class="shop-footer-links"><nav aria-label="Footer"><a href="order.html">Shop</a><a href="index.html#story">Our story</a><a href="#shop-gifting">Gifting</a><a href="mailto:elio.cheesecakes@gmail.com">Contact</a></nav><a href="https://www.instagram.com/elio.cheesecakes/" target="_blank" rel="noopener noreferrer">@elio.cheesecakes<span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:elio.cheesecakes@gmail.com">elio.cheesecakes@gmail.com</a></div></div></footer>
   <dialog id="order-flavor-dialog" aria-labelledby="dialog-title"><button class="dialog-close icon-button" type="button" aria-label="Close details"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19"/></svg></button><div id="order-flavor-content"></div></dialog>
+<dialog id="product-dialog" class="elio-commerce" aria-labelledby="product-title"></dialog><dialog id="checkout-dialog" class="elio-commerce" aria-labelledby="checkout-title"></dialog>
 </body>
 </html>

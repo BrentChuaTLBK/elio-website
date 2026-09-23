@@ -16,3 +16,11 @@ content_path = "./supabase/templates/confirmation.html"
 # The worker validates a private Vault credential in its handler before any work.
 [functions.email-worker]
 verify_jwt = false
+
+# Guest proof uploads authenticate with the private order token; signed-in
+# uploads and staff proof viewing verify Auth users and database permissions.
+[functions.proof-upload]
+verify_jwt = false
+
+[functions.proof-url]
+verify_jwt = false

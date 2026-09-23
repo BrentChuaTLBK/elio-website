@@ -47,6 +47,7 @@ try {
     const response = await (await handle(request())).json(); assert.equal(response.accepted, 1);
     assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'prepare_email', 'send', 'email_sent']);
     assert.equal(providerBodies[0].key, 'elio/review/order-id');
+    assert.equal(providerBodies[0].body.reply_to, 'elio.cheesecakes@gmail.com');
     assert.ok(providerBodies[0].body.html.includes('&lt;script&gt;'));
     assert.ok(providerBodies[0].body.html.includes('Elio Basque Cheesecake'));
     assert.ok(!providerBodies[0].body.html.includes('The Little Baker'));
@@ -65,9 +66,11 @@ try {
     setup.ackFailure = false; await handle(request()); assert.deepEqual(providerBodies[0], providerBodies[1]);
   });
   await check('customer order links and HTML values are escaped', async () => {
-    const email = renderEmail({ ...row.payload, event_type: 'payment_approved', order: { ...row.payload.order, access_token: 'private-order-token', items: [{ name: '<img src=x>', quantity: 1, line_total_cents: 99000 }] } });
+    const email = renderEmail({ ...row.payload, event_type: 'payment_approved', order: { ...row.payload.order, access_token: 'private-order-token', items: [{ name: '<img src=x>', quantity: 1, line_total_cents: 99000, selection_labels: [], flavor_contents: [{ name: 'Vanilla', quantity: 2 }, { name: 'Matcha', quantity: 1 }] }] } });
     assert.ok(email.text.includes('https://eliocheesecakes.com/order.html#order='));
     assert.ok(email.html.includes('&lt;img src=x&gt;')); assert.ok(!email.html.includes('<img src=x>'));
+    assert.ok(email.text.includes('Vanilla × 2, Matcha × 1'));
+    assert.ok(email.text.includes('Please use your order page to upload payment proof'));
   });
   console.log(`Passed ${checks} mocked email-worker checks; no emails sent.`);
 } finally { globalThis.fetch = actualFetch; }
