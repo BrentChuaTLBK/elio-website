@@ -33,7 +33,12 @@ try {
   const migrations = (await readdir(migrationDir)).filter(name => name.endsWith('.sql')).sort();
   if (!migrations.length) throw new Error('No backend migration files found.');
   for (const name of migrations) {
-    await db.exec(await readFile(join(migrationDir, name), 'utf8'));
+    const sql = await readFile(join(migrationDir, name), 'utf8');
+    if (sql.startsWith('-- Hosted infrastructure: pg_cron, pg_net, and Supabase Vault.')) {
+      process.stdout.write(`HOSTED-ONLY ${name}: verify schedule, Vault authentication, and HTTP responses on Supabase.\n`);
+      continue;
+    }
+    await db.exec(sql);
     process.stdout.write(`APPLIED ${name}\n`);
   }
   if (!process.argv.includes('--migrations-only')) {

@@ -7,3 +7,12 @@ extra_search_path = ["public", "extensions"]
 [auth]
 site_url = "https://eliocheesecakes.com"
 additional_redirect_urls = ["http://127.0.0.1:4173/admin-account.html", "http://127.0.0.1:4173/account.html", "https://eliocheesecakes.com/admin-account.html", "https://eliocheesecakes.com/account.html"]
+
+[auth.email.template.confirmation]
+subject = "Confirm your Elio account"
+content_path = "./supabase/templates/confirmation.html"
+
+# Auth confirmation uses SMTP immediately, independently of this order worker.
+# The worker validates a private Vault credential in its handler before any work.
+[functions.email-worker]
+verify_jwt = false

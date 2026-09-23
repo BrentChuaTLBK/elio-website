@@ -5,11 +5,36 @@ const form = document.querySelector('#account-form');
 const status = document.querySelector('#account-status');
 const heading = document.querySelector('#account-heading');
 const submit = document.querySelector('#account-submit');
+const intro = document.querySelector('#account-intro');
+const confirmPassword = form.elements.confirm_password;
+const customer = document.body.dataset.accountContext === 'customer';
 const googleButton = document.querySelector('#google-signin');
 const googleLabel = googleButton.innerHTML;
 const destination = document.body.dataset.accountContext === 'customer' ? 'account.html' : 'manage.html';
 const callback = new URL(document.body.dataset.accountContext === 'customer' ? 'account.html' : 'admin-account.html', location.href).href;
 let mode = 'signin';
+let busy = false;
+let googleAvailable = false;
+let resendAfter = 0;
+
+function updateControls() {
+  document.querySelectorAll('#account-tabs button, #account-recovery button, #account-back').forEach(button => { button.disabled = busy; });
+  const seconds = Math.max(0, Math.ceil((resendAfter - Date.now()) / 1000));
+  submit.disabled = busy || (mode === 'resend' && seconds > 0);
+  submit.textContent = mode === 'resend' && seconds > 0 ? `Resend in ${seconds}s` : {
+    signin: 'Sign in', signup: 'Create account', reset: 'Send reset link', recovery: 'Save password', resend: 'Resend verification',
+  }[mode];
+  googleButton.disabled = busy || !googleAvailable;
+}
+
+function startResendCooldown() {
+  resendAfter = Date.now() + 60_000;
+  updateControls();
+  const timer = setInterval(() => {
+    updateControls();
+    if (Date.now() >= resendAfter) clearInterval(timer);
+  }, 1000);
+}
 
 async function updateGoogleAvailability() {
   googleButton.disabled = true;
@@ -22,13 +47,14 @@ async function updateGoogleAvailability() {
     const settings = await response.json();
     if (settings.external?.google) {
       googleButton.innerHTML = googleLabel;
-      googleButton.disabled = false;
+      googleAvailable = true;
     } else {
       googleButton.textContent = 'Google sign-in coming soon';
     }
   } catch {
     googleButton.textContent = 'Google sign-in unavailable right now';
   }
+  updateControls();
 }
 
 function message(text, error = false) {
@@ -38,23 +64,60 @@ function message(text, error = false) {
 
 function setMode(value) {
   mode = value;
-  heading.textContent = { signin: 'Sign in to Elio.', signup: 'Create your Elio account.', reset: 'Reset your password.', recovery: 'Choose a new password.' }[value];
-  submit.textContent = { signin: 'Sign in', signup: 'Create account', reset: 'Send reset link', recovery: 'Save password' }[value];
+  const emailOnly = value === 'reset' || value === 'resend';
+  const newPassword = value === 'signup' || value === 'recovery';
+  heading.textContent = { signin: 'Sign in to Elio.', signup: 'Make yourself at home.', reset: 'Reset your password.', recovery: 'Choose a new password.', resend: 'Confirm your email.' }[value];
+  intro.textContent = {
+    signin: customer ? 'A little Elio, just for you. Sign in to your account.' : 'Use your Elio account. Dashboard access is granted separately by an owner.',
+    signup: customer ? 'Create your Elio account. Online ordering and order history are coming soon.' : 'Create your Elio account. An owner will need to grant you dashboard access.',
+    reset: 'Enter your email address and we’ll send you a link to reset your password.',
+    recovery: 'Choose a password for your Elio account, then enter it again to confirm.',
+    resend: 'Enter the email address you used to create your Elio account.',
+  }[value];
   form.email.closest('label').hidden = value === 'recovery';
   form.email.required = value !== 'recovery';
-  document.querySelector('#password-field').hidden = value === 'reset';
-  form.password.required = value !== 'reset';
+  form.email.disabled = value === 'recovery';
+  document.querySelector('#password-field').hidden = emailOnly;
+  form.password.required = !emailOnly;
+  form.password.disabled = emailOnly;
   form.password.minLength = value === 'signin' ? 0 : 12;
   form.password.autocomplete = value === 'signin' ? 'current-password' : 'new-password';
-  document.querySelector('#account-mode').textContent = value === 'signin' ? 'Create an account' : 'Back to sign in';
-  document.querySelector('#account-reset').hidden = value !== 'signin';
-  document.querySelector('#account-provider').hidden = value === 'reset' || value === 'recovery';
+  form.password.value = '';
+  confirmPassword.value = '';
+  confirmPassword.setCustomValidity('');
+  confirmPassword.required = newPassword;
+  confirmPassword.disabled = !newPassword;
+  document.querySelector('#confirm-password-field').hidden = !newPassword;
+  document.querySelector('#password-help').hidden = !newPassword;
+  if (newPassword) form.password.setAttribute('aria-describedby', 'password-help');
+  else form.password.removeAttribute('aria-describedby');
+  const newsletter = document.querySelector('#account-newsletter');
+  if (newsletter) newsletter.hidden = value !== 'signup';
+  document.querySelector('#account-provider').hidden = emailOnly || value === 'recovery';
+  document.querySelector('#account-recovery').hidden = emailOnly || value === 'recovery';
+  document.querySelector('#account-tabs').hidden = value === 'recovery';
+  document.querySelector('#account-back').hidden = !emailOnly;
+  for (const [id, tabMode] of [['account-signin', 'signin'], ['account-mode', 'signup']]) {
+    const button = document.getElementById(id);
+    button.classList.toggle('button-quiet', value !== tabMode);
+    button.setAttribute('aria-pressed', String(value === tabMode));
+  }
+  message('');
+  updateControls();
 }
 
 setMode('signin');
 
-document.querySelector('#account-mode').addEventListener('click', () => setMode(mode === 'signin' ? 'signup' : 'signin'));
+document.querySelector('#account-mode').addEventListener('click', () => setMode('signup'));
+document.querySelector('#account-signin').addEventListener('click', () => setMode('signin'));
+document.querySelector('#account-back').addEventListener('click', () => setMode('signin'));
 document.querySelector('#account-reset').addEventListener('click', () => setMode('reset'));
+document.querySelector('#account-resend').addEventListener('click', () => setMode('resend'));
+function validateConfirmation() {
+  confirmPassword.setCustomValidity(!confirmPassword.disabled && confirmPassword.value !== form.password.value ? 'Your passwords do not match. Please enter the same password again.' : '');
+}
+form.password.addEventListener('input', validateConfirmation);
+confirmPassword.addEventListener('input', validateConfirmation);
 document.querySelector('#account-signout').addEventListener('click', async () => {
   const { error } = await auth.signOut();
   if (error) { message(error.message, true); return; }
@@ -62,7 +125,9 @@ document.querySelector('#account-signout').addEventListener('click', async () =>
 });
 
 googleButton.addEventListener('click', async () => {
-  googleButton.disabled = true;
+  if (busy) return;
+  busy = true;
+  updateControls();
   message('Opening Google…');
   try {
     await ready;
@@ -74,14 +139,18 @@ googleButton.addEventListener('click', async () => {
     message(/provider is not enabled|unsupported provider/i.test(error.message || '')
       ? 'Google sign-in is still being connected. You can use email and password now.'
       : error.message || 'Google sign-in could not start.', true);
-    googleButton.disabled = false;
+    busy = false;
+    updateControls();
   }
 });
 
 form.addEventListener('submit', async event => {
   event.preventDefault();
+  if (busy || (mode === 'resend' && Date.now() < resendAfter)) return;
+  validateConfirmation();
   if (!form.reportValidity()) return;
-  submit.disabled = true;
+  busy = true;
+  updateControls();
   message('Connecting…');
   try {
     await ready;
@@ -93,7 +162,16 @@ form.addEventListener('submit', async event => {
     if (mode === 'signup') {
       result = await auth.signUp({ email, password, options: { emailRedirectTo: callback } });
       if (result.error) throw result.error;
+      if (result.data?.session) { location.assign(destination); return; }
+      form.password.value = '';
+      confirmPassword.value = '';
+      startResendCooldown();
       message('Check your email to verify your Elio account.');
+    } else if (mode === 'resend') {
+      result = await auth.resend({ type: 'signup', email, options: { emailRedirectTo: callback } });
+      if (result.error) throw result.error;
+      startResendCooldown();
+      message('If your account is awaiting verification, a new confirmation link will be sent. Check your inbox and spam folder.');
     } else if (mode === 'reset') {
       result = await auth.resetPasswordForEmail(email, { redirectTo: callback });
       if (result.error) throw result.error;
@@ -109,7 +187,7 @@ form.addEventListener('submit', async event => {
     }
   } catch (error) {
     message(error.message || 'Unable to complete the request.', true);
-  } finally { submit.disabled = false; }
+  } finally { busy = false; updateControls(); }
 });
 
 await Promise.all([ready, updateGoogleAvailability()]);
@@ -123,7 +201,11 @@ else if (auth) {
   } else if (authLink.recovery || authLink.type === 'recovery') setMode('recovery');
   else if (data.session) {
     heading.textContent = 'Your Elio account.';
+    intro.hidden = true;
     form.hidden = true;
+    document.querySelector('#account-tabs').hidden = true;
+    document.querySelector('#account-recovery').hidden = true;
+    document.querySelector('#account-back').hidden = true;
     document.querySelector('#account-provider').hidden = true;
     document.querySelector('#signed-in').hidden = false;
     message(`Signed in as ${data.session.user.email}.`);

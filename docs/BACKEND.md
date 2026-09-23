@@ -37,7 +37,7 @@ The customer account page shows a Staff dashboard link only after `shop_api('acc
 2. The privately designated owner account is verified and has claimed its role. Future staff accounts still require explicit authorization in Team access.
 3. Set confirmed prices, flavor surcharges, stock limits, production policy, pickup details, delivery zones, and payment instructions.
 4. Connect the customer storefront and proof-upload/proof-read Edge Functions to the tested RPC contract. The existing shop remains a preview; this change does not enable checkout.
-5. Deploy the email worker and schedule maintenance before opening orders. An outbox alone does not send emails. The existing lazy expiry check frees overdue holds on subsequent API calls.
+5. Configure Elio's email worker secrets and verify delivery before opening orders. The worker and private scheduler use a one-minute interval. Follow [email setup](EMAIL-SETUP.md) for the Auth confirmation template, worker configuration, and remaining customer-order link integration. The existing lazy expiry check also frees overdue holds on subsequent API calls.
 6. Connect an Elio analytics property if website visitor reporting is wanted. Sales/order analytics already reads only Elio orders.
 
 Supabase Auth Site URL: `https://eliocheesecakes.com`. Allowed redirect URLs: `https://eliocheesecakes.com/admin-account.html`, `https://eliocheesecakes.com/account.html`, and their `http://127.0.0.1:4173` counterparts for local testing. Set these in the hosted dashboard; editing `supabase/config.toml` alone does not change the hosted project.
