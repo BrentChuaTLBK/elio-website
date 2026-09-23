@@ -26,7 +26,7 @@ Backend validation: `cd tests/backend`, `npm ci`, then `npm test`. See the backe
 
 **Flavor menus** uses the same flavor records as **Flavors**. Owners can add a name, photo, description, flavor category, and current/next-month placements. Leaving both months unchecked keeps a flavor in the full collection. Hidden flavors leave the public collection and all future lineups and cannot be ordered. The public flavor list, descriptions, shop flavor strip, and homepage carousel read this managed collection. Categories filter the public collection.
 
-Each lineup belongs to a calendar month in Manila time. A published next-month lineup becomes the current lineup when that month begins. Hidden lineups can be prepared and stocked by staff, but they are excluded from public previews and customer ordering. Publishing a lineup does not override a shop pause, closed date, product activation, price confirmation, lead time, or daily quantity.
+Each lineup belongs to a calendar month in Manila time. A published next-month lineup becomes the current lineup when that month begins. Hidden lineups can be prepared and stocked by staff, but they are excluded from public previews and customer ordering. Publishing a lineup does not override a shop pause, closed date, box activation, price confirmation, lead time, or daily quantity.
 
 **Daily quantities** shows only the selected month's lineup. Dates start at zero until a quantity is entered. Whole-month and date-range selection stay within that month and include closed dates for stock planning, while customer orders remain blocked on closed dates. Quantities are totals including existing reservations: 20 total with 12 reserved leaves 8. Choose **Replace quantities** or **Fill only unconfigured dates**; an explicitly saved zero counts as configured. Blank / No limit is an explicit owner/staff choice, never the missing-row default. Removing and re-adding a flavor resets its unsold stock to zero; existing orders and their reserved pieces remain intact.
 
@@ -191,3 +191,6 @@ node --check server.mjs
 Brand assets and supplied copy remain the property of their respective owner. No open-source license is granted for them by this repository.
 
 Production groups custom boxes by the saved per-box flavor counts within each box product. Selection order does not affect grouping: Vanilla/Gorgonzola/Vanilla and Vanilla/Vanilla/Gorgonzola both mean 2 Vanilla + 1 Gorgonzola. Overall and daily tables show each combination with total and served box counts. Distinct recipes stay separate.
+
+
+Monthly lineup panels let owners select flavor chips directly, then save membership and publication together. A removal reminder shows outstanding confirmed requirements. Each month keeps its own unsaved selection, and stale saves cannot overwrite another session. Flavor orderability comes from a published lineup, confirmed surcharge, daily stock, and shop rules; there is no separate flavor availability toggle. Production uses the same styled calendar as Daily quantities for inclusive start/end dates, including historical and cross-month reports.

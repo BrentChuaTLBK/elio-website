@@ -14,7 +14,7 @@ Source: `BrentChuaTLBK/bakery-website`, commit `7e81baa1a6ef9ae179662aeea7cc238e
 
 Elio changes:
 
-- `kind=flavor`: price is the extra charge per individual piece in custom boxes. Product enablement, a published lineup for the fulfillment month, visibility, and daily stock all determine availability for boxes using that flavor.
+- `kind=flavor`: price is the extra charge per individual piece in custom boxes. A confirmed surcharge, a published lineup for the fulfillment month, visibility, and daily stock all determine availability for boxes using that flavor.
 - `kind=custom_box`: base price plus exactly three flavor surcharges per box. Each flavor's piece count is multiplied by the number of boxes.
 - `kind=set`: the owner selects three flavor IDs in `box_flavors` (repeats allowed) and enters one fixed total price. Customers cannot substitute flavors. Each set consumes the included flavors’ piece quantities; no separate box inventory exists. Any unavailable component makes the set unavailable.
 - Saved line items include trusted per-box `stock_requirements`, `flavor_contents` (IDs, names, quantities), and price snapshots. Multiply flavor quantities by ordered boxes for production totals. Unchanged configurations retain their saved recipes and unit prices during amendments. New configurations use current prices and recipes.
@@ -71,3 +71,6 @@ The removal-impact RPC returns aggregate outstanding paid/confirmed order counts
 Additional checks: `node tests/daily-quantities.test.mjs`, `node tests/production.test.mjs`, and `node tests/top-flavors.test.mjs`. Backend suites cover monthly stock gates, closure priority, reset/re-add behavior, atomic bulk updates, scoped multi-category ordering, stale edits, and removal-impact counts.
 
 Production groups custom boxes by the saved per-box flavor counts within each box product. Selection order does not affect grouping: Vanilla/Gorgonzola/Vanilla and Vanilla/Vanilla/Gorgonzola both mean 2 Vanilla + 1 Gorgonzola. Overall and daily tables show each combination with total and served box counts. Distinct recipes stay separate.
+
+
+`preview_flavor_lineup` and `save_flavor_lineup` are owner-only actions. Saving checks the calendar month and expected membership/publication before applying both fields atomically. Existing membership triggers clear only added/removed flavors’ unsold stock. Flavor `active` and `in_rotation` are derived compatibility fields, not independent ordering switches; boxes retain their listing switch.

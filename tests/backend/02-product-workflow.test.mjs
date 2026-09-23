@@ -31,7 +31,7 @@ export default async function({db,check,state}) {
   assert.equal((await catalog()).remaining_boxes,0);
   await assert.rejects(()=>api('create_order',checkout(set,date)),/Only 0 pieces/);
   await h.action('cancel_order',fixed,{reason:'QA'});await h.action('cancel_order',o,{reason:'QA'});
-  for(const change of [{active:false},{in_rotation:false}]) {
+  for(const change of [{price_confirmed:false}]) {
    await api('save_product',{product:{...a,...change}},ids.owner);
    assert.equal((await catalog()).stock_available,false);
    await assert.rejects(()=>api('quote',checkout(set,date)),/Flavor unavailable/);
