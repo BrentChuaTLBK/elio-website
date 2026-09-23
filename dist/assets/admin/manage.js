@@ -1,3 +1,6 @@
+import { productCategoryIds, sortProducts, categoryFields } from './catalog-ordering.js';
+import { mountCatalogOrder } from './catalog-order.js';
+import { buildProduction, renderProduction } from './production.js';
 import { api, auth, ready, configured, money, escapeHtml, manilaDate, formatDate, toast, upload, websiteVisitorStats } from './client.js';
 import { prepareOrderSave, normalizeOrderEditReason } from './order-edit-save.js';
 import { confirmOrderTotalChange } from './order-edit-confirmation.js';
@@ -6,9 +9,10 @@ import { fulfillmentStatus, matchesFulfillmentStatus, isActiveFulfillment, needs
 import { renderProductPhotos, bindProductPhotoOrder } from './product-photos.js';
 import { printOrderSlips } from './order-slips.js';
 import { productLabelSettings, labelTextColor, MAX_LABEL_LENGTH } from './product-label.js';
-import { dateCalendar, bindDateCalendars, calendarDates } from './date-calendar.js';
+import { dateCalendar, bindDateCalendars, calendarDates, calendarMonthDays } from './date-calendar.js';
 import { quantitySelection, quantitySaveRows, quantityStatus } from './daily-quantities.js';
 import { analyticsDateRange, buildAnalytics } from './analytics.js';
+import { renderFlavorMenus, flavorMenuFields, menuMonths, menuFor, monthLabel } from './flavor-menus.js';
 import { renderAnalytics } from './analytics-view.js';
 import { renderWebsiteVisitors, createVisitorPoller } from './website-visitors.js';
 
@@ -22,12 +26,18 @@ const PAYMENT = ['awaiting_payment', 'under_review', 'paid', 'rejected', 'cancel
 const FULFILLMENT = ['pending_confirmation', 'confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'completed', 'refunded', 'cancelled', 'expired'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const state = { view: 'overview', role: null, connected: false, products: [], categories: [], inventory: [], promos: [], zones: [], orders: [], settings: {}, staff: [], filters: { search: '', payment: '', fulfillment: '', date: '', method: '', refund: '', upcoming: false }, inventoryDates: [manilaDate()], inventoryDrafts: {} };
+state.inventoryMonth = manilaDate().slice(0,7);
+state.quantityMode = 'replace';
+state.productionRange = {from:manilaDate(),to:manilaDate()};
 state.productFilters = { search: '', status: '', category: '' };
 state.promoFilter = '';
 state.printSelection = new Set();
 let activeOrder = null;
 let productDraft = null;
 let clearPhotoDrag = () => {};
+let catalogOrderController = null;
+const catalogScope = () => ['menus','flavors'].includes(state.view) ? 'flavors' : 'boxes';
+const areaCategories = () => state.categories.filter(c => c.scope === catalogScope());
 let editDraft = null;
 let modalReturnFocus = null;
 let promoStatusTimer = null;
@@ -57,7 +67,7 @@ const amount = cents => (Number(cents || 0) / 100).toFixed(2);
 const cents = value => Math.round(Number(value || 0) * 100);
 const safeImage = value => typeof value === 'string' && (/^https?:\/\//.test(value) || /^assets\//.test(value)) ? value : '';
 const list = value => String(value || '').split(/\r?\n/).map(v => v.trim()).filter(Boolean);
-const stockProducts = () => state.products.filter(p => p.kind === 'flavor');
+const stockProducts = () => state.products.filter(p => p.kind === 'flavor' && !p.collection_hidden && menuFor(state,state.inventoryMonth+'-01').flavor_ids.includes(p.id));
 const areaProducts = () => state.products.filter(p => state.view === 'flavors' ? p.kind === 'flavor' : p.kind !== 'flavor');
 const productNoun = (plural = false) => state.view === 'flavors' ? (plural ? 'flavors' : 'flavor') : (plural ? 'boxes' : 'box');
 const owner = () => !state.connected || state.role === 'owner';
@@ -100,6 +110,8 @@ function setupNotice() {
   return `<div class="notice"><strong>Draft dashboard · backend setup pending.</strong> You can explore the layout and forms. Saving, accounts, uploads, orders, and email delivery become available after the setup steps are completed. <a href="admin-setup.html" target="_blank" rel="noopener">Open setup guide</a></div>`;
 }
 function showDialog(title, content) {
+  if (catalogOrderController && !catalogOrderController.canLeave()) return false;
+  catalogOrderController?.destroy(); catalogOrderController=null;
   clearPhotoDrag();
   if (!modal.open) modalReturnFocus = document.activeElement;
   $('#dialog-title').textContent = title;
@@ -108,7 +120,8 @@ function showDialog(title, content) {
   modal.scrollTop = 0;
   requestAnimationFrame(() => $('input:not([type=hidden]), select, textarea, button', $('#dialog-body'))?.focus());
 }
-function closeDialog() { clearPhotoDrag(); modal.close(); modalReturnFocus?.focus?.(); }
+function closeDialog() { if(catalogOrderController && !catalogOrderController.canLeave())return;catalogOrderController?.destroy();catalogOrderController=null;clearPhotoDrag(); modal.close(); modalReturnFocus?.focus?.(); }
+modal.addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 $('#dialog-close').addEventListener('click', closeDialog);
 modal.addEventListener('click', event => { if (event.target === modal) { const rect = modal.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeDialog(); } });
 
@@ -126,13 +139,24 @@ async function refresh() {
 }
 function render() {
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
-  const views = { overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, boxes: productsView, inventory: inventoryView, promos: promosView, settings: settingsView, team: teamView };
+  const views = { overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, settings: settingsView, team: teamView };
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
   syncVisitorPolling();
   syncPromoStatuses();
 }
+function flavorMenusView() {
+  return heading('Flavor menus', 'Plan the flavors you showcase, month by month.', `<button class="button button-secondary" data-action="categories">Arrange categories</button><button class="button button-secondary" data-action="reorder-products" ${ownerLocked()}>Arrange flavors</button><button class="button button-secondary" data-view="flavors">Photos & ordering settings</button><button class="button" data-action="edit-flavor-menu" ${ownerLocked()}>+ Add flavor</button>`) + readonly() + '<p class="notice">Lineups determine which flavors can have stock for each month. Publish a lineup to show it and allow orders. Hidden flavors cannot be ordered. Shop closures always take priority.</p>' + renderFlavorMenus(state, { today: manilaDate(), esc, disabled: ownerLocked() });
+}
+function editFlavorMenu(id) {
+  const flavor = state.products.find(p => p.id === id);
+  showDialog(flavor ? 'Edit ' + flavor.name : 'Add a flavor', `<form data-form="flavor-menu-editor">${formError}${flavorMenuFields(state,id,{ today: manilaDate(),esc,input,textarea,select,option,check,disabled:ownerLocked() })}${actions(flavor ? 'Save flavor' : 'Add to collection')}</form>`);
+}
+function productionView() {
+  const report=buildProduction(state.orders,state.productionRange.from,state.productionRange.to);
+  return heading('Production', 'Your confirmed orders, translated into cheesecake pieces and boxes.', `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh orders</button>`) + `<section class="panel"><form data-form="production-range" class="production-filter">${formError}${input('from','Pickup / delivery from',state.productionRange.from,'date','required')}${input('to','Through',state.productionRange.to,'date','required')}<button class="button" type="submit">View production</button></form></section>` + renderProduction(report,{esc,dateLabel:humanDate});
+}
 function analyticsView() {
-  return heading('Analytics', 'Your orders, sales and most-loved products.', `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh analytics</button>`) + renderAnalytics(state, { today: manilaDate(), money, escapeHtml: esc, formatDate });
+  return heading('Analytics', 'Your orders, sales and most-loved flavors.', `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh analytics</button>`) + renderAnalytics(state, { today: manilaDate(), money, escapeHtml: esc, formatDate });
 }
 function overviewView() {
   const today = manilaDate();
@@ -201,10 +225,10 @@ function filteredProducts() {
   const { search, status, category } = state.productFilters;
   const query = search.trim().toLowerCase();
   const categoryIds = new Set(state.categories.map(c => c.id));
-  return areaProducts().filter(product =>
+  return sortProducts(areaProducts(),category).filter(product =>
     (!query || product.name.toLowerCase().includes(query)) &&
     (!status || Boolean(product.active) === (status === 'active')) &&
-    (!category || (category === '__uncategorized__' ? !categoryIds.has(product.category_id) : product.category_id === category))
+    (!category || (category === '__uncategorized__' ? !productCategoryIds(product,areaCategories()).length : productCategoryIds(product,areaCategories()).includes(category)))
   );
 }
 function productFiltersActive() {
@@ -213,7 +237,7 @@ function productFiltersActive() {
 }
 function productResults(products) {
   if (!areaProducts().length) return `<section class="panel">${empty('Room for something delicious', 'Your ordering catalog starts empty. Add your own products, photos, and prices when you’re ready.', `<button class="button" data-action="new-product" ${owner() ? '' : 'disabled'}>+ Add your first ${productNoun()}</button>`)}</section>`;
-  return products.length ? `<div class="product-grid">${products.map(product => `<article class="panel product-card"><div class="product-photo">${safeImage(product.photos?.[0]) ? `<img src="${esc(safeImage(product.photos[0]))}" alt="${esc(product.name)}" loading="lazy">` : '<span aria-hidden="true">♧</span>'}</div><div class="product-card-body"><h3>${esc(product.name)}</h3><p class="muted">${esc(state.categories.find(c => c.id === product.category_id)?.name || 'Uncategorized')}</p><div class="product-card-meta"><span>${product.kind === 'flavor' ? (product.in_rotation ? 'On this month’s menu' : 'Outside this month’s menu') : product.kind === 'custom_box' ? 'Uses flavor-piece inventory' : 'Uses included flavors’ inventory'}</span><span>${product.allow_same_day === true ? '<span class="badge">Same-day eligible</span> ' : ''}${product.pickup_only ? '<span class="badge">Pickup only</span> ' : ''}${badge(product.active ? 'active' : 'hidden')}</span></div><div class="product-card-bottom"><strong>${money(product.price_cents)}${product.kind === 'flavor' ? ' / piece extra' : ''}${product.price_confirmed ? '' : ' · unconfirmed'}</strong><button class="button button-quiet" data-action="edit-product" data-id="${esc(product.id)}">${owner() ? (product.kind === 'flavor' ? 'Edit flavor' : 'Edit box') : 'View item'} →</button></div></div></article>`).join('')}</div>` : `<section class="panel">${empty('No matching products', 'Try another product name, status, or category, or clear the filters.')}</section>`;
+  return products.length ? `<div class="product-grid">${products.map(product => `<article class="panel product-card"><div class="product-photo">${safeImage(product.photos?.[0]) ? `<img src="${esc(safeImage(product.photos[0]))}" alt="${esc(product.name)}" loading="lazy">` : '<span aria-hidden="true">♧</span>'}</div><div class="product-card-body"><h3>${esc(product.name)}</h3><p class="muted">${esc(state.categories.filter(c=>productCategoryIds(product,state.categories).includes(c.id)).map(c=>c.name).join(' · ') || 'Uncategorized')}</p><div class="product-card-meta"><span>${product.kind === 'flavor' ? (product.in_rotation ? 'Enabled for ordering' : 'Ordering availability off') : product.kind === 'custom_box' ? 'Uses flavor-piece inventory' : 'Uses included flavors’ inventory'}</span><span>${product.allow_same_day === true ? '<span class="badge">Same-day eligible</span> ' : ''}${product.pickup_only ? '<span class="badge">Pickup only</span> ' : ''}${badge(product.active ? 'active' : 'hidden')}</span></div><div class="product-card-bottom"><strong>${money(product.price_cents)}${product.kind === 'flavor' ? ' / piece extra' : ''}${product.price_confirmed ? '' : ' · unconfirmed'}</strong><button class="button button-quiet" data-action="edit-product" data-id="${esc(product.id)}">${owner() ? (product.kind === 'flavor' ? 'Edit flavor' : 'Edit box') : 'View item'} →</button></div></div></article>`).join('')}</div>` : `<section class="panel">${empty('No matching products', 'Try another product name, status, or category, or clear the filters.')}</section>`;
 }
 function updateProductResults() {
   const products = filteredProducts();
@@ -225,13 +249,16 @@ function productsView() {
   const f = state.productFilters;
   if (f.category && f.category !== '__uncategorized__' && !state.categories.some(c => c.id === f.category)) f.category = '';
   const products = filteredProducts();
-  return heading(state.view === 'flavors' ? 'Flavors' : 'Boxes & sets', state.view === 'flavors' ? 'Your flavor collection, rotating menu, and per-piece surcharges.' : 'Fixed sets and custom boxes, each beautifully boxed.', `<button class="button button-secondary" data-action="categories">Categories</button><button class="button" data-action="new-product" ${owner() ? '' : 'disabled'}>+ Add ${productNoun()}</button>`) + readonly() +
-    `<div class="product-filters" role="search" aria-label="Filter products"><label class="field product-search">Search products<input id="product-search" type="search" data-product-filter="search" placeholder="Search by product name" value="${esc(f.search)}" aria-controls="product-results" autocomplete="off"></label>${select('product-status', 'Status', option('', 'All statuses', f.status) + option('active', 'Active', f.status) + option('hidden', 'Hidden', f.status), 'data-product-filter="status" aria-controls="product-results"')}${select('product-category', 'Category', option('', 'All categories', f.category) + state.categories.map(c => option(c.id, c.name, f.category)).join('') + option('__uncategorized__', 'Uncategorized', f.category), 'data-product-filter="category" aria-controls="product-results"')}</div>` +
+  return heading(state.view === 'flavors' ? 'Flavors' : 'Boxes & sets', state.view === 'flavors' ? 'Flavor photos, ordering availability, and per-piece surcharges. Plan website displays in Flavor menus.' : 'Fixed sets and custom boxes, each beautifully boxed.', `<button class="button button-secondary" data-action="categories">Arrange categories</button><button class="button button-secondary" data-action="reorder-products" ${ownerLocked()}>Arrange ${productNoun(true)}</button><button class="button" data-action="new-product" ${owner() ? '' : 'disabled'}>+ Add ${productNoun()}</button>`) + readonly() +
+    `<div class="product-filters" role="search" aria-label="Filter products"><label class="field product-search">Search products<input id="product-search" type="search" data-product-filter="search" placeholder="Search by product name" value="${esc(f.search)}" aria-controls="product-results" autocomplete="off"></label>${select('product-status', 'Status', option('', 'All statuses', f.status) + option('active', 'Active', f.status) + option('hidden', 'Hidden', f.status), 'data-product-filter="status" aria-controls="product-results"')}${select('product-category', 'Category', option('', 'All categories', f.category) + areaCategories().map(c => option(c.id, c.name, f.category)).join('') + option('__uncategorized__', 'Uncategorized', f.category), 'data-product-filter="category" aria-controls="product-results"')}</div>` +
     `<div class="product-filter-summary"><p class="muted no-margin" id="product-count" role="status">Showing ${products.length} of ${areaProducts().length} ${productNoun(areaProducts().length !== 1)}</p><button type="button" class="button button-quiet" data-action="clear-product-filters" ${productFiltersActive() ? '' : 'disabled'}>Clear filters</button></div><div id="product-results">${productResults(products)}</div>`;
 }
 function inventoryView() {
-  return heading('Daily quantities', 'Choose your dates, then set only the limits you need.') +
-    `<form data-form="inventory">${formError}<div class="quantity-layout"><aside class="panel quantity-calendar">${dateCalendar('inventory_dates', 'Select dates', state.inventoryDates, 'Choose one or more fulfillment dates.', manilaDate(), !state.connected, { saveLabel: 'Save quantities', selectionLabel: 'Apply quantities to these dates', minDate: manilaDate() })}<p class="quantity-explainer">Count individual cheesecake pieces. Fixed sets and custom boxes both use these quantities. Pickup and delivery share the same daily stock.</p></aside><section class="panel quantity-products"><div class="quantity-products-heading"><div><h2>Flavor quantities</h2><p>Blank = no limit · 0 = no stock</p></div><span>${stockProducts().length} stock items</span></div><p class="quantity-help">Totals include quantities already ordered. Clearing a saved quantity removes its limit. Product availability and shop schedules still apply.</p><div id="quantity-products">${inventoryProducts()}</div><div class="quantity-save"><p id="quantity-save-summary" aria-live="polite">${inventorySaveSummary()}</p><button type="button" class="button button-secondary" data-action="reset-quantities">Reset edits</button><button type="submit" class="button" ${locked()}>Save quantities</button></div></section></div></form>`;
+  const months=menuMonths(state,manilaDate());
+  if (!months.some(m=>m.startsWith(state.inventoryMonth))) {state.inventoryMonth=months[0].slice(0,7);state.inventoryDates=[];state.inventoryDrafts={};}
+  const days=calendarMonthDays(state.inventoryMonth).filter(d=>d && d>=manilaDate()), first=days[0],last=days.at(-1);
+  return heading('Daily quantities', 'Plan individual pieces for your monthly lineup.') + `<section class="panel quantity-month-tools">${select('inventory_month','Monthly lineup',months.map(m=>option(m.slice(0,7),monthLabel(m)+(menuFor(state,m).published?'':' · Hidden / preparation only'),state.inventoryMonth)).join(''),'id="inventory-month"')}<button type="button" class="button button-secondary" data-action="inventory-whole-month" ${locked()}>Select whole month</button><div class="quantity-range">${input('quantity_from','From',first,'date',`min="${first}" max="${last}"`)}${input('quantity_to','To',last,'date',`min="${first}" max="${last}"`)}<button type="button" class="button button-secondary" data-action="inventory-range" ${locked()}>Select date range</button></div><p>Selections stay within this month. Past dates are excluded. Save quantities to apply your edits.</p></section>` +
+    `<form data-form="inventory">${formError}${select('quantity_mode','How to apply quantities',option('replace','Replace quantities on selected dates',state.quantityMode)+option('fill_unconfigured','Fill only unconfigured dates',state.quantityMode),'id="quantity-mode"')}<div class="quantity-layout"><aside class="panel quantity-calendar">${dateCalendar('inventory_dates', 'Select dates', state.inventoryDates, 'Choose one or more fulfillment dates.', manilaDate(), !state.connected, { saveLabel: 'Save quantities', selectionLabel: 'Apply quantities to these dates', minDate: manilaDate(), fixedMonth: state.inventoryMonth })}<p class="quantity-explainer">Only this month’s lineup is shown. Fixed sets and custom boxes share these piece quantities. Saving stock never reopens a closed shop or fulfillment date.</p></aside><section class="panel quantity-products"><div class="quantity-products-heading"><div><h2>Flavor quantities</h2><p>Unsaved dates start at 0 · No limit must be chosen explicitly</p></div><span>${stockProducts().length} stock items</span></div><p class="quantity-help">Totals include quantities already ordered. Removing a flavor from its lineup clears unsold stock; adding it back starts at zero available. Hidden lineups remain closed to customer orders.</p><div id="quantity-products">${inventoryProducts()}</div><div class="quantity-save"><p id="quantity-save-summary" aria-live="polite">${inventorySaveSummary()}</p><button type="button" class="button button-secondary" data-action="reset-quantities">Reset edits</button><button type="submit" class="button" ${locked()}>Save quantities</button></div></section></div></form>`;
 }
 function inventorySaveSummary() {
   const count = Object.keys(state.inventoryDrafts).length, dates = state.inventoryDates.length;
@@ -244,7 +271,7 @@ function inventoryProducts() {
     const photo = safeImage(product.photos?.[0]);
     return `<div class="quantity-product" data-quantity-product="${esc(product.id)}"><div class="quantity-photo">${photo ? `<img src="${esc(photo)}" alt="" loading="lazy">` : '<span>No photo</span>'}</div><div class="quantity-product-name"><label for="${esc(id)}">${esc(product.name)}</label><small>${product.kind === 'flavor' ? 'Individual pieces' : 'Boxes / sets'}</small>${product.active ? '' : '<span class="quantity-hidden">Hidden from menu</span>'}</div><div class="quantity-control-field"><label class="sr-only" for="${esc(id)}">${esc(product.name)} total quantity per date</label><div class="quantity-input-row"><input id="${esc(id)}" data-quantity-id="${esc(product.id)}" type="number" min="0" max="1000000" step="1" inputmode="numeric" value="${esc(value.value)}" placeholder="${value.mixed ? 'Mixed' : 'No limit'}" aria-describedby="${esc(id)}-status" ${disabled ? 'disabled' : ''}><button type="button" class="button button-quiet" data-action="unlimit-quantity" data-id="${esc(product.id)}" aria-label="Remove limit for ${esc(product.name)}" ${disabled ? 'disabled' : ''}>No limit</button></div><small id="${esc(id)}-status" data-quantity-status>${esc(quantityStatus(value, state.inventoryDates))}</small></div></div>`;
   }).join('');
-  return stockProducts().length ? rows(stockProducts()) : empty('No flavors yet', 'Add flavors before setting daily piece quantities.');
+  return stockProducts().length ? rows(stockProducts()) : empty('No flavors in this lineup', 'Assign flavors to this month in Flavor menus before setting quantities.');
 }
 function updateInventoryProducts() {
   $('#quantity-products').innerHTML = inventoryProducts();
@@ -308,7 +335,7 @@ function openProduct(id) {
 function captureProduct() {
   const form = $('[data-form="product"]');
   if (!form) return;
-  Object.assign(productDraft, { kind: fieldValue(form, 'kind') || productDraft.kind, price_confirmed: fieldChecked(form, 'price_confirmed'), in_rotation: form.elements.namedItem('in_rotation') ? fieldChecked(form, 'in_rotation') : productDraft.in_rotation, name: fieldValue(form, 'name'), description: fieldValue(form, 'description'), category_id: fieldValue(form, 'category_id') || null, price_cents: cents(fieldValue(form, 'price')), min_quantity: Number(fieldValue(form, 'min_quantity')), lead_days: Number(fieldValue(form, 'lead_days')), sort_order: Number(fieldValue(form, 'sort_order')), active: fieldChecked(form, 'active'), pickup_only: fieldChecked(form, 'pickup_only'), allow_same_day: fieldChecked(form, 'allow_same_day'), label: productLabelSettings({ enabled: fieldChecked(form, 'label_enabled'), text: fieldValue(form, 'label_text'), color: fieldValue(form, 'label_color') }) });
+  Object.assign(productDraft, { kind: fieldValue(form, 'kind') || productDraft.kind, price_confirmed: fieldChecked(form, 'price_confirmed'), in_rotation: form.elements.namedItem('in_rotation') ? fieldChecked(form, 'in_rotation') : productDraft.in_rotation, name: fieldValue(form, 'name'), description: fieldValue(form, 'description'), category_ids: $$('[name=category_ids]:checked',form).map(el=>el.value), category_id: $('[name=category_ids]:checked',form)?.value || null, price_cents: cents(fieldValue(form, 'price')), min_quantity: Number(fieldValue(form, 'min_quantity')), lead_days: Number(fieldValue(form, 'lead_days')), active: fieldChecked(form, 'active'), pickup_only: fieldChecked(form, 'pickup_only'), allow_same_day: fieldChecked(form, 'allow_same_day'), label: productLabelSettings({ enabled: fieldChecked(form, 'label_enabled'), text: fieldValue(form, 'label_text'), color: fieldValue(form, 'label_color') }) });
   if (productDraft.kind === 'set') productDraft.box_flavors = $$('[data-box-flavor]', form).map(select => select.value).filter(Boolean);
   if (productDraft.kind === 'flavor') Object.assign(productDraft, { min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
   productDraft.option_groups = [];
@@ -363,14 +390,14 @@ function renderProductDialog() {
     ${flavor ? '<input type="hidden" name="kind" value="flavor">' : select('kind', 'Box type', option('set', 'Fixed box / set', kind) + option('custom_box', 'Custom box of three', kind), p.id ? 'disabled' : '')}
     ${input('name', flavor ? 'Flavor name' : 'Box name', p.name, 'text', 'required maxlength="160"')}
     ${textarea('description', 'Description', p.description, 'Describe the flavor or what makes this box special.', 'maxlength="6000"')}
-    <div class="field-row">${input('price', flavor ? 'Surcharge per piece · PHP' : kind === 'set' ? 'Fixed price per box · PHP' : 'Base price per box · PHP', amount(p.price_cents), 'number', 'required min="0" max="1000000" step="0.01"', flavor ? 'Use 0 for flavors included in the base box price.' : kind === 'set' ? 'The full set price. Flavor surcharges apply only to custom boxes.' : '')}${select('category_id', 'Category', option('', 'Uncategorized', p.category_id || '') + state.categories.map(c => option(c.id, c.name, p.category_id)).join(''))}</div>
+    <div class="field-row">${input('price', flavor ? 'Surcharge per piece · PHP' : kind === 'set' ? 'Fixed price per box · PHP' : 'Base price per box · PHP', amount(p.price_cents), 'number', 'required min="0" max="1000000" step="0.01"', flavor ? 'Use 0 for flavors included in the base box price.' : kind === 'set' ? 'The full set price. Flavor surcharges apply only to custom boxes.' : '')}</div>
     ${check('price_confirmed', 'I have confirmed this price / surcharge', p.price_confirmed === true)}
     ${check('active', flavor ? 'Available for boxes' : 'List this box for ordering', p.active)}
-    ${flavor ? check('in_rotation', 'Include in this month’s menu', p.in_rotation !== false) : ''}
+    ${flavor ? check('in_rotation', 'Enable ordering for this flavor', p.in_rotation !== false) : ''}
     ${kind === 'set' ? `<section class="subsection"><h3>Inside this box</h3><p class="muted">Choose a flavor for each of the three pieces. Repeats are welcome. Each box uses these flavors’ stock. If any required flavor is unavailable, the set is sold out.</p><div class="field-row three">${[0,1,2].map(i => select('box_flavor_' + i, 'Cheesecake ' + (i + 1), option('', 'Choose a flavor', savedFlavor(p.box_flavors?.[i])) + boxChoices.map(f => option(f.id, f.name, savedFlavor(p.box_flavors?.[i]))).join(''), 'data-box-flavor required')).join('')}</div></section>` : ''}
     ${kind === 'custom_box' ? '<p class="notice">Customers choose exactly three pieces. Each flavor adds its own surcharge and uses its own daily stock. Manage those choices in Flavors.</p>' : ''}
     ${flavor ? '<p class="notice">Inventory is counted in individual pieces and shared across all boxes. Set a quantity for each date in Daily quantities. Unavailable flavors also make their fixed sets unavailable.</p>' : `<section class="subsection"><h3>Ordering & fulfillment</h3><div class="field-row">${input('min_quantity', 'Minimum boxes per order', p.min_quantity || 1, 'number', 'required min="1" max="9999" step="1"')}${input('lead_days', 'Full production days', p.lead_days || 0, 'number', 'required min="0" max="365" step="1"')}</div>${check('pickup_only', 'Pickup only', p.pickup_only === true)}${check('allow_same_day', 'Allow same-day orders (requires 0 production days)', p.allow_same_day === true)}</section>`}
-    ${input('sort_order', 'Display order', p.sort_order || 0, 'number', 'required step="1"')}
+    ${categoryFields(p,areaCategories(),esc,ownerLocked())}
     ${productLabelEditor(p.label)}
     <section class="subsection"><h3>Photos</h3><p class="muted">JPEG, PNG, or WebP · up to 5 MB each. Product photos are public. The first photo is the cover.</p><p class="help-text" id="photo-order-help">Drag photos to rearrange them, or focus a photo and use the arrow keys. Save the item to publish changes.</p><div id="product-photo-order">${renderProductPhotos(p.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) })}</div><p id="photo-order-status" class="sr-only" role="status" aria-live="polite"></p>${input('photos', 'Upload photos', '', 'file', 'accept="image/jpeg,image/png,image/webp" multiple id="product-photos" ' + ownerLocked())}</section>
     ${actions(p.id ? 'Save changes' : 'Create ' + names[kind])}
@@ -381,12 +408,15 @@ function renderProductDialog() {
   $('[data-form="product"]').elements.namedItem('kind').addEventListener('change', () => { captureProduct(); renderProductDialog(); });
 }
 
-function categoriesDialog() {
-  showDialog('Menu categories', `${state.categories.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Category</th><th>Order</th><th></th></tr></thead><tbody>${state.categories.map(c => `<tr><td>${esc(c.name)}</td><td>${c.sort_order}</td><td><button class="table-link" data-action="edit-category" data-id="${esc(c.id)}">Edit</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Categories help customers browse your menu.</p>'}<div class="dialog-actions"><button class="button button-secondary" data-action="close-dialog">Done</button><button class="button" data-action="new-category" ${owner() ? '' : 'disabled'}>+ Add category</button></div>`);
+function categoriesDialog() { catalogOrderDialog('categories'); }
+function catalogOrderDialog(kind) {
+ const scope=catalogScope(),items=kind==='categories'?areaCategories():state.products.filter(p=>(p.kind==='flavor')===(scope==='flavors'));
+ if(showDialog(kind==='categories'?'Arrange '+scope+' categories':'Arrange '+scope,'<div id="catalog-order-root"></div>')===false)return;
+ catalogOrderController=mountCatalogOrder($('#catalog-order-root'),{kind,scope,items,categories:areaCategories(),editable:!ownerLocked(),api,escapeHtml:esc,safeImage,onSaved:items=>{const ids=new Set(items.map(p=>p.id));const field=kind==='categories'?'categories':'products';state[field]=[...state[field].filter(p=>!ids.has(p.id)),...items];state.categories.sort((a,b)=>a.sort_order-b.sort_order||a.name.localeCompare(b.name));render();}});
 }
 function categoryDialog(id) {
   const c = state.categories.find(item => item.id === id) || { name: '', sort_order: 0 };
-  showDialog(c.id ? 'Edit category' : 'Add category', `<form data-form="category" data-id="${esc(c.id || '')}">${formError}${input('name', 'Category name', c.name, 'text', 'required maxlength="100"')}${input('sort_order', 'Display order', c.sort_order, 'number', 'required step="1"')}${c.id ? `<button type="button" class="button button-quiet" data-action="delete-category" data-id="${esc(c.id)}" ${ownerLocked()}>Remove category</button><p class="help-text">Products remain in your catalog and become uncategorized.</p>` : ''}${actions(c.id ? 'Save category' : 'Add category')}</form>`);
+  showDialog(c.id ? 'Edit category' : 'Add category', `<form data-form="category" data-id="${esc(c.id || '')}">${formError}${input('name', 'Category name', c.name, 'text', 'required maxlength="100"')}${c.id ? `<button type="button" class="button button-quiet" data-action="delete-category" data-id="${esc(c.id)}" ${ownerLocked()}>Remove category</button><p class="help-text">Products keep their other categories and inventory. Those with no categories still appear under All.</p>` : ''}${actions(c.id ? 'Save category' : 'Add category')}</form>`);
 }
 function zoneDialog(id) {
   const z = state.zones.find(zone => zone.id === id) || { name: '', description: '', localities: [], fee_cents: 0, active: true };
@@ -578,12 +608,22 @@ async function onAction(button) {
       state.productFilters = { search: '', status: '', category: '' };
       $$('[data-product-filter]').forEach(control => { control.value = ''; });
       updateProductResults(); $('#product-search').focus(); break;
+    case 'inventory-whole-month': {
+      state.inventoryDates=calendarMonthDays(state.inventoryMonth).filter(d=>d && d>=manilaDate()); render(); break;
+    }
+    case 'inventory-range': {
+      const from=$('[name="quantity_from"]').value,to=$('[name="quantity_to"]').value;
+      if (!from || !to || from>to || from<manilaDate() || !from.startsWith(state.inventoryMonth) || !to.startsWith(state.inventoryMonth)) throw new Error('Choose a valid future date range within the selected month.');
+      state.inventoryDates=calendarMonthDays(state.inventoryMonth).filter(d=>d && d>=from && d<=to);render();break;
+    }
+    case 'edit-flavor-menu': editFlavorMenu(id); break;
     case 'new-product': openProduct(); break;
     case 'edit-product': openProduct(id); break;
     case 'categories': categoriesDialog(); break;
+    case 'reorder-products': catalogOrderDialog('products'); break;
     case 'new-category': categoryDialog(); break;
     case 'edit-category': categoryDialog(id); break;
-    case 'delete-category': showDialog('Remove category', `<form data-form="delete-category" data-id="${esc(id)}">${formError}<p class="muted">Remove this category? Its products remain in your catalog and become uncategorized.</p>${actions('Remove category')}</form>`); break;
+    case 'delete-category': showDialog('Remove category', `<form data-form="delete-category" data-id="${esc(id)}">${formError}<p class="muted">Remove this category? Its products keep their other categories and inventory. Those with no categories still appear under All.</p>${actions('Remove category')}</form>`); break;
     case 'add-group': captureProduct(); productDraft.option_groups.push({ id: uid(), label: '', required_count: 1, choices: [{ id: uid(), label: '', surcharge_cents: 0, active: true }] }); renderProductDialog(); break;
     case 'remove-group': captureProduct(); productDraft.option_groups.splice(index, 1); renderProductDialog(); break;
     case 'add-choice': captureProduct(); productDraft.option_groups[index].choices.push({ id: uid(), label: '', surcharge_cents: 0, active: true }); renderProductDialog(); break;
@@ -680,6 +720,18 @@ document.addEventListener('input', event => {
 document.addEventListener('change', async event => {
   const target = event.target;
   try {
+    if (target.id === 'menu-cover-photo') {
+      const form=target.form, file=target.files[0]; if (!file) return;
+      if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>5*1024*1024) throw new Error('Choose a JPEG, PNG, or WebP image up to 5 MB.');
+      const controls=[...form.elements], disabled=controls.map(c=>c.disabled); form.dataset.busy='true'; controls.forEach(c=>c.disabled=true);
+      try { const result=await upload(file,{kind:'product'}); if (!safeImage(result.url)) throw new Error('The photo upload did not return a valid URL.');
+        if(form.isConnected){const photos=JSON.parse(fieldValue(form,'photos')||'[]');form.elements.photos.value=JSON.stringify([result.url,...photos.slice(1)]);$('#menu-photo-preview').innerHTML=`<img src="${esc(result.url)}" alt="New flavor cover" style="width:110px;height:90px;object-fit:cover;border-radius:8px">`;}
+      } finally {form.dataset.busy='false';controls.forEach((c,i)=>c.disabled=disabled[i]);} return;
+    }
+    if (target.id === 'quantity-mode') {state.quantityMode=target.value;return;}
+    if (target.id === 'inventory-month') {
+      state.inventoryMonth=target.value;state.inventoryDates=[];state.inventoryDrafts={};render();return;
+    }
     if (target.id === 'select-print-orders') {
       filteredOrders().forEach(order => target.checked ? state.printSelection.add(order.id) : state.printSelection.delete(order.id));
       syncOrderPrintSelection(); return;
@@ -794,6 +846,9 @@ document.addEventListener('submit', async event => {
   if (form.dataset.busy === 'true') return;
   const errorBox = $('.form-error', form);
   errorBox.textContent = '';
+  if (form.dataset.form==='production-range') {
+    try {const range={from:fieldValue(form,'from'),to:fieldValue(form,'to')};buildProduction(state.orders,range.from,range.to);state.productionRange=range;render();}catch(error){errorBox.textContent=error.message;}return;
+  }
   if (!state.connected) { errorBox.textContent = 'Complete backend setup and sign in as an authorized team member before saving.'; return; }
   if (!form.reportValidity()) return;
   form.dataset.busy = 'true';
@@ -809,6 +864,19 @@ document.addEventListener('submit', async event => {
 async function submitForm(form) {
   const type = form.dataset.form;
   switch (type) {
+    case 'flavor-menu-editor': {
+      const payload = Object.fromEntries(['id','name','tagline','description','expected_month'].map(key => [key,fieldValue(form,key)]));
+      payload.category_ids=$$('[name=category_ids]:checked',form).map(el=>el.value);
+      payload.current_month = fieldChecked(form,'current_month'); payload.next_month = fieldChecked(form,'next_month'); payload.hidden = fieldChecked(form,'hidden'); payload.photos = JSON.parse(fieldValue(form,'photos') || '[]');
+      if(payload.id){
+        const impact=await api('flavor_removal_impact',payload);
+        if(impact.months.length&&!confirm(impact.months.map(m=>`${monthLabel(m.month)}: ${m.orders} outstanding confirmed order${m.orders===1?'':'s'} still need ${m.pieces} pieces of this flavor.`).join('\n')+'\n\nRemoving this flavor stops new orders and clears unsold stock for these months. Existing orders stay in Production. Continue?'))break;
+      }
+      await api('save_flavor_editor',payload); closeDialog(); await refresh(); toast('Flavor and menu placements saved.'); break;
+    }
+    case 'menu-visibility':
+      await api('save_flavor_menu_visibility',{month:form.dataset.month,expected_month:form.dataset.current,published:fieldChecked(form,'published')});
+      await refresh(); toast('Menu visibility saved.'); break;
     case 'product': {
       captureProduct();
       if (productDraft.kind === 'set' && productDraft.box_flavors.length !== 3) throw new Error('Choose three flavors for this fixed box.');
@@ -818,7 +886,7 @@ async function submitForm(form) {
       await api('save_product', { product: productDraft });
       closeDialog(); await refresh(); toast('Product saved.'); break;
     }
-    case 'category': await api('save_category', { category: { ...(form.dataset.id ? { id: form.dataset.id } : {}), name: fieldValue(form, 'name'), sort_order: Number(fieldValue(form, 'sort_order')) } }); closeDialog(); await refresh(); toast('Category saved.'); break;
+    case 'category': await api('save_category', { category: { ...(form.dataset.id ? { id: form.dataset.id } : {}), name: fieldValue(form, 'name'), scope: catalogScope() } }); closeDialog(); await refresh(); toast('Category saved.'); break;
     case 'delete-category': await api('delete_category', { id: form.dataset.id }); closeDialog(); await refresh(); toast('Category removed. Products are preserved.'); break;
     case 'zone': {
       const localities = [...new Set(list(fieldValue(form, 'localities')))];
@@ -827,13 +895,13 @@ async function submitForm(form) {
       closeDialog(); await refresh(); toast('Delivery zone saved.'); break;
     }
     case 'inventory': {
-      const rows = quantitySaveRows(stockProducts(), state.inventory, state.inventoryDates, state.inventoryDrafts, manilaDate());
+      const rows = quantitySaveRows(stockProducts(), state.inventory, state.inventoryDates, state.inventoryDrafts, manilaDate(), state.quantityMode);
       const dateCount = state.inventoryDates.length;
       if (!rows.length) { state.inventoryDrafts = {}; state.inventoryDates = []; render(); toast('Quantities are already up to date.'); break; }
       const controls = [...$$('input, button, textarea', form), ...$$('[data-view]')].filter(control => !control.disabled);
       controls.forEach(control => { control.disabled = true; });
       try {
-        state.inventory = await api('save_inventory', { rows });
+        state.inventory = await api('save_inventory', { rows, mode:state.quantityMode });
         state.inventoryDrafts = {};
         state.inventoryDates = [];
         render(); toast(`Quantities saved for ${dateCount} selected date${dateCount === 1 ? '' : 's'}.`);

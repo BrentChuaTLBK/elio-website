@@ -54,6 +54,7 @@ export default async function({db,check,state}) {
  await check('The server permits this month and next month across year and leap-year boundaries',async()=>{
   const p=await product({box_flavors:[a.id,a.id,b.id],lead_days:0,allow_same_day:true});
   for(const [submitted,last,beyond] of [['2026-12-15T02:00:00Z','2027-01-31','2027-02-01'],['2028-01-15T02:00:00Z','2028-02-29','2028-03-01'],['2026-12-31T16:00:00Z','2027-02-28','2027-03-01']]) {
+   for (const flavor of [a,b]) await h.plan(flavor,[last.slice(0,7)+'-01',beyond.slice(0,7)+'-01']);
    const quote=(date,admin=false)=>db.query('select elio.calculate_quote($1::jsonb,null,null,$2,$3::timestamptz) as q',[JSON.stringify(checkout(p,date)),admin,submitted]);
    await quote(last);
    await assert.rejects(()=>quote(beyond),/this month or next month/);

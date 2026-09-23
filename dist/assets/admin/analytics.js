@@ -1,6 +1,6 @@
 // Read-only reporting over the latest admin order snapshots. All amounts are cents.
 const DAY = 86400000;
-const CLOSED = new Set(['cancelled', 'expired']);
+const CLOSED = new Set(['cancelled', 'expired', 'refunded']);
 const manilaFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit'
 });
@@ -101,7 +101,7 @@ export function buildAnalytics(orders = [], {start = '', end = '', today = manil
     refundedPaidOrderCount: 0, fullRefundOrderValueCents: 0,
     customerCount: 0, repeatCustomerCount: 0, completedOrderCount: 0, toFulfillCount: 0,
     promoUseCount: 0, distinctPromoCodeCount: 0, promoCodes: [],
-    totalUnits: 0, topProducts: [], trend: [], trendUnit: 'day', trendInterval: 1
+    totalUnits: 0, topProducts: [], totalFlavorPieces: 0, topFlavors: [], missingFlavorRecipeCount: 0, trend: [], trendUnit: 'day', trendInterval: 1
   };
   if (invalidRange) return result;
   const rows = [];
@@ -113,6 +113,7 @@ export function buildAnalytics(orders = [], {start = '', end = '', today = manil
   }
   const names = new Map((Array.isArray(products) ? products : []).filter(Boolean).map(product => [String(product.id), product.name]));
   const productTotals = new Map();
+  const flavorTotals = new Map();
   const customers = new Map();
   const promoTotals = new Map();
   result.totalOrders = rows.length;
@@ -183,6 +184,15 @@ export function buildAnalytics(orders = [], {start = '', end = '', today = manil
       row.lineValueCents += item.line_total_cents == null ? (Number.isSafeInteger(fallback) ? fallback : 0) : cents(item.line_total_cents);
       row.orderIndexes.add(index);
       result.totalUnits += units;
+      const recipe=Array.isArray(item.flavor_contents)?item.flavor_contents:[];
+      if(!recipe.length)result.missingFlavorRecipeCount++;
+      for(const flavor of recipe){
+        const perBox=nonnegativeInteger(flavor.quantity)??0,pieces=perBox*units;
+        if(!pieces||!Number.isSafeInteger(pieces))continue;
+        const id=String(flavor.product_id||flavor.name||'Unknown flavor');
+        const total=flavorTotals.get(id)||{flavorId:id,name:flavor.name||'Unknown flavor',pieces:0,orderIndexes:new Set()};
+        total.pieces+=pieces;total.orderIndexes.add(index);flavorTotals.set(id,total);result.totalFlavorPieces+=pieces;
+      }
     }
   });
   result.averageApprovedPaymentCents = result.approvedAmountOrderCount ? Math.round(result.approvedPaymentsCents / result.approvedAmountOrderCount) : null;
@@ -193,6 +203,8 @@ export function buildAnalytics(orders = [], {start = '', end = '', today = manil
   result.averageOrderValueCents = result.activePaidOrderCount ? Math.round(result.currentOrderValueCents / result.activePaidOrderCount) : null;
   result.topProducts = [...productTotals.values()].map(({orderIndexes, ...product}) => ({...product, orderCount: orderIndexes.size}))
     .sort((a, b) => b.units - a.units || b.lineValueCents - a.lineValueCents || String(a.name).localeCompare(String(b.name)) || a.productId.localeCompare(b.productId));
+  result.topFlavors=[...flavorTotals.values()].map(({orderIndexes,...flavor})=>({...flavor,orderCount:orderIndexes.size}))
+    .sort((a,b)=>b.pieces-a.pieces||a.name.localeCompare(b.name)||a.flavorId.localeCompare(b.flavorId));
   Object.assign(result, makeTrend(rows, start, end, validDate(today) ? today : manilaOrderDate(new Date())));
   return result;
 }

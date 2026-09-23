@@ -14,14 +14,14 @@ Source: `BrentChuaTLBK/bakery-website`, commit `7e81baa1a6ef9ae179662aeea7cc238e
 
 Elio changes:
 
-- `kind=flavor`: price is the extra charge per individual piece in custom boxes; active and in-rotation flags determine availability for every box that uses that flavor.
+- `kind=flavor`: price is the extra charge per individual piece in custom boxes. Product enablement, a published lineup for the fulfillment month, visibility, and daily stock all determine availability for boxes using that flavor.
 - `kind=custom_box`: base price plus exactly three flavor surcharges per box. Each flavor's piece count is multiplied by the number of boxes.
 - `kind=set`: the owner selects three flavor IDs in `box_flavors` (repeats allowed) and enters one fixed total price. Customers cannot substitute flavors. Each set consumes the included flavors’ piece quantities; no separate box inventory exists. Any unavailable component makes the set unavailable.
 - Saved line items include trusted per-box `stock_requirements`, `flavor_contents` (IDs, names, quantities), and price snapshots. Multiply flavor quantities by ordered boxes for production totals. Unchanged configurations retain their saved recipes and unit prices during amendments. New configurations use current prices and recipes.
 - Reservations aggregate all cart lines. A database transaction lock serializes stock, promo, cancellation, and amendment mutations. Failed updates roll back all stock changes.
 - Unpaid cancellation/expiry releases holds. Paid cancellation explicitly chooses whether to restore stock. Redeemed promo usage remains counted after paid cancellation.
 - Prices start as unconfirmed drafts. The shop starts paused, with no payment account, pickup address, delivery fees, or stock limits assumed.
-- Blank daily quantities mean unlimited, as in TLB. Zero means sold out. Daily quantities contains only individual flavors; all boxes share these limits.
+- Unsaved daily quantities mean zero. An explicitly saved blank / No limit means unlimited. Daily quantities shows only the selected month's lineup; all fixed and custom boxes share individual flavor limits. `configured` distinguishes explicit zero from a not-yet-configured date, so bulk fill can preserve saved values.
 - `catalog` accepts optional `fulfillment_date` and returns `stock_available`, `remaining_boxes`, and flavor stock for that date. These are stock indicators; the quote still enforces lead time, closures, pickup/delivery rules, and paused ordering.
 - Customer date selection and server quotes are limited to this month and next month in Asia/Manila. Staff calendars and authorized amendments retain their separate date rules.
 - Owners can upload JPEG/PNG/WebP product photos up to 5 MB in the public `product-images` bucket. An INSERT-only Storage policy checks the current database owner role and their own UUID folder. Removing a photo from a product detaches it; it does not delete the stored object.
@@ -58,3 +58,16 @@ Run `npm run check`, `node tests/shop-rules.test.mjs`, `node --experimental-tran
 The global transaction lock follows the TLB implementation. Measure response time and lock waits before increasing throughput; per-resource locking can be introduced if measured traffic warrants it.
 
 The first hosted installation passed the anonymous catalog and permission checks. Security advisors returned no warnings or errors. Informational “RLS Enabled No Policy” entries are expected for the private, deny-by-default `elio` tables: browser roles have no table grants, and access goes through the checked RPCs. See [the Supabase explanation](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy). Unused-index notices are expected in an empty database. Auth currently uses the default absolute connection allocation; review [production configuration](https://supabase.com/docs/guides/deployment/going-into-prod) when scaling compute.
+
+
+## Monthly menus, categories and production
+
+The monthly-menu migration adds private `elio.flavor_menus` and explicit inventory configuration state. Unconfigured dated stock is zero. Membership changes reset only unsold stock while preserving reservations. Publication gates customer ordering, and existing shop closures remain authoritative. There is no rollover scheduler: queries resolve current/next months in Manila and retain the saved month records.
+
+Categories follow TLB’s multi-category approach, adapted to separate `flavors` and `boxes` scopes. Product JSON stores `category_ids`, `category_sort_orders`, and the independent All-list `sort_order`. Owner-only `reorder_catalog` requires complete scoped memberships and an optimistic snapshot under the existing transaction lock. Product editing preserves saved positions. Category removal never deletes a product or touches inventory. Public collection responses expose only flavor categories and visible flavor metadata.
+
+The removal-impact RPC returns aggregate outstanding paid/confirmed order counts and saved flavor-piece requirements to the owner before lineup removal. Completed orders are already served and excluded from this reminder. Production includes completed orders in range totals and shows served quantities separately; its date range is the fulfillment date. Analytics Top Flavors retains the order-placement date filter.
+
+Additional checks: `node tests/daily-quantities.test.mjs`, `node tests/production.test.mjs`, and `node tests/top-flavors.test.mjs`. Backend suites cover monthly stock gates, closure priority, reset/re-add behavior, atomic bulk updates, scoped multi-category ordering, stale edits, and removal-impact counts.
+
+Production groups custom boxes by the saved per-box flavor counts within each box product. Selection order does not affect grouping: Vanilla/Gorgonzola/Vanilla and Vanilla/Vanilla/Gorgonzola both mean 2 Vanilla + 1 Gorgonzola. Overall and daily tables show each combination with total and served box counts. Distinct recipes stay separate.

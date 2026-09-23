@@ -101,9 +101,10 @@ export function selectionLabels(product,selections){
 }
 
 export function flavorStock(flavor,date,inventory){
-  if(!flavor||flavor.active===false||flavor.in_rotation===false)return 0;
+  if(!flavor||flavor.active===false||flavor.in_rotation===false||flavor.collection_hidden===true)return 0;
+  if(date&&Array.isArray(flavor.available_months)&&!flavor.available_months.includes(date.slice(0,7)+'-01'))return 0;
   const row=inventory.find(r=>r.product_id===(flavor.product_id||flavor.id)&&r.date===date);
-  if(row?.available===false)return 0;
+  if(row?.available===false||(!row&&date))return 0;
   return row?.capacity==null?Infinity:Math.max(0,Number(row.remaining??(row.capacity-Number(row.reserved||0))));
 }
 export function boxStock(product,date,inventory){
@@ -145,5 +146,5 @@ export function firstAvailableDate(items,products,settings,inventory,now=new Dat
 
 export function prepareCatalog(catalog){
   const flavors=catalog.flavors||[];
-  return {...catalog,products:catalog.products.map(p=>p.kind==='set'?{...p,flavor_contents:(p.flavor_contents||[]).map(f=>({...f,...(flavors.find(x=>x.id===f.product_id)||{active:false})}))}:p.kind==='custom_box'?{...p,option_groups:[{id:'flavors',label:'Flavors per box',required_count:3,choices:flavors.map(f=>({...f,label:f.name,surcharge_cents:f.price_cents,active:f.active&&f.in_rotation}))}]}:p)};
+  return {...catalog,products:catalog.products.map(p=>p.kind==='set'?{...p,flavor_contents:(p.flavor_contents||[]).map(f=>({...f,...(flavors.find(x=>x.id===f.product_id)||{active:false})}))}:p.kind==='custom_box'?{...p,option_groups:[{id:'flavors',label:'Flavors per box',required_count:3,choices:flavors.map(f=>({...f,label:f.name,surcharge_cents:f.price_cents,active:f.active&&f.in_rotation&&!f.collection_hidden}))}]}:p)};
 }

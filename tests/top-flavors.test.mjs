@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {buildAnalytics} from '../dist/assets/admin/analytics.js';
+const item={product_id:'box',name:'Fixed trio',quantity:2,flavor_contents:[{product_id:'v',name:'Vanilla',quantity:2},{product_id:'m',name:'Matcha',quantity:1}]};
+const order={created_at:'2026-09-23T16:00:00Z',payment_status:'paid',fulfillment_status:'confirmed',items:[item,{product_id:'custom',quantity:1,flavor_contents:[{product_id:'m',name:'Matcha',quantity:3}]}]};
+const report=buildAnalytics([order,{...order,fulfillment_status:'completed',items:[item]},...['cancelled','expired','refunded'].map(fulfillment_status=>({...order,fulfillment_status})),{...order,refund_label:true},{...order,payment_status:'under_review'},{...order,created_at:'2026-09-22T16:00:00Z'}],{start:'2026-09-24',end:'2026-09-24',products:[{id:'v',name:'Renamed product',box_flavors:['wrong']}]});
+assert.equal(report.totalFlavorPieces,15);
+assert.deepEqual(report.topFlavors.map(f=>[f.name,f.pieces,f.orderCount]),[['Vanilla',8,2],['Matcha',7,2]]);
+assert.equal(buildAnalytics([{...order,items:[{quantity:2,product_id:'legacy'}]}]).missingFlavorRecipeCount,1);
+assert.equal(buildAnalytics([{...order,payment_status:'under_review'}]).topFlavors.length,0);
+console.log('PASS 4 flavor ranking, repetition, saved recipe and exclusion checks');

@@ -27,6 +27,11 @@ window.ELIO_CONTENT = {
   featuredOrder: ['vanilla', 'matcha', 'chocolate']
 };
 
-// Read the current data each time so every page follows the same rotation.
-window.ELIO_CONTENT.isAvailable = (flavor) =>
-  flavor.available !== false && window.ELIO_CONTENT.monthlyMenu.includes(flavor.id);
+// The public collection describes flavors; the shop rechecks dated stock.
+window.ELIO_CONTENT.isAvailable = () => true;
+window.ELIO_CONTENT.currentMenuShown = true;
+window.ELIO_CONTENT.nextMenuShown = false;
+window.ELIO_CONTENT.nextMonthlyMenu = [];
+window.ELIO_CONTENT_READY = /(?:^|\/)(?:index|order|flavors)\.html$/.test(location.pathname) || location.pathname.endsWith('/')
+  ? import('./assets/shop/flavor-content.js').then(({loadFlavorContent}) => loadFlavorContent(window.ELIO_CONTENT)).catch(() => Object.assign(window.ELIO_CONTENT,{flavors:[],monthlyMenu:[],nextMonthlyMenu:[],currentMenuShown:false,nextMenuShown:false,collectionLoaded:false}))
+  : Promise.resolve(window.ELIO_CONTENT);

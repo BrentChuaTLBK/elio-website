@@ -4,7 +4,7 @@ A responsive Elio storefront prototype with an independent Supabase ordering bac
 
 ## Preview
 
-Run `node server.mjs`, then open http://127.0.0.1:4173. No package installation is needed. You can also open `dist/index.html` directly in a browser. The local server binds only to this computer.
+Run `node server.mjs`, then open http://127.0.0.1:4173. No package installation is needed. Use the local server for JavaScript modules and the live flavor collection; the server binds only to this computer.
 
 For a static host, the publish directory is `dist` and no compilation is needed. All asset URLs are relative. The storefront and dashboard connect to Elio's separate Supabase project using a publishable browser key. No server secrets belong in the static files.
 
@@ -21,6 +21,18 @@ Overview, Orders, Daily quantities, Analytics, Promo codes, Shop settings, and T
 The live database is installed in `dzxyhckkkrzqpwpavngn`, separate from TLB's project within the same organization. The initial owner is verified. The checkout and private proof functions are connected. The email worker runs every minute; complete a controlled real-delivery check before launching. Verify Resend/SMTP deliverability before relying on account emails. Website visitor analytics is not connected; order analytics is available in the dashboard.
 
 Backend validation: `cd tests/backend`, `npm ci`, then `npm test`. See the backend guide for local PostgreSQL-compatible test details and limitations.
+
+### Flavor menus, quantities, and production
+
+**Flavor menus** uses the same flavor records as **Flavors**. Owners can add a name, photo, description, flavor category, and current/next-month placements. Leaving both months unchecked keeps a flavor in the full collection. Hidden flavors leave the public collection and all future lineups and cannot be ordered. The public flavor list, descriptions, shop flavor strip, and homepage carousel read this managed collection. Categories filter the public collection.
+
+Each lineup belongs to a calendar month in Manila time. A published next-month lineup becomes the current lineup when that month begins. Hidden lineups can be prepared and stocked by staff, but they are excluded from public previews and customer ordering. Publishing a lineup does not override a shop pause, closed date, product activation, price confirmation, lead time, or daily quantity.
+
+**Daily quantities** shows only the selected month's lineup. Dates start at zero until a quantity is entered. Whole-month and date-range selection stay within that month and include closed dates for stock planning, while customer orders remain blocked on closed dates. Quantities are totals including existing reservations: 20 total with 12 reserved leaves 8. Choose **Replace quantities** or **Fill only unconfigured dates**; an explicitly saved zero counts as configured. Blank / No limit is an explicit owner/staff choice, never the missing-row default. Removing and re-adding a flavor resets its unsold stock to zero; existing orders and their reserved pieces remain intact.
+
+**Production** reports paid, admin-confirmed orders by pickup/delivery date range, with overall and daily flavor-piece totals, fixed sets, custom boxes, and served quantities. Completed orders stay in the range totals; unpaid, cancelled, expired, and refunded orders do not. Calculations use saved order recipes, including repeated flavors. **Top Flavors** in Analytics ranks those saved flavor pieces by the Analytics order-placement date filter, including completed orders and excluding unpaid/cancelled/refunded orders. Box revenue is not arbitrarily allocated to individual flavors.
+
+Product detail popups fit their contents and contain readonly flavor tiles for fixed sets, plus expandable packaging and care information. The date and pickup/delivery selector appears once on the shop page. Legacy `box.html` links open the corresponding shop popup.
 
 ## Cloudflare deployment
 
@@ -49,13 +61,13 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - Responsive homepage with the navigation layered over the hero photograph, ivory/brown/gold palette, centered typographic wordmark, and food-first imagery. The same text logo is retained, using its lighter bronze variant over the photo.
 - The flavor collection and gifting section now form one compact showcase: three browsable flavor tiles beside a box photograph. The box copy and “Order a box” button are live HTML over the image, with a dark fade for contrast. They stack cleanly on mobile.
 - Mobile navigation, a full flavor catalog carousel, individual flavor dialogs, gifting details, and a factual brand introduction.
-- “Explore all flavors” opens `flavors.html`: a photo-led catalog with taste filters, clickable descriptions, a monthly menu, and a separate section for flavors outside the rotation. All current flavors are in the initial monthly lineup, as confirmed by Elio. The legacy `#flavors` link redirects to this page.
+- “Explore all flavors” opens `flavors.html`: a photo-led catalog with taste filters, clickable descriptions, a monthly menu, and the full collection. All current flavors are in the initial monthly lineup, as confirmed by Elio. The legacy `#flavors` link redirects to this page.
 - The carousel glides automatically at a gentle 14 pixels per second, with the first flavor following the last seamlessly. It keeps moving while the cursor is over it. The previous/next buttons move three flavors at a time on desktop and mobile; keyboard arrows move one flavor, with Home/End jumping to the first/last. Native touch/trackpad scrolling remains available.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Account and bag icons appear beside the centered wordmark. Compact navigation is used at widths up to 1000 px and includes My account, My orders, and Order a box links.
 - “Order a box” opens `order.html`: the existing photographic shop layout now loads active boxes from the dashboard and includes Your basket. Fixed-set recipes cannot be changed; custom boxes require exactly three available flavor pieces. Prices and shared stock are revalidated by the server. Draft concepts remain previews until activated.
 - The shop uses TLB’s calendar UI, restricted to the current and following month in Philippine time. On initial load, Pickup and the earliest available date are selected, accounting for production rules, closures, and shared flavor stock. A saved basket is checked as a whole. Customers can then change the date or choose Delivery.
-- Listed box cards open a product dialog with photographs, included flavors or custom choices, quantity, price, and Add to basket. Legacy `box.html?collection=...` links open the matching live product when listed; unlisted concepts retain their gallery preview.
+- Box cards open a compact, centered product dialog with photographs, included flavors or custom choices, quantity, price, and Add to basket. Legacy `box.html?collection=...` links open the matching shop dialog. Unlisted concepts use the same compact window with ordering disabled. Date and pickup/delivery selection stay on the shop page, outside product details.
 - Public account and team account pages use Elio's Supabase Auth for email/password registration, sign-in, verification, password reset, and sign-out. Google sign-in controls activate automatically when the Elio Google provider is enabled; see [Google sign-in setup](docs/GOOGLE-SIGN-IN.md). Only users with an Elio staff role can open the dashboard. Signed-in customers see their own order history; guests use a private order link. Payment approval remains a staff action.
 - A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
 - Immediately above the newsletter, an editorial block introduces the three-piece box, a gifting banner, and three everyday Elio moments. “Build your trio” opens the box preview, “Explore gifting” opens the existing packaging details, and the Instagram handle links to Elio. The copy and controls are real HTML; the photographs are replaceable concept assets.
@@ -105,13 +117,15 @@ The four new shop photographs were generated with `image_gen.imagegen` in refere
 
 ## Growing the flavor catalog
 
-The live ordering menu is managed in **Flavors** and **Boxes & sets** in the dashboard. Daily quantities are individual pieces shared by every set and custom box. The editorial homepage/gallery content below remains maintained in `content.js`; it is separate from bookable stock.
+Manage flavors in **Flavor menus**: upload a photo, edit descriptions, select categories, and assign the current month, next month, both, or neither. Neither means collection-only. Individually hidden flavors are omitted from the public collection and cannot accept new orders. Product surcharges and ordering switches remain in **Flavors**; all screens use the same flavor record.
 
-Add a flavor object to `flavors` in `dist/content.js` with a unique `id`, `name`, `line`, and `description`. It appears automatically in the homepage carousel, full catalog, order page, and its own `#flavor-id` detail view. Add `image` when its photograph is ready. Optional `category` values are `classic`, `tea`, and `rich`; flavors without a category still appear under All flavors. `featuredOrder` only controls which flavors lead; every other flavor follows automatically. Public copy uses “Explore all flavors” without a fixed count.
+**Arrange categories** and **Arrange flavors / boxes** support mouse, touch, and keyboard movement. Boxes and flavors have separate category lists. Each item can appear in multiple categories while retaining one inventory record. The All list and every category have independent saved orders. Public filters use these orders. Uncategorized items remain in All. Removing a category preserves other memberships, inventory and orders. Sorting uses a complete saved snapshot to reject stale edits; changing a description preserves existing positions.
 
-For the editorial homepage and flavor gallery, update the `monthlyMenu` array in `dist/content.js` with the IDs in the current rotation. All current flavors are included initially. Removing an ID moves that flavor to “More to discover,” keeps its description accessible, and marks it “Currently unavailable” across the homepage, catalog, and shop. It also disables that option in the box preview. Adding an ID brings it back into the monthly lineup. A newly added flavor stays outside the menu until its ID is included; adding catalog entries never silently makes them selectable.
+Monthly lineups use Manila calendar dates. Prepared next-month menus roll forward automatically with their publication setting and quantities. Flavors not included stay in the full collection unless individually hidden. An unpublished lineup blocks orders for its dates. New or re-added members start with zero unsold stock. Before removal, the editor reports outstanding paid, confirmed order and piece counts. Saved order recipes remain in Production.
 
-`available: false` is an optional override that keeps a flavor unavailable even when its ID is in `monthlyMenu`. Remove that override and include the ID in `monthlyMenu` to make it selectable again. An empty monthly list displays a coming-soon message and leaves the full collection browsable. The shared `isAvailable` helper keeps all pages consistent. This is an editorial menu, not live inventory or an enabled order service.
+Daily quantities shows the selected month’s lineup. Select individual dates, a range within the month, or the whole remaining month. Totals include already ordered pieces. Choose replace or fill only unconfigured dates; a saved zero is configured. If any requested total is below existing reservations, the whole operation is rejected with the conflicting date. Closed dates may be stocked for planning, but shop and fulfillment closures still block ordering.
+
+The live public collection comes from the checked Supabase RPC. Static entries in `dist/content.js` are concept-preview fallbacks, not the live management interface. If public collection loading fails, hidden static flavors are not restored. The carousel follows the saved All flavors order.
 
 Automatic movement starts as soon as the carousel enters view, with no startup delay, and continues on hover and during vertical page scrolling. Only horizontal wheel/trackpad input (including Shift+wheel) starts manual carousel browsing; page scrolling and zoom gestures do not trigger a sideways snap. After an arrow click or mobile swipe, the gentle glide resumes as soon as the movement and native momentum finish. Horizontal wheel/trackpad browsing and focus interaction retain a four-second reading pause. It also pauses while details are open and when the carousel or page is out of view. Reduced-motion preferences disable automatic movement. Screen-reader status announcements are silent while it moves automatically; the full catalog page provides a stationary view of all flavors.
 
@@ -175,3 +189,5 @@ node --check server.mjs
 ```
 
 Brand assets and supplied copy remain the property of their respective owner. No open-source license is granted for them by this repository.
+
+Production groups custom boxes by the saved per-box flavor counts within each box product. Selection order does not affect grouping: Vanilla/Gorgonzola/Vanilla and Vanilla/Vanilla/Gorgonzola both mean 2 Vanilla + 1 Gorgonzola. Overall and daily tables show each combination with total and served box counts. Distinct recipes stay separate.

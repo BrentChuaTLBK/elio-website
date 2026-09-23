@@ -35,11 +35,29 @@ export async function makeHarness(db) {
     recipient: { name: 'QA Recipient', phone: '09177654321' },
     instructions: 'Test fixture only', idempotency_key: randomUUID(), ...changes,
   });
-  const product = async (overrides = {}) => api('save_product', { product: {
+  // Existing checkout contracts explicitly prepare a published, unlimited fixture
+  // for both bookable months. Menu tests create drafts through the raw API instead.
+  const plan = async (p, months) => {
+    for (const month of months) {
+      await db.query(`insert into elio.flavor_menus(month,flavor_ids,published) values($1,array[$2::uuid],true)
+        on conflict(month) do update set flavor_ids=array_append(array_remove(elio.flavor_menus.flavor_ids,$2::uuid),$2::uuid),published=true`,[month,p.id]);
+      await db.query(`insert into elio.inventory(product_id,date,capacity,available)
+        select $1::uuid,d::date,null,true from generate_series($2::date::timestamp,($2::date+interval '1 month - 1 day')::timestamp,interval '1 day') d
+        on conflict(product_id,date) do update set capacity=null,available=true`,[p.id,month]);
+    }
+  };
+  const product = async (overrides = {}) => {
+    const p = await api('save_product', { product: {
     name: `QA ${randomUUID().slice(0, 8)}`, description: 'Local test fixture only', category_id: null,
     kind: 'set', price_confirmed: true, price_cents: 10000, min_quantity: 1, lead_days: 1, active: true,
     photos: [], option_groups: [], sort_order: 0, ...overrides,
-  } }, ids.owner);
+    } }, ids.owner);
+    if (p.kind === 'flavor') {
+      const months=await scalar("select jsonb_build_array(date_trunc('month',now() at time zone 'Asia/Manila')::date,(date_trunc('month',now() at time zone 'Asia/Manila')+interval '1 month')::date)");
+      await plan(p,months);
+    }
+    return p;
+  };
   const inventory = async (product, date, capacity, available = true) => api('save_inventory', {
     rows: [{ product_id: product.id, date, capacity, available }],
   }, ids.owner);
@@ -60,5 +78,5 @@ export async function makeHarness(db) {
   const remaining = (product, date) => scalar('select elio.capacity_remaining($1::uuid, $2::date)', [product.id, date]);
   const allocations = (id) => db.query('select product_id::text, date::text, quantity, state from elio.allocations where order_id=$1 order by product_id,date', [id]).then(r => r.rows);
 
-  return { ids, as, api, service, scalar, day, item, checkout, product, inventory, fixture, order, action, proof, remaining, allocations };
+  return { ids, as, api, service, scalar, day, item, checkout, product, plan, inventory, fixture, order, action, proof, remaining, allocations };
 }

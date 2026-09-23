@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {quantitySelection,quantitySaveRows} from '../dist/assets/admin/daily-quantities.js';
+const product={id:'a',name:'Vanilla'}, dates=['2026-10-01','2026-10-02','2026-10-03'];
+const rows=[{product_id:'a',date:dates[0],capacity:20,reserved:12,configured:true},{product_id:'a',date:dates[1],capacity:0,reserved:0,configured:true},{product_id:'a',date:dates[2],capacity:0,reserved:0,configured:false,available:false}];
+assert.equal(quantitySelection('a',['2026-10-04'],rows).value,'0');
+assert.equal(quantitySaveRows([product],rows,dates,{a:'25'},'2026-09-24','fill_unconfigured').length,1);
+assert.equal(quantitySaveRows([product],rows,dates,{a:'25'},'2026-09-24','replace').length,3);
+assert.throws(()=>quantitySaveRows([product],rows,dates,{a:'11'},'2026-09-24'),/12 already ordered/);
+assert.equal(quantitySaveRows([product],rows,dates,{a:'11'},'2026-09-24','fill_unconfigured').length,1);
+assert.equal(quantitySaveRows([product],[],['2026-10-04'],{a:'0'},'2026-09-24')[0].capacity,0);
+console.log('PASS 6 quantity mode, zero-default and reservation checks');

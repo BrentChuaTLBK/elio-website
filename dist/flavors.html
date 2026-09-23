@@ -33,6 +33,7 @@
         <button type="button" data-category="classic" aria-pressed="false">Classic</button>
         <button type="button" data-category="tea" aria-pressed="false">Tea</button>
         <button type="button" data-category="rich" aria-pressed="false">Rich &amp; bold</button>
+        <button type="button" data-category="other" aria-pressed="false">Other</button>
       </div>
       <p class="sr-only" id="filter-status" role="status" aria-atomic="true"></p>
       <section class="flavor-section" id="monthly-menu" aria-labelledby="monthly-title">
@@ -40,12 +41,16 @@
         <div class="flavors-grid" id="monthly-flavors"></div>
         <p class="flavors-empty" id="monthly-empty" hidden></p>
       </section>
+      <section class="flavor-section" id="next-month-menu" aria-labelledby="next-month-title" hidden>
+        <div class="flavor-section-heading"><div><p class="eyebrow">Coming next month</p><h2 id="next-month-title">A taste of what’s next.</h2></div><p id="next-month-label"></p></div>
+        <div class="flavors-grid" id="next-month-flavors"></div><p class="flavors-empty" id="next-month-empty" hidden></p>
+      </section>
       <section class="flavor-section flavor-archive" id="other-flavors" aria-labelledby="other-title">
-        <div class="flavor-section-heading"><div><p class="eyebrow">The rest of the collection</p><h2 id="other-title">More to discover.</h2></div><p>Out of rotation for now.<br> Still part of the Elio story.</p></div>
+        <div class="flavor-section-heading"><div><p class="eyebrow">Every Elio flavor</p><h2 id="other-title">The full collection.</h2></div><p>Familiar favorites and new discoveries.<br> Find the flavor that speaks to you.</p></div>
         <div class="flavors-grid" id="other-flavors-grid"></div>
         <p class="flavors-empty" id="other-empty" hidden></p>
       </section>
-      <p class="flavors-footnote">Our menu changes throughout the year. Online ordering is coming soon.</p>
+      <p class="flavors-footnote">Our selections change throughout the year. Visit the shop for ordering availability on your chosen date.</p>
       <noscript><p>Enable JavaScript to explore the flavor collection and descriptions.</p></noscript>
     </div>
   </main>

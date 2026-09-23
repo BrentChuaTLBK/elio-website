@@ -4,7 +4,7 @@ const now=new Date('2026-09-24T01:00:00Z');
 const settings={paused:false,production_weekdays:[1,2,3,4,5,6],fulfillment_weekdays:[0,1,2,3,4,5,6],cutoff_time:'10:00'};
 const flavors=[{id:'a',name:'Vanilla',active:true,in_rotation:true,price_cents:0},{id:'b',name:'Matcha',active:true,in_rotation:true,price_cents:5000}];
 const products=prepareCatalog({flavors,products:[{id:'set',kind:'set',active:true,price_cents:99000,lead_days:1,min_quantity:1,flavor_contents:[{product_id:'a',name:'Vanilla',quantity:2},{product_id:'b',name:'Matcha',quantity:1}]},{id:'custom',kind:'custom_box',active:true,price_cents:90000,lead_days:1,min_quantity:1}]}).products;
-const inventory=[{product_id:'a',date:'2026-09-25',capacity:0,remaining:0},{product_id:'b',date:'2026-09-25',capacity:0,remaining:0},{product_id:'a',date:'2026-09-26',capacity:3,remaining:3}];
+const inventory=[{product_id:'a',date:'2026-09-25',capacity:0,remaining:0},{product_id:'b',date:'2026-09-25',capacity:0,remaining:0},{product_id:'a',date:'2026-09-26',capacity:3,remaining:3},{product_id:'b',date:'2026-09-26',capacity:2,remaining:2},{product_id:'a',date:'2026-09-27',capacity:10,remaining:10},{product_id:'b',date:'2026-09-27',capacity:10,remaining:10}];
 assert.equal(firstAvailableDate([],products,settings,inventory,now),'2026-09-26');
 assert.equal(firstAvailableDate([{product_id:'set',quantity:2,selections:{}}],products,settings,inventory,now),'2026-09-27');
 assert.equal(firstAvailableDate([],products,{...settings,paused:true},inventory,now),'');
@@ -19,3 +19,8 @@ assert.equal(availability(products[0],'2026-11-01',settings,[],now).available,fa
 const unavailable=prepareCatalog({flavors:flavors.map(f=>f.id==='b'?{...f,active:false}:f),products}).products;
 assert.equal(boxStock(unavailable[0],'2026-09-26',inventory),0);
 console.log('PASS 12 shop date, pricing, and shared-stock checks');
+assert.equal(boxStock(products[0],'2026-09-28',[]),0);
+const monthly=prepareCatalog({flavors:flavors.map(f=>({...f,available_months:['2026-10-01']})),products}).products;
+assert.equal(boxStock(monthly[0],'2026-09-27',inventory),0);
+assert.equal(firstAvailableDate([],monthly,settings,inventory,now),'');
+console.log('PASS unsaved quantities and unpublished/out-of-month flavors have no stock');

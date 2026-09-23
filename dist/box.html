@@ -12,13 +12,9 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="order.css">
   <link rel="stylesheet" href="box.css">
-  <link rel="stylesheet" href="fulfillment.css">
-  <link rel="stylesheet" href="calendar.css">
   <script src="content.js" defer></script>
   <script src="box.js" defer></script>
   <script type="module" src="assets/shop/box-link.js"></script>
-  <script src="calendar.js" defer></script>
-  <script src="fulfillment.js" defer></script>
 </head>
 <body class="box-page">
   <a class="skip-link" href="#main">Skip to content</a>
@@ -44,7 +40,6 @@
         <h2 class="box-field-title box-flavor-label">Choose your flavors</h2>
         <div class="box-flavor-chips" id="box-flavor-chips" aria-label="Flavor selection preview"></div>
         <details class="box-flavor-picker" id="box-flavor-picker"><summary>Choose different flavors</summary><fieldset id="box-flavor-selects"><legend class="sr-only">Choose one flavor for each of the three cheesecakes</legend></fieldset></details>
-        <section class="fulfillment" data-fulfillment aria-label="Choose a date and pickup or delivery"></section>
         <div class="box-quantity-field">
           <label class="box-field-title" for="box-quantity">Quantity</label>
           <div class="box-quantity-row"><div class="box-quantity-control"><button type="button" id="box-minus" aria-label="Remove one box" disabled>−</button><input id="box-quantity" type="number" inputmode="numeric" min="1" step="1" value="1" aria-describedby="box-quantity-unit"><button type="button" id="box-plus" aria-label="Add one box">+</button></div><span id="box-quantity-unit">Boxes</span></div>

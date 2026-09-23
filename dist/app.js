@@ -1,5 +1,6 @@
-(() => {
+(async () => {
   'use strict';
+  await window.ELIO_CONTENT_READY;
   const { flavors, featuredOrder, productImage, isAvailable } = window.ELIO_CONTENT;
   const byId = (id) => flavors.find((flavor) => flavor.id === id);
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));

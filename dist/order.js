@@ -1,5 +1,6 @@
-(() => {
+(async () => {
   'use strict';
+  await window.ELIO_CONTENT_READY;
   const { flavors, featuredOrder, productImage, boxCollections, isAvailable } = window.ELIO_CONTENT;
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map((id) => flavors.find((flavor) => flavor.id === id)).filter(Boolean);

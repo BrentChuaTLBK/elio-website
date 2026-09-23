@@ -1,10 +1,10 @@
 import { calendarDates } from './date-calendar.js';
 
-// Missing rows and null capacities both mean unlimited. Drafts contain only
+// Missing rows mean zero; explicit null capacities mean unlimited. Drafts contain only
 // products explicitly edited, so mixed or untouched limits are never replaced.
 export function quantitySelection(productId, dates, inventory, drafts = {}) {
   const rows = dates.map(date => inventory.find(row => row.product_id === productId && row.date === date));
-  const values = rows.map(row => row?.capacity == null ? '' : String(row.capacity));
+  const values = rows.map(row => !row ? '0' : row.capacity == null ? '' : String(row.capacity));
   const edited = Object.hasOwn(drafts, productId);
   const mixed = !edited && new Set(values).size > 1;
   return {
@@ -14,7 +14,7 @@ export function quantitySelection(productId, dates, inventory, drafts = {}) {
   };
 }
 
-export function quantitySaveRows(products, inventory, selectedDates, drafts, today) {
+export function quantitySaveRows(products, inventory, selectedDates, drafts, today, mode = 'replace') {
   const dates = calendarDates(selectedDates);
   if (!dates.length) throw new Error('Select at least one date in the calendar.');
   if (dates.some(date => date < today)) throw new Error('Choose today or a future date.');
@@ -27,8 +27,9 @@ export function quantitySaveRows(products, inventory, selectedDates, drafts, tod
     const capacity = value === '' ? null : Number(value);
     for (const date of dates) {
       const saved = inventory.find(row => row.product_id === product.id && row.date === date);
+      if (mode === 'fill_unconfigured' && saved && saved.configured !== false) continue;
       if (capacity !== null && capacity < Number(saved?.reserved || 0)) throw new Error(`${product.name}: ${saved.reserved} already ordered on ${date}. The total cannot be lower than that.`);
-      if ((saved?.capacity ?? null) !== capacity || saved?.available === false) rows.push({ product_id: product.id, date, capacity, available: true });
+      if (!saved || saved.configured === false || saved.capacity !== capacity || saved.available === false) rows.push({ product_id: product.id, date, capacity, available: true });
     }
   }
   return rows;
@@ -36,7 +37,7 @@ export function quantitySaveRows(products, inventory, selectedDates, drafts, tod
 
 export function quantityStatus(selection, dates) {
   if (!dates.length) return 'Select a date to view quantities';
-  if (selection.paused && !selection.edited) return 'Orders paused on a selected date. Edit the quantity or choose No limit to reopen.';
+  if (selection.paused && !selection.edited) return 'Stock not enabled on a selected date. Enter a total to enable it; shop closures still apply.';
   const min = Math.min(...selection.reserved), max = Math.max(...selection.reserved);
   const ordered = min === max ? String(min) : `${min}–${max}`;
   const suffix = `${ordered} already ordered${dates.length > 1 ? ' per date' : ''}`;
