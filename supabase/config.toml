@@ -6,4 +6,4 @@ extra_search_path = ["public", "extensions"]
 
 [auth]
 site_url = "https://eliocheesecakes.com"
-additional_redirect_urls = ["http://127.0.0.1:4173/admin-account.html", "https://eliocheesecakes.com/admin-account.html"]
+additional_redirect_urls = ["http://127.0.0.1:4173/admin-account.html", "http://127.0.0.1:4173/account.html", "https://eliocheesecakes.com/admin-account.html", "https://eliocheesecakes.com/account.html"]

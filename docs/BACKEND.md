@@ -2,7 +2,7 @@
 
 Elio uses project `dzxyhckkkrzqpwpavngn` in the existing TLB Supabase organization. Its database, authentication users, storage, keys, migrations, and order data are separate from TLB. Only organization billing and organization administration are shared.
 
-The admin entry point is `/manage.html`; team accounts use `/admin-account.html`. Owner access is assigned to an explicitly allowed, email-verified Elio user. It is not granted to the first person who registers. The initial owner allowlist is stored privately in the database, not in this public repository.
+The admin entry point is `/manage.html`; team accounts use `/admin-account.html`, and customers use `/account.html`. Both account pages share Elio's Supabase Auth project. Signing up as a customer does not grant staff access. Owner access is assigned to an explicitly allowed, email-verified Elio user. It is not granted to the first person who registers. The initial owner allowlist is stored privately in the database, not in this public repository.
 
 First-owner activation consumes only that verified account's pending reservation, using a filtered delete compatible with Supabase API sessions' `safeupdate` protection. Other reservations remain untouched and cannot grant access after the initial owner exists. The regression covers verified-email checks, preservation of unrelated reservations, repeated dashboard access, and denial of a subsequent owner claim. Hosted bootstrap was also checked using transaction-local authenticated claims with rollback; this is a database check, not a browser sign-in test.
 
@@ -31,14 +31,14 @@ Owners manage catalog, promos, settings, and team access. Staff manage orders an
 
 ## Setup still required before customer launch
 
-1. Configure Elio Resend credentials and sending domain, Supabase Auth SMTP, and allowed redirect URLs. Never reuse TLB keys or store Resend/server keys in `dist`.
-2. Create and verify the privately designated owner's Elio account. Open `/manage.html` to claim its pending role.
+1. Verify Elio Resend/SMTP delivery and add both customer and staff account redirect URLs in hosted Supabase Auth settings. Follow [Google sign-in setup](GOOGLE-SIGN-IN.md) to create Elio's own Google OAuth client and enable its provider. Never reuse TLB keys or store secrets in `dist`.
+2. The privately designated owner account is verified and has claimed its role. Future staff accounts still require explicit authorization in Team access.
 3. Set confirmed prices, flavor surcharges, stock limits, production policy, pickup details, delivery zones, and payment instructions.
 4. Connect the customer storefront and proof-upload/proof-read Edge Functions to the tested RPC contract. The existing shop remains a preview; this change does not enable checkout.
 5. Deploy the email worker and schedule maintenance before opening orders. An outbox alone does not send emails. The existing lazy expiry check frees overdue holds on subsequent API calls.
 6. Connect an Elio analytics property if website visitor reporting is wanted. Sales/order analytics already reads only Elio orders.
 
-Supabase Auth Site URL: `https://eliocheesecakes.com`. Allowed redirect URLs: `https://eliocheesecakes.com/admin-account.html` and `http://127.0.0.1:4173/admin-account.html` for local testing. These dashboard settings are separate from the SQL migrations.
+Supabase Auth Site URL: `https://eliocheesecakes.com`. Allowed redirect URLs: `https://eliocheesecakes.com/admin-account.html`, `https://eliocheesecakes.com/account.html`, and their `http://127.0.0.1:4173` counterparts for local testing. Set these in the hosted dashboard; editing `supabase/config.toml` alone does not change the hosted project.
 
 ## Local checks
 
