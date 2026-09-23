@@ -16,6 +16,16 @@ export default async function({db,check,state}) {
   await rejects(()=>as(ids.customer,()=>db.query("select elio.calculate_quote('{}',null)")),/permission denied/);
   await rejects(()=>as(null,()=>db.query("select public.shop_service('maintenance')")),/permission denied/);
  })();
+ await check('Account navigation exposes only the current database-assigned role',async()=>{
+  assert.deepEqual(await api('account_access'),{role:null});
+  assert.deepEqual(await api('account_access',{},ids.customer),{role:null});
+  assert.deepEqual(await api('account_access',{},ids.owner),{role:'owner'});
+  assert.deepEqual(await api('account_access',{},ids.staff),{role:'staff'});
+  await db.query("update auth.users set raw_user_meta_data=jsonb_build_object('role','owner') where id=$1",[ids.customer]);
+  try {
+   assert.deepEqual(await api('account_access',{user_id:ids.owner,role:'owner'},ids.customer),{role:null});
+  } finally { await db.query("update auth.users set raw_user_meta_data='{}'::jsonb where id=$1",[ids.customer]); }
+ })();
  await check('Only owners can change settings, prices, promotions, and team access',async()=>{
   for(const name of ['save_settings','save_product','save_promo','save_staff'])await rejects(()=>api(name,{},ids.staff),/owner/);
   await api('save_settings',{settings:{paused:false,payment_instructions:'QA only',pickup_address:'QA pickup',contact_email:'owner@example.test',site_url:'https://example.test'}},ids.owner);
@@ -118,6 +128,7 @@ export default async function({db,check,state}) {
  await check('Team access protects the last owner and removes staff privileges immediately',async()=>{
   await rejects(()=>api('save_staff',{email:'owner@example.test',role:'none'},ids.owner),/owner/i);
   await api('save_staff',{email:'staff@example.test',role:'none'},ids.owner);
+  assert.deepEqual(await api('account_access',{},ids.staff),{role:null});
   await rejects(()=>api('admin_bootstrap',{},ids.staff),/Authorized/);
  })();
  await check('Paid-active analytics excludes cancelled orders and refund labels',async()=>{

@@ -29,6 +29,8 @@ All business tables are in the unexposed `elio` schema, with RLS enabled and no 
 
 Owners manage catalog, promos, settings, and team access. Staff manage orders and daily quantities and can read operational analytics. The last owner cannot remove their own remaining owner role.
 
+The customer account page shows a Staff dashboard link only after `shop_api('account_access')` returns an owner or staff role. This lightweight read uses the authenticated user ID and the private team table, ignores caller-supplied roles and user IDs, and returns no dashboard data. The dashboard continues to enforce access independently.
+
 ## Setup still required before customer launch
 
 1. Verify Elio Resend/SMTP delivery and add both customer and staff account redirect URLs in hosted Supabase Auth settings. Follow [Google sign-in setup](GOOGLE-SIGN-IN.md) to create Elio's own Google OAuth client and enable its provider. Never reuse TLB keys or store secrets in `dist`.

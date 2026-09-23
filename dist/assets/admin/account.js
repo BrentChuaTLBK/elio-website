@@ -1,4 +1,4 @@
-import { auth, ready, initializationError, authLink } from './client.js';
+import { auth, ready, initializationError, authLink, api } from './client.js';
 import { config } from './config.js';
 
 const form = document.querySelector('#account-form');
@@ -122,9 +122,21 @@ else if (auth) {
     message(params.get('error_description') || 'The sign-in link could not be used. Please try again.', true);
   } else if (authLink.recovery || authLink.type === 'recovery') setMode('recovery');
   else if (data.session) {
+    heading.textContent = 'Your Elio account.';
     form.hidden = true;
     document.querySelector('#account-provider').hidden = true;
     document.querySelector('#signed-in').hidden = false;
     message(`Signed in as ${data.session.user.email}.`);
+    const dashboardLink = document.querySelector('#staff-dashboard');
+    if (dashboardLink) {
+      try {
+        const access = await api('account_access');
+        dashboardLink.hidden = !['owner', 'staff'].includes(access?.role);
+      } catch {
+        // An unavailable role lookup must not expose team navigation or block
+        // the customer's account. The dashboard enforces its own permissions.
+        dashboardLink.hidden = true;
+      }
+    }
   }
 }
