@@ -1,3 +1,5 @@
+import { PHOTO_ACCEPT, PHOTO_HELP, validatePhoto } from './photo-upload.js';
+import { flavorDetailFields, readFlavorDetails } from './flavor-details.js';
 import { productCategoryIds, sortProducts, categoryFields } from './catalog-ordering.js';
 import { mountCatalogOrder } from './catalog-order.js';
 import { buildProduction, renderProduction } from './production.js';
@@ -338,7 +340,7 @@ function captureProduct() {
   if (!form) return;
   Object.assign(productDraft, { kind: fieldValue(form, 'kind') || productDraft.kind, price_confirmed: true, in_rotation: productDraft.kind==='flavor' ? true : productDraft.in_rotation, name: fieldValue(form, 'name'), description: fieldValue(form, 'description'), category_ids: $$('[name=category_ids]:checked',form).map(el=>el.value), category_id: $('[name=category_ids]:checked',form)?.value || null, price_cents: cents(fieldValue(form, 'price')), min_quantity: Number(fieldValue(form, 'min_quantity')), lead_days: Number(fieldValue(form, 'lead_days')), active: productDraft.kind==='flavor' ? !productDraft.collection_hidden : fieldChecked(form, 'active'), pickup_only: fieldChecked(form, 'pickup_only'), allow_same_day: fieldChecked(form, 'allow_same_day'), label: productLabelSettings({ enabled: fieldChecked(form, 'label_enabled'), text: fieldValue(form, 'label_text'), color: fieldValue(form, 'label_color') }) });
   if (productDraft.kind === 'set') productDraft.box_flavors = $$('[data-box-flavor]', form).map(select => select.value).filter(Boolean);
-  if (productDraft.kind === 'flavor') Object.assign(productDraft, { min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
+  if (productDraft.kind === 'flavor') Object.assign(productDraft, { tagline: fieldValue(form,'tagline'), collection_details: readFlavorDetails(form), min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
   productDraft.option_groups = [];
 }
 function productLabelEditor(value) {
@@ -390,15 +392,17 @@ function renderProductDialog() {
   showDialog(p.id ? 'Edit ' + p.name : 'Add ' + names[kind], `<form data-form="product">${formError}
     ${flavor ? '<input type="hidden" name="kind" value="flavor">' : select('kind', 'Box type', option('set', 'Fixed box / set', kind) + option('custom_box', 'Custom box of three', kind), p.id ? 'disabled' : '')}
     ${input('name', flavor ? 'Flavor name' : 'Box name', p.name, 'text', 'required maxlength="160"')}
-    ${textarea('description', 'Description', p.description, 'Describe the flavor or what makes this box special.', 'maxlength="6000"')}
+    ${flavor ? input('tagline', 'Tagline', p.tagline ?? window.ELIO_CONTENT?.flavors.find(f=>f.id===p.slug)?.line ?? '', 'text', 'maxlength="100"', 'For example: Classic and creamy. Shown on the flavor card and popup.') : ''}
+    ${textarea('description', flavor ? 'Brief description' : 'Description', p.description, 'Describe the flavor or what makes this box special.', 'maxlength="6000"')}
     <div class="field-row">${input('price', flavor ? 'Surcharge per piece · PHP' : kind === 'set' ? 'Fixed price per box · PHP' : 'Base price per box · PHP', amount(p.price_cents), 'number', 'required min="0" max="1000000" step="0.01"', flavor ? 'Use 0 for flavors included in the base box price.' : kind === 'set' ? 'The full set price. Flavor surcharges apply only to custom boxes.' : '')}</div>
     ${flavor ? '' : check('active', 'Show this product in shop', p.active)}
     ${kind === 'set' ? `<section class="subsection"><h3>Inside this box</h3><p class="muted">Choose a flavor for each of the three pieces. Repeats are welcome. Each box uses these flavors’ stock. If any required flavor is unavailable, the set is sold out.</p><div class="field-row three">${[0,1,2].map(i => select('box_flavor_' + i, 'Cheesecake ' + (i + 1), option('', 'Choose a flavor', savedFlavor(p.box_flavors?.[i])) + boxChoices.map(f => option(f.id, f.name, savedFlavor(p.box_flavors?.[i]))).join(''), 'data-box-flavor required')).join('')}</div></section>` : ''}
     ${kind === 'custom_box' ? '<p class="notice">Customers choose exactly three pieces. Each flavor adds its own surcharge and uses its own daily stock. Manage those choices in Flavors.</p>' : ''}
     ${flavor ? '<p class="notice">Inventory is counted in individual pieces and shared across all boxes. Set a quantity for each date in Daily quantities. Unavailable flavors also make their fixed sets unavailable.</p>' : `<section class="subsection"><h3>Ordering & fulfillment</h3><div class="field-row">${input('min_quantity', 'Minimum boxes per order', p.min_quantity || 1, 'number', 'required min="1" max="9999" step="1"')}${input('lead_days', 'Full production days', p.lead_days || 0, 'number', 'required min="0" max="365" step="1"')}</div>${check('pickup_only', 'Pickup only', p.pickup_only === true)}${check('allow_same_day', 'Allow same-day orders (requires 0 production days)', p.allow_same_day === true)}</section>`}
+    ${flavor ? flavorDetailFields(p,{input,textarea,disabled:ownerLocked()}) : ''}
     ${categoryFields(p,areaCategories(),esc,ownerLocked())}
     ${productLabelEditor(p.label)}
-    <section class="subsection"><h3>Photos</h3><p class="muted">JPEG, PNG, or WebP · up to 5 MB each. Product photos are public. The first photo is the cover.</p><p class="help-text" id="photo-order-help">Drag photos to rearrange them, or focus a photo and use the arrow keys. Save the item to publish changes.</p><div id="product-photo-order">${renderProductPhotos(p.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) })}</div><p id="photo-order-status" class="sr-only" role="status" aria-live="polite"></p>${input('photos', 'Upload photos', '', 'file', 'accept="image/jpeg,image/png,image/webp" multiple id="product-photos" ' + ownerLocked())}</section>
+    <section class="subsection"><h3>Photos</h3><p class="muted">${PHOTO_HELP} Product photos are public. The first photo is the cover.</p><p class="help-text" id="photo-order-help">Drag photos to rearrange them, or focus a photo and use the arrow keys. Save the item to publish changes.</p><div id="product-photo-order">${renderProductPhotos(p.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) })}</div><p id="photo-order-status" class="sr-only" role="status" aria-live="polite"></p>${input('photos', 'Upload photos', '', 'file', `accept="${PHOTO_ACCEPT}" multiple id="product-photos" ` + ownerLocked())}</section>
     ${actions(p.id ? 'Save changes' : 'Create ' + names[kind])}
   </form>`);
   bindPhotoOrder();
@@ -732,7 +736,8 @@ document.addEventListener('change', async event => {
     }
     if (target.id === 'menu-cover-photo') {
       const form=target.form, file=target.files[0]; if (!file) return;
-      if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>5*1024*1024) throw new Error('Choose a JPEG, PNG, or WebP image up to 5 MB.');
+      validatePhoto(file);
+      toast('Converting and uploading ' + file.name + '…');
       const controls=[...form.elements], disabled=controls.map(c=>c.disabled); form.dataset.busy='true'; controls.forEach(c=>c.disabled=true);
       try { const result=await upload(file,{kind:'product'}); if (!safeImage(result.url)) throw new Error('The photo upload did not return a valid URL.');
         if(form.isConnected){const photos=JSON.parse(fieldValue(form,'photos')||'[]');form.elements.photos.value=JSON.stringify([result.url,...photos.slice(1)]);$('#menu-photo-preview').innerHTML=`<img src="${esc(result.url)}" alt="New flavor cover" style="width:110px;height:90px;object-fit:cover;border-radius:8px">`;}
@@ -787,10 +792,7 @@ document.addEventListener('change', async event => {
       const draft = productDraft, files = [...target.files];
       if (!files.length) return;
       if (files.length + draft.photos.length > 20) throw new Error('Use up to 20 photos per item.');
-      for (const file of files) {
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Use a JPEG, PNG, or WebP image.');
-        if (file.size > 5 * 1024 * 1024) throw new Error('Each image must be 5 MB or smaller.');
-      }
+      files.forEach(validatePhoto);
       form.dataset.busy = 'true';
       const controls = [...form.querySelectorAll('input,select,textarea,button')];
       const disabled = controls.map(control => control.disabled);
@@ -798,7 +800,7 @@ document.addEventListener('change', async event => {
       let failure = '';
       try {
         for (const file of files) {
-          toast('Uploading ' + file.name + '…');
+          toast('Converting and uploading ' + file.name + '…');
           const result = await upload(file, { kind: 'product' });
           if (!safeImage(result.url)) throw new Error('The upload service did not return a valid image URL.');
           draft.photos.push(result.url);
@@ -883,6 +885,7 @@ async function submitForm(form) {
     case 'flavor-menu-editor': {
       const payload = Object.fromEntries(['id','name','tagline','description','expected_month'].map(key => [key,fieldValue(form,key)]));
       payload.category_ids=$$('[name=category_ids]:checked',form).map(el=>el.value);
+      payload.collection_details=readFlavorDetails(form);
       payload.current_month = fieldChecked(form,'current_month'); payload.next_month = fieldChecked(form,'next_month'); payload.hidden = fieldChecked(form,'hidden'); payload.photos = JSON.parse(fieldValue(form,'photos') || '[]');
       if(payload.id){
         const impact=await api('flavor_removal_impact',payload);

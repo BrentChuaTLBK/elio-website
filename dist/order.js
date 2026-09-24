@@ -1,6 +1,7 @@
 (async () => {
   'use strict';
   await window.ELIO_CONTENT_READY;
+  const { flavorMetaHtml } = await import('./assets/shop/flavor-details.js');
   const { flavors, featuredOrder, productImage, boxCollections, isAvailable } = window.ELIO_CONTENT;
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map((id) => flavors.find((flavor) => flavor.id === id)).filter(Boolean);
@@ -21,7 +22,7 @@
       if (dialog.open) { dialog.close(); if (trigger?.isConnected) trigger.focus({ preventScroll: true }); }
       return;
     }
-    content.innerHTML = `<div class="${hasPhoto(flavor) ? 'detail-layout' : ''}">${hasPhoto(flavor) ? photo(flavor) : ''}<div class="dialog-body${hasPhoto(flavor) ? '' : ' simple-dialog'}"><p class="eyebrow">The collection</p><h2 id="dialog-title" tabindex="-1">${escape(flavor.name)}</h2>${availability(flavor)}<p class="detail-line">${escape(flavor.line)}</p><p class="detail-description">${escape(flavor.description)}</p><p class="detail-meta">INDIVIDUAL SQUARE BASQUE CHEESECAKE<br>Three pieces per box</p><p class="order-detail-availability">Browse the shop for boxes, current prices, and availability for your selected date.</p>${hasPhoto(flavor) ? '<p class="asset-note">Concept photography. Final product appearance may vary.</p>' : ''}</div></div>`;
+    content.innerHTML = `<div class="${hasPhoto(flavor) ? 'detail-layout' : ''}">${hasPhoto(flavor) ? photo(flavor) : ''}<div class="dialog-body${hasPhoto(flavor) ? '' : ' simple-dialog'}"><p class="eyebrow">The collection</p><h2 id="dialog-title" tabindex="-1">${escape(flavor.name)}</h2>${availability(flavor)}<p class="detail-line">${escape(flavor.line)}</p><p class="detail-description">${escape(flavor.description)}</p>${flavorMetaHtml(flavor, escape)}<p class="order-detail-availability">Browse the shop for boxes, current prices, and availability for your selected date.</p></div></div>`;
     if (!dialog.open) dialog.showModal();
     dialog.scrollTop = 0;
     document.querySelector('#dialog-title').focus({ preventScroll: true });

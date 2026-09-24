@@ -1,6 +1,7 @@
 (async () => {
   'use strict';
   await window.ELIO_CONTENT_READY;
+  const { flavorMetaHtml } = await import('./assets/shop/flavor-details.js');
   const { flavors, featuredOrder, productImage } = window.ELIO_CONTENT;
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map((id) => flavors.find((flavor) => flavor.id === id)).filter(Boolean);
@@ -61,7 +62,7 @@
       }
       return;
     }
-    content.innerHTML = `<div class="${hasPhoto(flavor) ? 'detail-layout' : ''}">${hasPhoto(flavor) ? photo(flavor) : ''}<div class="dialog-body${hasPhoto(flavor) ? '' : ' simple-dialog'}"><p class="eyebrow">The Elio collection</p><h2 id="dialog-title" tabindex="-1">${escape(flavor.name)}</h2><p class="flavor-menu-status">${isFeatured(flavor) ? 'Featured this month' : isNext(flavor) ? 'Coming next month' : 'The full collection'}</p><p class="detail-line">${escape(flavor.line)}</p><p class="detail-description">${escape(flavor.description)}</p><p class="detail-meta">INDIVIDUAL SQUARE BASQUE CHEESECAKE<br>Approximately 6 × 6 × 5 cm · Three pieces per box</p><div class="flavor-dialog-links"><a class="text-link" href="order.html">Discover the Elio box <span aria-hidden="true">→</span></a></div><p class="asset-note">${hasPhoto(flavor) ? (flavor.uploadedPhoto ? '' : 'Concept photography. Final product appearance may vary.') : 'Product photograph coming soon.'}<br>Visit the shop to check availability for your chosen date.</p></div></div>`;
+    content.innerHTML = `<div class="${hasPhoto(flavor) ? 'detail-layout' : ''}">${hasPhoto(flavor) ? photo(flavor) : ''}<div class="dialog-body${hasPhoto(flavor) ? '' : ' simple-dialog'}"><p class="eyebrow">The Elio collection</p><h2 id="dialog-title" tabindex="-1">${escape(flavor.name)}</h2><p class="flavor-menu-status">${isFeatured(flavor) ? 'Featured this month' : isNext(flavor) ? 'Coming next month' : 'The full collection'}</p><p class="detail-line">${escape(flavor.line)}</p><p class="detail-description">${escape(flavor.description)}</p>${flavorMetaHtml(flavor, escape)}<div class="flavor-dialog-links"><a class="text-link" href="order.html">Discover the Elio box <span aria-hidden="true">→</span></a></div></div></div>`;
     if (!dialog.open) dialog.showModal();
     dialog.scrollTop = 0;
     document.querySelector('#dialog-title').focus({ preventScroll: true });

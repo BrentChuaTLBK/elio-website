@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { preparePhoto } from './photo-upload.js';
 
 const setupMessage = 'Backend setup is pending. Accounts and orders will be available after the shop owner connects the ordering service.';
 const currentUrl = new URL(window.location.href);
@@ -116,19 +117,19 @@ export async function websiteVisitorStats({ signal } = {}) {
 
 export async function upload(file, { kind = 'proof', order_id, token, payment_reference } = {}) {
   if (!(file instanceof File) || !file.size) throw new Error('Choose a photo to upload.');
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP image.');
-  if (file.size > 5 * 1024 * 1024) throw new Error('The image must be 5 MB or smaller.');
   if (kind === 'product') {
     const client = await connection();
     const { data: identity, error: identityError } = await client.auth.getUser();
     if (identityError || !identity.user) throw new Error('Sign in as an owner to upload product photos.');
-    const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type];
-    const path = `${identity.user.id}/${crypto.randomUUID()}.${extension}`;
+    file = await preparePhoto(file);
+    const path = `${identity.user.id}/${crypto.randomUUID()}.webp`;
     // Storage RLS independently requires the current database-assigned owner role.
     const { error } = await client.storage.from('product-images').upload(path, file, { contentType: file.type, upsert: false, cacheControl: '3600' });
     if (error) throw new Error(error.message || 'The photo could not be uploaded.');
     return { url: client.storage.from('product-images').getPublicUrl(path).data.publicUrl };
   }
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP image.');
+  if (file.size > 5 * 1024 * 1024) throw new Error('The image must be 5 MB or smaller.');
   const body = new FormData();
   body.set('file', file);
   body.set('kind', kind);
