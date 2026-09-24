@@ -40,8 +40,8 @@ export default async function({db,check,state}) {
   await save({...await snapshot(),published:true});
   assert.equal(await h.remaining(flavor,date),12);
   const unpriced=await api('save_product',{product:{...flavor,price_confirmed:false}},ids.owner);
-  assert.equal(unpriced.active,false);
-  await assert.rejects(()=>api('quote',h.checkout(box,date)),/unavailable/);
+  assert.equal(unpriced.active,true);
+  assert.equal((await api('quote',h.checkout(box,date))).items[0].quantity,1);
   await api('save_product',{product:flavor},ids.owner);
   paid=await api('create_order',h.checkout(box,date));await h.proof(paid);paid=await h.action('approve_payment',await h.order(paid.id));
  })();

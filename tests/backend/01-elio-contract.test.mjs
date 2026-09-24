@@ -36,8 +36,8 @@ export default async function({db,check,state}) {
   date=await h.day(5);
   for(const [p,n] of [[v,20],[m,20]])await inventory(p,date,n);
  })();
- await check('Prices require explicit confirmation; stock types are immutable',async()=>{
-  await rejects(()=>product({price_confirmed:false}),/Confirm this price/);
+ await check('Numeric saved prices take effect immediately; stock types are immutable',async()=>{
+  assert.equal((await product({kind:'custom_box',price_confirmed:false})).price_confirmed,true);
   await rejects(()=>api('save_product',{product:{...v,kind:'set',box_flavors:[v.id,v.id,v.id]}},ids.owner),/cannot change/);
   await rejects(()=>inventory(custom,date,10),/All boxes use flavor stock/);
   await rejects(()=>product({price_cents:1.1}),/whole centavos|integer/);
@@ -55,11 +55,11 @@ export default async function({db,check,state}) {
   assert.deepEqual(q.items[0].stock_requirements.sort((a,b)=>a.quantity-b.quantity),[{product_id:v.id,quantity:1},{product_id:m.id,quantity:2}]);
   await rejects(()=>api('quote',checkout(v,date)),/inside a custom box/);
  })();
- await check('Invalid flavor counts, unknown flavors, and unconfirmed surcharges are rejected',async()=>{
+ await check('Invalid flavor counts and unknown flavors are rejected; saved surcharges need no confirmation',async()=>{
   for(const n of [0,2,4])await rejects(()=>api('quote',checkout(custom,date,{items:[mixed(1,{[v.id]:n})]})),/exactly 3/);
   await rejects(()=>api('quote',checkout(custom,date,{items:[mixed(1,{[randomUUID()]:3})]})),/Unknown option/);
   await api('save_product',{product:{...m,price_confirmed:false}},ids.owner);
-  await rejects(()=>api('quote',checkout(custom,date,{items:[mixed()]})),/unavailable/);
+  assert.equal((await api('quote',checkout(custom,date,{items:[mixed()]}))).subtotal_cents,100000);
   await api('save_product',{product:{...m,price_confirmed:true}},ids.owner);
  })();
  await check('Checkout reserves shared flavor pieces for custom boxes and fixed sets atomically',async()=>{

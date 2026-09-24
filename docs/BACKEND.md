@@ -14,13 +14,13 @@ Source: `BrentChuaTLBK/bakery-website`, commit `7e81baa1a6ef9ae179662aeea7cc238e
 
 Elio changes:
 
-- `kind=flavor`: price is the extra charge per individual piece in custom boxes. A confirmed surcharge, a published lineup for the fulfillment month, visibility, and daily stock all determine availability for boxes using that flavor.
+- `kind=flavor`: price is the extra charge per individual piece in custom boxes. A saved surcharge, a published lineup for the fulfillment month, visibility, and daily stock all determine availability for boxes using that flavor.
 - `kind=custom_box`: base price plus exactly three flavor surcharges per box. Each flavor's piece count is multiplied by the number of boxes.
 - `kind=set`: the owner selects three flavor IDs in `box_flavors` (repeats allowed) and enters one fixed total price. Customers cannot substitute flavors. Each set consumes the included flavors’ piece quantities; no separate box inventory exists. Any unavailable component makes the set unavailable.
 - Saved line items include trusted per-box `stock_requirements`, `flavor_contents` (IDs, names, quantities), and price snapshots. Multiply flavor quantities by ordered boxes for production totals. Unchanged configurations retain their saved recipes and unit prices during amendments. New configurations use current prices and recipes.
 - Reservations aggregate all cart lines. A database transaction lock serializes stock, promo, cancellation, and amendment mutations. Failed updates roll back all stock changes.
 - Unpaid cancellation/expiry releases holds. Paid cancellation explicitly chooses whether to restore stock. Redeemed promo usage remains counted after paid cancellation.
-- Prices start as unconfirmed drafts. The shop starts paused, with no payment account, pickup address, delivery fees, or stock limits assumed.
+- Saved prices take effect automatically; legacy `price_confirmed` is always derived true. The shop starts paused, with no payment account, pickup address, delivery fees, or stock limits assumed.
 - Unsaved daily quantities mean zero. An explicitly saved blank / No limit means unlimited. Daily quantities shows only the selected month's lineup; all fixed and custom boxes share individual flavor limits. `configured` distinguishes explicit zero from a not-yet-configured date, so bulk fill can preserve saved values.
 - `catalog` accepts optional `fulfillment_date` and returns `stock_available`, `remaining_boxes`, and flavor stock for that date. These are stock indicators; the quote still enforces lead time, closures, pickup/delivery rules, and paused ordering.
 - Customer date selection and server quotes are limited to this month and next month in Asia/Manila. Staff calendars and authorized amendments retain their separate date rules.
@@ -74,3 +74,6 @@ Production groups custom boxes by the saved per-box flavor counts within each bo
 
 
 `preview_flavor_lineup` and `save_flavor_lineup` are owner-only actions. Saving checks the calendar month and expected membership/publication before applying both fields atomically. Existing membership triggers clear only added/removed flavors’ unsold stock. Flavor `active` and `in_rotation` are derived compatibility fields, not independent ordering switches; boxes retain their listing switch.
+
+
+The public collection returns `collection_only` for flavors outside both current/next monthly memberships. Flavors exclusive to unpublished monthly lineups are omitted, without exposing draft membership IDs. Uploaded `photos[0]` is the shared cover. Box `active` means “Show this product in shop”; hiding also prevents new orders without rewriting existing order snapshots.

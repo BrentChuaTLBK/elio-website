@@ -17,7 +17,7 @@ export default async function({db,check,state}) {
     }
     await edit({});
     flavor=(await api('admin_bootstrap',{},ids.owner)).products.find(p=>p.name===editor.name);
-    assert.equal(flavor.active,false);assert.equal(flavor.price_confirmed,false);
+    assert.equal(flavor.active,true);assert.equal(flavor.price_confirmed,true);
     await visibility(false);
     const publicData=await api('flavor_collection');
     assert(publicData.flavors.some(f=>f.id===flavor.id));
