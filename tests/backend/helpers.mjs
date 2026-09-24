@@ -43,7 +43,7 @@ export async function makeHarness(db) {
         on conflict(month) do update set flavor_ids=array_append(array_remove(elio.flavor_menus.flavor_ids,$2::uuid),$2::uuid),published=true`,[month,p.id]);
       await db.query(`insert into elio.inventory(product_id,date,capacity,available)
         select $1::uuid,d::date,null,true from generate_series($2::date::timestamp,($2::date+interval '1 month - 1 day')::timestamp,interval '1 day') d
-        on conflict(product_id,date) do update set capacity=null,available=true`,[p.id,month]);
+        on conflict(product_id,date) do update set capacity=null,available=true,configured=true`,[p.id,month]);
     }
   };
   const product = async (overrides = {}) => {

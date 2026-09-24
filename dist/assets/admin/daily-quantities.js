@@ -11,6 +11,7 @@ export function quantitySelection(productId, dates, inventory, drafts = {}) {
     edited, mixed, value: edited ? drafts[productId] : mixed ? '' : values[0] ?? '',
     reserved: rows.map(row => Number(row?.reserved || 0)),
     paused: rows.some(row => row?.available === false),
+    automatic: !edited && rows.length > 0 && rows.every(row => row && row.configured === false),
   };
 }
 
@@ -47,5 +48,12 @@ export function quantityStatus(selection, dates) {
   if (!Number.isInteger(capacity) || capacity < 0) return 'Enter a whole quantity or leave blank';
   if (capacity < max) return `Below the ${max} already ordered on a selected date`;
   const remaining = min === max ? String(capacity - max) : `${capacity - max}–${capacity - min}`;
-  return `${remaining} left · ${suffix}`;
+  return `${selection.automatic ? 'Automatic · ' : ''}${remaining} left · ${suffix}`;
+}
+
+export function bulkQuantityDrafts(products, value, drafts = {}) {
+  const quantity = String(value).trim();
+  if (!/^\d+$/.test(quantity) || Number(quantity) > 1000000) throw new Error('Enter a whole quantity from 0 to 1,000,000 for all flavors.');
+  if (!products.length) throw new Error('Add flavors to this month’s lineup first.');
+  return { ...drafts, ...Object.fromEntries(products.map(product => [product.id, quantity])) };
 }
