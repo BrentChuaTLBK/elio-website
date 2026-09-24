@@ -81,7 +81,6 @@
   }
   dialog.querySelector('.dialog-close').addEventListener('click', closeFlavor);
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeFlavor(); });
-  dialog.addEventListener('click', (event) => { const rect = dialog.getBoundingClientRect(); if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) closeFlavor(); });
   window.addEventListener('hashchange', syncFlavor);
   window.addEventListener('popstate', syncFlavor);
   syncFlavor();

@@ -329,9 +329,7 @@
   });
   document.querySelector('.dialog-close').addEventListener('click', closeDialog);
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(); });
-  dialog.addEventListener('click', (event) => { const rect = dialog.getBoundingClientRect(); if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) closeDialog(); });
   window.addEventListener('popstate', syncRoute);
   window.addEventListener('hashchange', syncRoute);
   syncRoute();
 })();
-

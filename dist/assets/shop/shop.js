@@ -44,7 +44,7 @@ function earliestFor(p){if(state.method==='delivery'&&p.pickup_only===true)retur
 function productLabelBadge(value){const label=visibleProductLabel(value);return label?`<span class="badge product-label" style="background-color:${label.color};color:${label.textColor}">${esc(label.text)}</span>`:''}
 function productCard(p){
  const a=displayAvailability(p);
- return `<button type="button" class="elio-product-card" data-product="${esc(p.id)}">${p.photos?.length?'<img src="'+safeImage(p.photos[0])+'" alt="'+esc(p.name)+'" loading="lazy">':placeholder()}${productLabelBadge(p.label)}<div class="elio-product-copy"><h3>${esc(p.name)}</h3><p>${esc(p.description)}</p><div class="elio-product-bottom"><strong>${p.kind==='custom_box'?'From ':''}${money(p.price_cents)}</strong><span>${p.kind==='custom_box'?'Customize':'View box'} →</span></div><p class="availability ${a.available?'':'unavailable'}">${esc(a.reason)}</p></div></button>`;
+ return `<button type="button" class="elio-product-card" data-product="${esc(p.id)}" aria-label="${p.kind==='custom_box'?'Customize':'View'} ${esc(p.name)}" aria-haspopup="dialog"><div class="elio-product-media">${p.photos?.length?'<img src="'+safeImage(p.photos[0])+'" alt="" loading="lazy">':placeholder()}${productLabelBadge(p.label)}</div><div class="elio-product-copy"><h3>${esc(p.name)}</h3><p class="elio-product-description">${esc(p.description||'')}</p><div class="elio-product-bottom"><strong>${p.kind==='custom_box'?'From ':''}${money(p.price_cents)}</strong><span class="elio-product-add" aria-hidden="true">+</span></div><p class="availability ${a.available?'':'unavailable'}">${esc(a.reason)}</p></div></button>`;
 }
 function placeholder(){return '<div class="empty-state" aria-label="Product photo coming soon"><div class="empty-icon">'+icon+'</div><small>Fresh from our kitchen</small></div>'}
 function renderShop(){
@@ -241,5 +241,4 @@ async function init(){
  }catch(e){app.innerHTML=`<div class="panel empty-state"><h2>The menu is taking a little longer</h2><p>${esc(e.message)}</p><button class="button" id="retry-menu">Try again</button></div>`;$('#retry-menu').onclick=init;}
 }
 window.addEventListener('hashchange',()=>{if(location.hash.includes('order='))renderOrder();else if(location.hash==='#your-bag'||location.hash==='#your-basket')$('#cart')?.scrollIntoView({behavior:'smooth'});else if(document.body.classList.contains('viewing-order'))renderShop()});
-for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('click',e=>{if(e.target===dialog){const b=dialog.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)dialog.close()}});
 init();

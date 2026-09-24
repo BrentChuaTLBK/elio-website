@@ -3,9 +3,11 @@ import { flavorDetailFields, readFlavorDetails } from './flavor-details.js';
 import { productCategoryIds, sortProducts, categoryFields } from './catalog-ordering.js';
 import { mountCatalogOrder } from './catalog-order.js';
 import { buildProduction, renderProduction } from './production.js';
+import { productionCalendar, bindProductionCalendar } from './production-calendar.js';
 import { api, auth, ready, configured, money, escapeHtml, manilaDate, formatDate, toast, upload, websiteVisitorStats } from './client.js';
 import { prepareOrderSave, normalizeOrderEditReason } from './order-edit-save.js';
 import { confirmOrderTotalChange } from './order-edit-confirmation.js';
+import { confirmFlavorRemoval } from './flavor-confirmation.js';
 import { socialContactMessage } from './checkout-fields.js';
 import { fulfillmentStatus, matchesFulfillmentStatus, isActiveFulfillment, needsPaymentReview } from './refund-status.js';
 import { renderProductPhotos, bindProductPhotoOrder } from './product-photos.js';
@@ -32,6 +34,7 @@ state.inventoryMonth = manilaDate().slice(0,7);
 state.quantityMode = 'replace';
 state.lineupDrafts = {};
 state.productionRange = {from:manilaDate(),to:manilaDate()};
+state.productionMode = 'range';
 state.productFilters = { search: '', status: '', category: '' };
 state.promoFilter = '';
 state.printSelection = new Set();
@@ -62,6 +65,7 @@ window.addEventListener('pageshow', syncPromoStatuses);
 window.addEventListener('pagehide', () => clearTimeout(promoStatusTimer));
 const modal = $('#admin-dialog');
 bindDateCalendars($('#workspace'));
+bindProductionCalendar($('#workspace'));
 const label = value => String(value || '').replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase());
 const badge = value => `<span class="badge ${esc(value)}${value === 'refunded' ? ' refund' : ''}">${esc(label(value))}</span>`;
 const humanDate = value => value ? formatDate(value) : '—';
@@ -126,7 +130,6 @@ function showDialog(title, content) {
 function closeDialog() { if(catalogOrderController && !catalogOrderController.canLeave())return;catalogOrderController?.destroy();catalogOrderController=null;clearPhotoDrag(); modal.close(); modalReturnFocus?.focus?.(); }
 modal.addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 $('#dialog-close').addEventListener('click', closeDialog);
-modal.addEventListener('click', event => { if (event.target === modal) { const rect = modal.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeDialog(); } });
 
 async function refresh() {
   if (!configured) return;
@@ -156,7 +159,7 @@ function editFlavorMenu(id) {
 }
 function productionView() {
   const report=buildProduction(state.orders,state.productionRange.from,state.productionRange.to);
-  return heading('Production', 'Your confirmed orders, translated into cheesecake pieces and boxes.', `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh orders</button>`) + `<section class="panel"><form data-form="production-range" class="production-filter">${formError}<div class="production-calendars">${dateCalendar('from','Pickup / delivery from',[state.productionRange.from],'Choose the first date.',manilaDate(),false,{mode:'single',saveLabel:'View production',selectionLabel:'Range starts here'})}${dateCalendar('to','Through',[state.productionRange.to],'Choose the last date, included.',manilaDate(),false,{mode:'single',saveLabel:'View production',selectionLabel:'Range ends here'})}</div><button class="button" type="submit">View production</button></form></section>` + renderProduction(report,{esc,dateLabel:humanDate});
+  return heading('Production', 'Your confirmed orders, translated into cheesecake pieces and boxes.', `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh orders</button>`) + `<section class="panel production-date-panel"><form data-form="production-range" class="production-filter">${formError}${productionCalendar(state.productionRange,manilaDate(),state.productionMode)}<div class="production-picker-footer"><span>Totals use pickup / delivery dates.</span><button class="button" type="submit">View production</button></div></form></section>` + renderProduction(report,{esc,dateLabel:humanDate});
 }
 function analyticsView() {
   return heading('Analytics', 'Your orders, sales and most-loved flavors.', `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh analytics</button>`) + renderAnalytics(state, { today: manilaDate(), money, escapeHtml: esc, formatDate });
@@ -174,8 +177,7 @@ function overviewView() {
       ['Upcoming orders', upcoming.length, 'Scheduled today and beyond'],
       ['Active products', activeProducts, 'Availability set by product and date']
     ].map(([title, value, note]) => `<div class="panel metric-card"><div class="metric-label">${title}<span aria-hidden="true">↗</span></div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></div>`).join('')}</div>
-    <div class="overview-grid"><section class="panel"><div class="section-heading"><h2>Coming out of the kitchen</h2><button class="button button-quiet" data-action="upcoming">View all →</button></div>${upcoming.length ? orderTable(upcoming.slice(0, 7), true) : empty('Your next bake starts here', 'Scheduled orders will appear here as customers check out. Set up your products and daily quantities to get started.')}</section>
-    <section class="panel"><div class="section-heading"><h2>Make the shop your own</h2><span class="badge">Getting started</span></div><ol class="setup-steps"><li><div><strong>Add your menu</strong><p>Photos, prices, categories, and the little details that make each bake yours.</p><button class="button button-quiet" data-view="flavors">Manage flavors →</button></div></li><li><div><strong>Plan your baking dates</strong><p>Choose how many of each product can be collected or delivered on each date.</p><button class="button button-quiet" data-view="inventory">Set daily quantities →</button></div></li><li><div><strong>Finish your shop details</strong><p>Add payment details, pickup information, delivery zones, and your production schedule.</p><button class="button button-quiet" data-view="settings">Shop settings →</button></div></li></ol></section></div>
+    <section class="panel"><div class="section-heading"><h2>Coming out of the kitchen</h2><button class="button button-quiet" data-action="upcoming">View all →</button></div>${upcoming.length ? orderTable(upcoming.slice(0, 7), true) : empty('Your next bake starts here', 'Scheduled orders will appear here as customers check out. Set up your products and daily quantities to get started.')}</section>
     ${state.settings.paused ? '<p class="notice" style="margin-top:22px">New orders are paused. Existing order links and valid payment-proof uploads remain available.</p>' : ''}
     ${state.connected ? emailStatusCard() : ''}`;
 }
@@ -859,7 +861,7 @@ document.addEventListener('submit', async event => {
   const errorBox = $('.form-error', form);
   errorBox.textContent = '';
   if (form.dataset.form==='production-range') {
-    try {const range={from:fieldValue(form,'from'),to:fieldValue(form,'to')};buildProduction(state.orders,range.from,range.to);state.productionRange=range;render();}catch(error){errorBox.textContent=error.message;}return;
+    try {const range={from:fieldValue(form,'from'),to:fieldValue(form,'to')};buildProduction(state.orders,range.from,range.to);state.productionRange=range;state.productionMode=$('[data-production-picker]',form).dataset.mode;render();}catch(error){errorBox.textContent=error.message;}return;
   }
   if (!state.connected) { errorBox.textContent = 'Complete backend setup and sign in as an authorized team member before saving.'; return; }
   if (!form.reportValidity()) return;
@@ -887,18 +889,26 @@ async function submitForm(form) {
       payload.category_ids=$$('[name=category_ids]:checked',form).map(el=>el.value);
       payload.collection_details=readFlavorDetails(form);
       payload.current_month = fieldChecked(form,'current_month'); payload.next_month = fieldChecked(form,'next_month'); payload.hidden = fieldChecked(form,'hidden'); payload.photos = JSON.parse(fieldValue(form,'photos') || '[]');
-      if(payload.id){
-        const impact=await api('flavor_removal_impact',payload);
-        if(impact.months.length&&!confirm(impact.months.map(m=>`${monthLabel(m.month)}: ${m.orders} outstanding confirmed order${m.orders===1?'':'s'} still need ${m.pieces} pieces of this flavor.`).join('\n')+'\n\nRemoving this flavor stops new orders and clears unsold stock for these months. Existing orders stay in Production. Continue?'))break;
-      }
-      await api('save_flavor_editor',payload); closeDialog(); await refresh(); toast('Flavor and menu placements saved.'); break;
+      const controls=$$('input,select,textarea,button',form),disabled=controls.map(el=>el.disabled);controls.forEach(el=>el.disabled=true);
+      try {
+        if(payload.id){
+          const impact=await api('flavor_removal_impact',payload);
+          if(!form.isConnected||!modal.open)break;
+          if(impact.months.length&&!await confirmFlavorRemoval({heading:payload.name,items:impact.months.map(m=>({...m,label:monthLabel(m.month)})),description:'Removing this flavor stops new orders and clears its unsold stock for the months below.',saveLabel:'Save flavor'}, {parentDialog:modal,returnFocus:$('button[type=submit]',form)}))break;
+        }
+        if(!form.isConnected||!modal.open)break;
+        await api('save_flavor_editor',payload); closeDialog(); await refresh(); toast('Flavor and menu placements saved.');
+      } finally {controls.forEach((el,i)=>el.disabled=disabled[i]);}
+      break;
     }
     case 'flavor-lineup': {
       const payload={month:form.dataset.month,expected_month:form.dataset.current,flavor_ids:$$('[name=flavor_ids]:checked',form).map(el=>el.value),published:fieldChecked(form,'published'),expected_flavor_ids:JSON.parse(fieldValue(form,'expected_flavor_ids')),expected_published:fieldValue(form,'expected_published')==='true'};
       const controls=$$('input',form),disabled=controls.map(el=>el.disabled);controls.forEach(el=>el.disabled=true);
       try {
         const impact=await api('preview_flavor_lineup',payload);
-        if(impact.removed.length&&!confirm(`${monthLabel(payload.month)}\n`+impact.removed.map(f=>`${f.name}: ${f.orders} outstanding confirmed order${f.orders===1?'':'s'} still need ${f.pieces} pieces.`).join('\n')+'\n\nRemoving these flavors stops new orders and clears their unsold stock for this month. Existing orders stay in Production. Save this lineup?'))break;
+        if(!form.isConnected)break;
+        if(impact.removed.length&&!await confirmFlavorRemoval({heading:monthLabel(payload.month),items:impact.removed.map(f=>({...f,label:f.name})),description:'Removing these flavors stops new orders and clears their unsold stock for this month.'},{returnFocus:$('button[type=submit]',form)}))break;
+        if(!form.isConnected)break;
         await api('save_flavor_lineup',payload);delete state.lineupDrafts[payload.month];await refresh();toast('Monthly lineup saved.');
       } finally {controls.forEach((el,i)=>el.disabled=disabled[i]);}
       break;

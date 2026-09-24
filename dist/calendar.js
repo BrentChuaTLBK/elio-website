@@ -118,9 +118,6 @@
         else if (button.hasAttribute('data-current')) { month = today().slice(0, 7); render({ focusDate: today(), focus: true }); }
         else if (button.hasAttribute('data-month')) { month = shiftMonth(month, Number(button.dataset.month)); render({ focusControl: `[data-month="${button.dataset.month}"]`, focus: true }); }
         else if (button.dataset.date) choose(button.dataset.date);
-      } else if (event.target === popup) {
-        const rect = popup.getBoundingClientRect();
-        if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) close();
       }
     });
     popup.addEventListener('keydown', event => {

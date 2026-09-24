@@ -32,6 +32,10 @@ Each lineup belongs to a calendar month in Manila time. A published next-month l
 
 **Production** reports paid, admin-confirmed orders by pickup/delivery date range, with overall and daily flavor-piece totals, fixed sets, custom boxes, and served quantities. Completed orders stay in the range totals; unpaid, cancelled, expired, and refunded orders do not. Calculations use saved order recipes, including repeated flavors. **Top Flavors** in Analytics ranks those saved flavor pieces by the Analytics order-placement date filter, including completed orders and excluding unpaid/cancelled/refunded orders. Box revenue is not arbitrarily allocated to individual flavors.
 
+The Production picker supports **Date range** (start, then end, both included) and **Single date**. It shows consecutive months on desktop and one navigable month on phones, including past dates. Click **View production** to apply the selection. Choosing the same start and end also produces a single-day report.
+
+Lineup removal uses an in-page confirmation with each flavor's upcoming paid, approved order count and required pieces. Cancelling keeps the unsaved draft. Shop and dashboard dialogs ignore outside clicks; close buttons, explicit actions, and keyboard dismissal remain available.
+
 Product detail popups fit their contents and contain readonly flavor tiles for fixed sets, plus expandable packaging and care information. The date and pickup/delivery selector appears once on the shop page. Legacy `box.html` links open the corresponding shop popup.
 
 ## Cloudflare deployment

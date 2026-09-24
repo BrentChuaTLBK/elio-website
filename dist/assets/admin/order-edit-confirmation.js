@@ -88,11 +88,6 @@ export function confirmOrderTotalChange({ oldTotal, newTotal, paymentStatus }, {
     listen(approve, 'click', () => finish(true));
     listen(dialog, 'cancel', event => { event.preventDefault(); finish(false); });
     listen(dialog, 'close', () => finish(false));
-    listen(dialog, 'click', event => {
-      if (event.target !== dialog) return;
-      const rect = dialog.getBoundingClientRect();
-      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) finish(false);
-    });
     if (parentDialog) listen(parentDialog, 'close', () => finish(false));
     try {
       doc.body.append(dialog);

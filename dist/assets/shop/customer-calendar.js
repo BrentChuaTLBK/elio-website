@@ -183,9 +183,6 @@ export function mountCustomerCalendar(container, { value = '', settings = {}, me
         month = shiftCalendarMonth(fresh.month, move);
         render({ focus: true, focusSelector: `[data-customer-month="${move}"]` });
       } else if (button.dataset.customerDate) choose(button.dataset.customerDate);
-    } else if (event.target === popup) {
-      const bounds = popup.getBoundingClientRect();
-      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) close();
     }
   }, listener);
   popup.addEventListener('keydown', event => {
