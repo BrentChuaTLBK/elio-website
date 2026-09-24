@@ -1,0 +1,38 @@
+/* Shared quantity controls for the shop and kitchen dashboard. */
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control){
+  display:inline-flex;align-items:center;justify-content:center;gap:0;
+  width:max-content;min-width:0;max-width:100%;height:36px;padding:1px;
+  border:1px solid #e6d8c9;border-radius:7px;background:#fff;color:#764b25;
+  overflow:visible;vertical-align:middle;font-family:KitchenInter,Arial,sans-serif;
+  font-size:12px;line-height:1;flex-shrink:0;
+}
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>button{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;
+  width:28px;min-width:28px;height:32px;min-height:32px;margin:0;padding:0;
+  border:0;border-radius:5px;background:transparent;color:#764b25;
+  box-shadow:none;font-family:Arial,sans-serif;font-size:17px;font-weight:400;line-height:1;
+  cursor:pointer;text-decoration:none;
+}
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>button:hover:not(:disabled){background:#f7f1e9;color:#764b25}
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>button:disabled{
+  background:#faf7f2;color:#c8b8a6;opacity:1;cursor:default;
+}
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>:is(input,.option-count,span){
+  display:block;flex:0 0 auto;width:var(--quantity-value-width,34px);min-width:0;
+  max-width:100%;height:32px;min-height:32px;margin:0;padding:0 2px;
+  border:0;border-radius:0;background:transparent;color:#764b25;box-shadow:none;
+  font-family:KitchenInter,Arial,sans-serif;font-size:12px;font-weight:400;
+  line-height:32px;text-align:center;appearance:textfield;-moz-appearance:textfield;
+}
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>input:disabled{background:transparent;color:#a99a8a;cursor:default}
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>input::placeholder{color:#94816e;opacity:1}
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>input::-webkit-inner-spin-button,
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>input::-webkit-outer-spin-button{appearance:none;-webkit-appearance:none;margin:0}
+:is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>:is(button,input):focus-visible{outline:2px solid #a87b50;outline-offset:2px}
+.quantity-input-row>.quantity-stepper{flex:0 1 auto}
+.product-dialog-bottom>.field{min-width:94px}
+@media(pointer:coarse){
+  :is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control){height:44px}
+  :is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>button{width:36px;min-width:36px;flex-basis:36px;height:40px;min-height:40px}
+  :is(.elio-commerce,.manage-page,.box-page) :is(.quantity-stepper,.quantity-control,.option-stepper,.box-quantity-control)>:is(input,.option-count,span){height:40px;min-height:40px;line-height:40px}
+}

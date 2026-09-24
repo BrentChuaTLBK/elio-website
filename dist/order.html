@@ -21,6 +21,9 @@
   <script src="calendar.js" defer></script>
 
 <link rel="stylesheet" href="assets/shop/commerce.css"><link rel="stylesheet" href="assets/shop/customer-calendar.css"><link rel="stylesheet" href="assets/shop/elio-commerce.css"><script type="module" src="assets/shop/shop.js"></script>
+<link rel="stylesheet" href="assets/quantity-stepper.css">
+<script type="module" src="assets/quantity-stepper.js"></script>
+<script type="module" src="assets/shop/faqs.js"></script>
 </head>
 <body class="shop-page">
   <a class="skip-link" href="#main">Skip to content</a>
@@ -45,14 +48,9 @@
         <picture><source media="(max-width:600px)" srcset="assets/thoughtful-gift-concept.webp"><img src="assets/thoughtful-gift-wide-concept.webp" width="1920" height="640" alt="Elio's bronze-lettered brown paper bag and closed cheesecake box — concept photograph" loading="lazy"></picture>
         <div class="shop-gift-copy"><p class="eyebrow">A little box. A lovely gesture.</p><h2 id="shop-gift-title">A sweeter way<br>to show you care.</h2><p>Thoughtful treats for birthdays,<br>thank yous, and everyday moments.</p><a class="button button-outline" href="index.html#box">Explore gifting <span aria-hidden="true">→</span></a></div>
       </section>
-      <section class="shop-faq" aria-labelledby="faq-title">
+      <section class="shop-faq" data-shop-faqs aria-labelledby="faq-title" hidden>
         <h2 id="faq-title">Frequently asked questions</h2>
-        <div class="shop-faq-grid">
-          <details><summary>What flavors are available?</summary><p>Our menu rotates, while the full collection stays here to explore. See <a href="flavors.html#monthly-flavors">flavors of the month</a> for the current lineup.</p></details>
-          <details><summary>Can I customize a box?</summary><p>Choose three available flavors in our <a href="order.html?product=your-own">build-your-own box</a>. Flavor surcharges are shown before you add it to your basket. Fixed sets come with their listed flavors.</p></details>
-          <details><summary>How should I store the cheesecakes?</summary><p>Storage and serving instructions will be added before ordering opens.</p></details>
-          <details><summary>Do you offer gift packaging?</summary><p>Elio's packaging concept pairs a brown three-piece box with a matching paper bag. Final gifting options will be confirmed before ordering opens.</p></details>
-        </div>
+        <div class="shop-faq-grid"></div>
       </section>
     </div>
   </main>
