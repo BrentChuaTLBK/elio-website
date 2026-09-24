@@ -19,8 +19,10 @@
   ];
   sections.forEach(section => { document.querySelector(section.root).hidden = !section.shown; section.grid.innerHTML = section.items.map(card).join(''); });
   const monthName = value => new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`));
-  if (data.currentMonth) document.querySelector('#monthly-menu .eyebrow').textContent = monthName(data.currentMonth);
-  if (data.nextMonth) document.querySelector('#next-month-label').textContent = monthName(data.nextMonth);
+  const headings = data.flavorHeadings || {};
+  document.querySelector('#monthly-title').textContent = (headings.current || 'Flavors of the Month') + (data.currentMonth ? ` — ${monthName(data.currentMonth)}` : '');
+  document.querySelector('#next-month-title').textContent = (headings.next || 'Coming Next Month') + (data.nextMonth ? ` — ${monthName(data.nextMonth)}` : '');
+  document.querySelector('#other-title').textContent = headings.collection || 'The full collection.';
   if (data.collectionLoaded === false) document.querySelector('.flavors-footnote').textContent = 'Monthly selections are temporarily unavailable. Please check back shortly. Visit the shop for current ordering availability.';
   const filters = document.querySelector('.flavor-filters');
   const categories=data.categories || [{id:'classic',name:'Classic'},{id:'tea',name:'Tea'},{id:'rich',name:'Rich & bold'}];

@@ -693,6 +693,10 @@ document.addEventListener('click', async event => {
 });
 document.addEventListener('input', event => {
   const target = event.target;
+  if (target.closest('[data-form="flavor-headings"]')) {
+    state.headingDraft = Object.fromEntries(['current','next','collection'].map(key => [key, fieldValue(target.form, key)]));
+    $('[data-heading-preview]', target.closest('.field')).textContent = target.value.trim() + (target.dataset.headingMonth ? ` — ${monthLabel(target.dataset.headingMonth)}` : '');
+  }
   if (target.hasAttribute('data-quantity-id')) {
     const id = target.dataset.quantityId;
     state.inventoryDrafts[id] = target.value;
@@ -870,6 +874,12 @@ document.addEventListener('submit', async event => {
 async function submitForm(form) {
   const type = form.dataset.form;
   switch (type) {
+    case 'flavor-headings': {
+      const flavor_headings = Object.fromEntries(['current','next','collection'].map(key => [key, fieldValue(form,key)]));
+      if (Object.values(flavor_headings).some(value => !value || value.length > 80)) throw new Error('Enter headings of 1–80 characters.');
+      await api('save_settings', { settings: { flavor_headings } });
+      delete state.headingDraft; await refresh(); toast('Website headings saved.'); break;
+    }
     case 'flavor-menu-editor': {
       const payload = Object.fromEntries(['id','name','tagline','description','expected_month'].map(key => [key,fieldValue(form,key)]));
       payload.category_ids=$$('[name=category_ids]:checked',form).map(el=>el.value);

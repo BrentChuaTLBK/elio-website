@@ -18,6 +18,7 @@ export async function loadFlavorContent(content) {
     if (!Array.isArray(data.flavors) || !Array.isArray(data.menus)) throw new Error('Invalid flavor collection');
     const initial = content.flavors;
     content.categories = data.categories || [];
+    content.flavorHeadings = data.headings || {};
     content.featuredOrder = [];
     content.flavors = data.flavors.map(f => {
       const fallback = initial.find(item => item.id === f.slug);
