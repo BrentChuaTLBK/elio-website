@@ -10,33 +10,89 @@ export function mountHomeBoxes(content) {
   const status = region.querySelector('[data-box-status]');
   const boxes = content.homeBoxes || [];
   const mobile = matchMedia('(max-width:700px)');
-  let page = 0, pageSize = mobile.matches ? 1 : 3;
-  const pageCount = () => Math.ceil(boxes.length / pageSize);
+  const reducedMotion = matchMedia('(prefers-reduced-motion:reduce)');
+  let first = 0, target = 0, direction = 1, pageSize = mobile.matches ? 1 : 3;
+  let transition = null;
+  const wrap = index => (index % boxes.length + boxes.length) % boxes.length;
+  const visibleBoxes = () => Array.from({length:Math.min(pageSize, boxes.length)}, (_, offset) => boxes[wrap(first + offset)]);
   const card = box => {
     const href = `order.html?product=${encodeURIComponent(box.id)}`;
     const image = imageUrl(box);
     return `<article class="home-box-card" data-home-box="${escape(box.id)}"><a class="home-box-photo" href="${href}" tabindex="-1" aria-hidden="true">${image ? `<img src="${escape(image)}" alt="" width="1440" height="960" loading="lazy">` : '<span class="home-box-placeholder">ELIO</span>'}</a><h3><a href="${href}">${escape(box.name)}</a></h3><p class="home-box-description">${escape(box.description ?? box.line)}</p>${Number.isFinite(box.price_cents) ? `<p class="home-box-price">${money(box.price_cents)}</p>` : ''}<a class="button" href="${href}" aria-label="View ${escape(box.name)}">View box</a></article>`;
   };
-  function render(announce = false) {
-    const first = page * pageSize;
-    viewport.innerHTML = boxes.slice(first, first + pageSize).map(card).join('');
-    controls.hidden = pageCount() <= 1;
+  function makePage() {
+    const page = document.createElement('div');
+    page.className = 'home-box-page';
+    page.innerHTML = visibleBoxes().map(card).join('');
+    return page;
+  }
+  function updateControls(announce = false) {
+    controls.hidden = boxes.length <= pageSize;
     for (const button of controls.querySelectorAll('button')) button.setAttribute('aria-label', `${button.dataset.boxMove === '1' ? 'Next' : 'Previous'} ${pageSize === 1 ? 'box' : 'boxes'}`);
-    const message = boxes.length ? `${first + 1}–${Math.min(first + pageSize, boxes.length)} of ${boxes.length} boxes` : '';
+    const positions = visibleBoxes().map((_, offset) => wrap(first + offset) + 1);
+    const range = positions.length === 1 ? positions[0] : first + positions.length > boxes.length ? positions.join(', ') : `${positions[0]}–${positions.at(-1)}`;
+    const message = boxes.length ? `${range} of ${boxes.length} boxes` : '';
     region.querySelector('[data-box-position]').textContent = message;
-    if (announce) status.textContent = message + '. ' + boxes.slice(first, first + pageSize).map(box => box.name).join(', ') + '.';
+    if (announce) status.textContent = message + '. ' + visibleBoxes().map(box => box.name).join(', ') + '.';
+  }
+  function cancelTransition() {
+    const previous = transition;
+    transition = null;
+    previous?.animations.forEach(animation => animation.cancel());
+    viewport.removeAttribute('aria-busy');
+  }
+  function render(announce = false) {
+    cancelTransition();
+    viewport.replaceChildren(makePage());
+    updateControls(announce);
+  }
+  function slide() {
+    if (transition || first === target) return;
+    const outgoing = viewport.querySelector('.home-box-page');
+    if (outgoing?.contains(document.activeElement)) viewport.focus({preventScroll:true});
+    first = target;
+    if (reducedMotion.matches || !outgoing?.animate) { render(true); return; }
+    const incoming = makePage();
+    // Only the settled group is interactive; repeated clicks update the next
+    // destination without interrupting the current slide or accumulating copies.
+    for (const page of [outgoing, incoming]) { page.inert = true; page.setAttribute('aria-hidden', 'true'); }
+    viewport.append(incoming);
+    viewport.setAttribute('aria-busy', 'true');
+    const timing = {duration:420,easing:'cubic-bezier(.22,.61,.36,1)'};
+    const animations = [
+      outgoing.animate([{transform:'translateX(0)'},{transform:`translateX(${-direction * 100}%)`}], timing),
+      incoming.animate([{transform:`translateX(${direction * 100}%)`},{transform:'translateX(0)'}], timing),
+    ];
+    const running = {animations};
+    transition = running;
+    updateControls();
+    Promise.all(animations.map(animation => animation.finished)).then(() => {
+      if (transition !== running) return;
+      outgoing.remove();
+      incoming.inert = false;
+      incoming.removeAttribute('aria-hidden');
+      transition = null;
+      viewport.removeAttribute('aria-busy');
+      updateControls(true);
+      slide();
+    }).catch(() => {}); // Resizing or changing motion preferences cancels safely.
   }
   function move(amount) {
-    if (pageCount() < 2) return;
-    page = (page + amount + pageCount()) % pageCount();
-    render(true);
+    if (boxes.length <= pageSize) return;
+    direction = Math.sign(amount);
+    target = wrap(target + amount * pageSize);
+    slide();
   }
   region.querySelectorAll('[data-box-move]').forEach(button => button.addEventListener('click', () => move(Number(button.dataset.boxMove))));
   region.addEventListener('keydown', event => {
     if (event.target !== viewport || event.altKey || event.ctrlKey || event.metaKey) return;
     if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key) || !boxes.length) return;
     event.preventDefault();
-    if (event.key === 'Home' || event.key === 'End') { page = event.key === 'Home' ? 0 : pageCount()-1; render(true); }
+    if (event.key === 'Home' || event.key === 'End') {
+      direction = event.key === 'Home' ? -1 : 1;
+      target = event.key === 'Home' || boxes.length <= pageSize ? 0 : boxes.length - 1;
+      slide();
+    }
     else move(event.key === 'ArrowRight' ? 1 : -1);
   });
   let touch;
@@ -49,12 +105,15 @@ export function mountHomeBoxes(content) {
   }, {passive:true});
   viewport.addEventListener('touchcancel', () => { touch = null; }, {passive:true});
   mobile.addEventListener('change', () => {
-    const first = page * pageSize;
     const hadFocus = viewport.contains(document.activeElement);
     pageSize = mobile.matches ? 1 : 3;
-    page = Math.floor(first / pageSize);
-    render();
+    first = target = boxes.length <= pageSize ? 0 : target;
+    if (boxes.length) render();
+    else cancelTransition();
     if (hadFocus) viewport.focus({preventScroll:true});
+  });
+  reducedMotion.addEventListener('change', () => {
+    if (reducedMotion.matches && transition) { first = target; render(true); }
   });
   if (boxes.length) render();
   else viewport.innerHTML = `<p class="home-catalog-message">${content.homeLoaded ? 'Discover what’s baking in our shop.' : 'Our boxes couldn’t load just now.'} <a href="order.html">Visit the shop →</a></p>`;

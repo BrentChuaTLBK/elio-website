@@ -25,7 +25,8 @@
 .home-section-heading .eyebrow:before,.home-section-heading .eyebrow:after{content:'';width:clamp(48px,18vw,250px);height:1px;background:var(--line)}
 .home-section-heading h2{font-size:clamp(32px,3vw,47px);line-height:1.1;letter-spacing:-.025em}
 .home-boxes{padding:32px var(--gutter) 22px;max-width:1600px;margin:auto}
-.home-box-viewport{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;touch-action:pan-y;min-height:320px}
+.home-box-viewport{display:grid;grid-template-columns:minmax(0,1fr);overflow:hidden;touch-action:pan-y;min-height:320px}
+.home-box-page{grid-area:1/1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}
 .home-box-card{min-width:0;padding:0 24px 5px;text-align:center;display:flex;flex-direction:column;align-items:center}
 .home-box-card+.home-box-card{border-left:1px solid var(--line)}
 .home-box-card:first-child{padding-left:0}.home-box-card:last-child{padding-right:0}
@@ -89,7 +90,7 @@
  .home-hero-actions{gap:10px}.home-hero-actions .button{font-size:14px;min-height:42px;padding:10px 19px}
  .home-boxes{padding:28px 24px 20px}.home-section-heading{margin-bottom:20px}.home-section-heading h2{font-size:34px}
  .home-section-heading .eyebrow{font-size:9px;gap:12px}
- .home-box-viewport{grid-template-columns:1fr;min-height:350px}
+ .home-box-viewport{min-height:350px}.home-box-page{grid-template-columns:1fr}
  .home-box-card,.home-box-card:first-child,.home-box-card:last-child{padding:0 0 5px;border:0}
  .home-box-photo{aspect-ratio:1.65}.home-box-card h3{font-size:30px}.home-box-description{font-size:15px;min-height:0;margin-bottom:8px}
  .home-box-controls{margin-top:17px}
