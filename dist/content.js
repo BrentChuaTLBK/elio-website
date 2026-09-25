@@ -32,6 +32,8 @@ window.ELIO_CONTENT.isAvailable = () => true;
 window.ELIO_CONTENT.currentMenuShown = true;
 window.ELIO_CONTENT.nextMenuShown = false;
 window.ELIO_CONTENT.nextMonthlyMenu = [];
-window.ELIO_CONTENT_READY = /(?:^|\/)(?:index|order|flavors)(?:\.html)?$/.test(location.pathname) || location.pathname.endsWith('/')
+window.ELIO_CONTENT_READY = /(?:^|\/)index(?:\.html)?$/.test(location.pathname) || location.pathname.endsWith('/')
+  ? import('./assets/shop/home-content.js').then(({loadHomeContent}) => loadHomeContent(window.ELIO_CONTENT)).catch(() => Object.assign(window.ELIO_CONTENT,{flavors:[],homeBoxes:[],homeLoaded:false}))
+  : /(?:^|\/)(?:order|flavors)(?:\.html)?$/.test(location.pathname)
   ? import('./assets/shop/flavor-content.js').then(({loadFlavorContent}) => loadFlavorContent(window.ELIO_CONTENT)).catch(() => Object.assign(window.ELIO_CONTENT,{flavors:[],monthlyMenu:[],nextMonthlyMenu:[],currentMenuShown:false,nextMenuShown:false,collectionLoaded:false}))
   : Promise.resolve(window.ELIO_CONTENT);

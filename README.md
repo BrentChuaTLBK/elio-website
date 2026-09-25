@@ -62,10 +62,10 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 
 ## What works
 
-- Responsive homepage with the navigation layered over the hero photograph, ivory/brown/gold palette, centered typographic wordmark, and food-first imagery. The same text logo is retained, using its lighter bronze variant over the photo.
-- The flavor collection and gifting section now form one compact showcase: three browsable flavor tiles beside a box photograph. The box copy and “Order a box” button are live HTML over the image, with a dark fade for contrast. They stack cleanly on mobile.
-- Mobile navigation, a full flavor catalog carousel, individual flavor dialogs, gifting details, and a factual brand introduction.
-- “Explore all flavors” opens `flavors.html`: a photo-led catalog with taste filters, clickable descriptions, a monthly menu, and the full collection. All current flavors are in the initial monthly lineup, as confirmed by Elio. The legacy `#flavors` link redirects to this page.
+- The homepage uses a centered photographic hero, a live premade-box section, the full flavor carousel, a story feature, and a sharing banner. Navigation remains Our Story, Flavors, and Order a Box.
+- The public `home_catalog` read returns listed fixed sets, the first listed custom-box link, and every flavor that is not individually Hidden. Names, descriptions, photos, prices, and saved All-list positions come from the dashboard. Stock, lineup membership and publication do not limit the homepage flavor carousel; unpublished month assignments are never returned. This showcase does not change ordering eligibility or the flavor page's monthly sections.
+- Premade boxes move manually in groups of three on larger screens, one per page on phones, looping in either direction. A final partial group is supported; controls disappear when everything fits. Boxes never autoplay. Box links open the selected product in the shop. Swipe and keyboard browsing are supported.
+- The flavor carousel keeps all visible flavors as the collection grows, displaying seven tiles across wide screens, five on tablets and three on phones. The number of visible tiles does not cap the catalog. Uploaded photos are shared with the flavor collection and product details.
 - The carousel glides automatically at a gentle 14 pixels per second, with the first flavor following the last seamlessly. It keeps moving while the cursor is over it. The previous/next buttons move three flavors at a time on desktop and mobile; keyboard arrows move one flavor, with Home/End jumping to the first/last. Native touch/trackpad scrolling remains available.
 - Keyboard-accessible native dialogs, focus restoration, Escape to close, direct detail links, visible focus states, and reduced-motion support.
 - Account and bag icons appear beside the centered wordmark. Compact navigation is used at widths up to 1000 px and includes My account, My orders, and Order a box links.
@@ -74,14 +74,15 @@ Cloudflare references: [Workers Static Assets](https://developers.cloudflare.com
 - Box cards open a compact, centered product dialog with photographs, included flavors or custom choices, quantity, price, and Add to basket. Legacy `box.html?collection=...` links open the matching shop dialog. Unlisted concepts use the same compact window with ordering disabled. Date and pickup/delivery selection stay on the shop page, outside product details.
 - Public account and team account pages use Elio's Supabase Auth for email/password registration, sign-in, verification, password reset, and sign-out. Google sign-in controls activate automatically when the Elio Google provider is enabled; see [Google sign-in setup](docs/GOOGLE-SIGN-IN.md). Only users with an Elio staff role can open the dashboard. Signed-in customers see their own order history; guests use a private order link. Payment approval remains a staff action.
 - A compact newsletter placeholder sits above the footer, with small copy beside the email field on desktop and a tight stack on mobile. The email input and arrow are disabled, with an explicit unavailable message. Instagram remains linked in the footer.
-- Immediately above the newsletter, an editorial block introduces the three-piece box, a gifting banner, and three everyday Elio moments. “Build your trio” opens the box preview, “Explore gifting” opens the existing packaging details, and the Instagram handle links to Elio. The copy and controls are real HTML; the photographs are replaceable concept assets.
+- The story feature and “Made to share” banner sit above the retained newsletter placeholder. Hero and banner calls to action open the shop; “Build your own” opens the listed custom box. Copy and controls are real HTML.
 
 ## Structure
 
 | File | Purpose |
 | --- | --- |
 | `dist/index.html` | Semantic homepage, real copy, navigation, asset references |
-| `dist/styles.css` | Responsive components and shared design tokens |
+| `dist/styles.css`, `dist/home.css` | Shared design tokens and scoped homepage composition |
+| `dist/assets/shop/home-content.js`, `dist/assets/shop/home-boxes.js` | Anonymous homepage data and manual looping box pages |
 | `dist/content.js` | Structured flavor names, descriptions, and image replacement points |
 | `dist/app.js` | Reusable product rendering, navigation, accessible detail views |
 | `dist/order.html`, `dist/shop.css`, `dist/order.js` | Connected shop shell, flavor details, gifting, and FAQs |
@@ -103,7 +104,8 @@ The hero, featured flavor images, and gifting image are AI-generated **concept p
 
 | Asset | Replacement point |
 | --- | --- |
-| `dist/assets/hero-concept.webp` | Hero image and preload in `dist/index.html` |
+| `dist/assets/home-hero-centered.webp` | Centered homepage hero and preload in `dist/index.html` |
+| `dist/assets/hero-concept.webp` | Homepage story close-up |
 | `dist/assets/flavors-concept.webp` | Shared vanilla/matcha/chocolate triptych in `dist/content.js` |
 | `dist/assets/gifting-concept.webp` | Homepage showcase, flavor-catalog hero, box gallery, and gifting dialog |
 | `dist/assets/trio-story-concept.webp` | Homepage editorial photograph and Signature Trio card/gallery |
@@ -129,7 +131,7 @@ Monthly lineups use Manila calendar dates. Prepared next-month menus roll forwar
 
 Daily quantities shows the selected month’s lineup. Select individual dates, a range within the month, or the whole remaining month. Totals include already ordered pieces. Choose replace or fill only unconfigured dates; a saved zero is configured. If any requested total is below existing reservations, the whole operation is rejected with the conflicting date. Closed dates may be stocked for planning, but shop and fulfillment closures still block ordering.
 
-The live public collection comes from the checked Supabase RPC. Static entries in `dist/content.js` are concept-preview fallbacks, not the live management interface. If public collection loading fails, hidden static flavors are not restored. The carousel follows the saved All flavors order.
+The live public collection comes from the checked Supabase RPC. The homepage uses its separate `home_catalog` action so an individually visible flavor can appear there even before its next-month placement is announced. Static entries in `dist/content.js` are concept-preview fallbacks, not the live management interface. If public collection loading fails, hidden static flavors are not restored. The carousel follows the saved All flavors order.
 
 Automatic movement starts as soon as the carousel enters view, with no startup delay, and continues on hover and during vertical page scrolling. Only horizontal wheel/trackpad input (including Shift+wheel) starts manual carousel browsing; page scrolling and zoom gestures do not trigger a sideways snap. After an arrow click or mobile swipe, the gentle glide resumes as soon as the movement and native momentum finish. Horizontal wheel/trackpad browsing and focus interaction retain a four-second reading pause. It also pauses while details are open and when the carousel or page is out of view. Reduced-motion preferences disable automatic movement. Screen-reader status announcements are silent while it moves automatically; the full catalog page provides a stationary view of all flavors.
 

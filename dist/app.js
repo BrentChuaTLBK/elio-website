@@ -2,6 +2,8 @@
   'use strict';
   await window.ELIO_CONTENT_READY;
   const { flavorMetaHtml } = await import('./assets/shop/flavor-details.js');
+  const { mountHomeBoxes } = await import('./assets/shop/home-boxes.js');
+  mountHomeBoxes(window.ELIO_CONTENT);
   const { flavors, featuredOrder, productImage, isAvailable } = window.ELIO_CONTENT;
   const byId = (id) => flavors.find((flavor) => flavor.id === id);
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -18,11 +20,17 @@
   // accessibility tree and tab order; the full catalog still contains each flavor once.
   const pageSize = 3;
   // Buffer a visible group plus a full three-card move, including small catalogs.
-  const copyCount = canLoop ? Math.ceil(pageSize * 2 / catalog.length) * catalog.length : 0;
+  const copyCount = canLoop ? Math.ceil((7 + pageSize) / catalog.length) * catalog.length : 0;
   const copies = Array.from({ length: copyCount }, (_, index) => renderSlide(catalog[index % catalog.length], index % catalog.length, true)).join('');
   track.innerHTML = copies + catalog.map((flavor, index) => renderSlide(flavor, index)).join('') + copies;
+  if (!catalog.length) {
+    const message = document.createElement('p');
+    message.className = 'home-catalog-message';
+    message.textContent = window.ELIO_CONTENT.homeLoaded ? 'More little discoveries to come.' : 'Our flavors couldn’t load just now. Please try again shortly.';
+    track.replaceChildren(message);
+  }
 
-  const allSlides = [...track.children];
+  const allSlides = [...track.querySelectorAll('.flavor-slide')];
   const slides = allSlides.filter((slide) => !slide.hasAttribute('data-carousel-copy'));
   const controls = document.querySelector('.carousel-controls');
   const [previous, next] = controls.querySelectorAll('button');

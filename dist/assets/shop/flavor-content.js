@@ -1,5 +1,13 @@
 import { config } from '../admin/config.js';
 
+export function mapPublicFlavors(flavors, initial = []) {
+  return flavors.map(f => {
+    const fallback = initial.find(item => item.id === f.slug);
+    const image = f.photos?.find(url => typeof url === 'string' && /^(https?:\/\/|assets\/)/.test(url));
+    return { ...fallback, id: f.slug || f.id, productId: f.id, name: f.name, description: f.description || '', collection_details: f.collection_details, line: f.tagline ?? fallback?.line ?? '', category_ids: f.category_ids || [], category_sort_orders: f.category_sort_orders || {}, sort_order: f.sort_order || 0, collectionOnly: f.collection_only, uploadedPhoto: Boolean(image), ...(image ? { image, imagePosition: undefined } : {}) };
+  });
+}
+
 // Public editorial data only. This request never reads or changes an auth session.
 export async function loadFlavorContent(content) {
   if (new URLSearchParams(location.search).get('preview') === '1') return content;
@@ -20,11 +28,7 @@ export async function loadFlavorContent(content) {
     content.categories = data.categories || [];
     content.flavorHeadings = data.headings || {};
     content.featuredOrder = [];
-    content.flavors = data.flavors.map(f => {
-      const fallback = initial.find(item => item.id === f.slug);
-      const image = f.photos?.find(url => typeof url === 'string' && /^(https?:\/\/|assets\/)/.test(url));
-      return { ...fallback, id: f.slug || f.id, productId: f.id, name: f.name, description: f.description || '', collection_details: f.collection_details, line: f.tagline ?? fallback?.line ?? '', category_ids: f.category_ids || [], category_sort_orders: f.category_sort_orders || {}, sort_order: f.sort_order || 0, collectionOnly: f.collection_only, uploadedPhoto: Boolean(image), ...(image ? { image, imagePosition: undefined } : {}) };
-    });
+    content.flavors = mapPublicFlavors(data.flavors, initial);
     const selected = month => {
       const ids = data.menus.find(menu => menu.month === month)?.flavor_ids || [];
       return content.flavors.filter(f => ids.includes(f.productId)).map(f => f.id);
