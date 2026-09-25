@@ -166,3 +166,17 @@
 .quantity-bulk>div{display:flex;gap:12px;align-items:flex-end}.quantity-bulk .field{max-width:220px;margin:0}
 .quantity-bulk p{font-size:12px;color:var(--muted);margin:10px 0 0}.quantity-bulk input{width:100%}
 @media(max-width:760px){.quantity-default-panel form{grid-template-columns:1fr}.quantity-default-controls,.quantity-bulk>div{flex-wrap:wrap;align-items:stretch}.quantity-default-controls .field,.quantity-bulk .field{flex:1 1 180px;max-width:none}.quantity-default-controls button,.quantity-bulk button{flex:1 1 auto}}
+
+/* Date exceptions are crossed out directly in the settings calendars. */
+.manage-page .date-calendar-closures .calendar-day{background:#fffaf3;border-color:#f0e6d9;font-weight:400}
+.manage-page .date-calendar-closures .calendar-day:hover{background:#f2e8da;border-color:#d2bfa7}
+.manage-page .date-calendar-closures .calendar-day[aria-pressed="true"]{background:#eee5d9;border-color:#e1d2bf;color:#8b7159;font-weight:400}
+.manage-page .date-calendar-closures .calendar-day[aria-pressed="true"]:after{content:none}
+.manage-page .date-calendar-closures .calendar-day[aria-current="date"]{border-color:var(--caramel);font-weight:700}
+.calendar-day-number{display:inline-block;position:relative;min-width:1.4em;line-height:1.4}
+.date-calendar-closures .calendar-day[aria-pressed="true"] .calendar-day-number:after{content:'';position:absolute;width:1.6em;height:1px;left:50%;top:50%;background:currentColor;transform:translate(-50%,-50%) rotate(45deg)}
+.calendar-closure-legend{justify-content:flex-start;gap:10px 16px;margin-bottom:8px}.calendar-closure-legend>span{display:inline-flex;align-items:center;gap:6px}
+.calendar-closure-legend .calendar-today{margin-left:auto}
+.calendar-open-key,.calendar-closed-key{position:relative;display:inline-block;width:14px;height:14px;border:1px solid #e1d2bf;border-radius:3px;background:#fffaf3}
+.calendar-closed-key{background:#eee5d9}.calendar-closed-key:after{content:'';position:absolute;width:12px;height:1px;top:50%;left:50%;background:#8b7159;transform:translate(-50%,-50%) rotate(45deg)}
+.calendar-closure-summary{border-top:1px solid var(--line);margin:0;padding-top:10px;color:var(--muted);font-size:11px;line-height:1.5}
