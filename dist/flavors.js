@@ -1,7 +1,7 @@
 (async () => {
   'use strict';
   await window.ELIO_CONTENT_READY;
-  const { flavorMetaHtml } = await import('./assets/shop/flavor-details.js');
+  const { flavorMetaHtml, closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
   const { flavors, featuredOrder, productImage } = window.ELIO_CONTENT;
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map((id) => flavors.find((flavor) => flavor.id === id)).filter(Boolean);
@@ -108,6 +108,7 @@
     syncFlavor();
   }
   dialog.querySelector('.dialog-close').addEventListener('click', closeFlavor);
+  closeFlavorOnBackdrop(dialog, closeFlavor);
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); });
   window.addEventListener('hashchange', syncFlavor);
   window.addEventListener('popstate', syncFlavor);

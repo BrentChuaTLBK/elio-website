@@ -1,7 +1,7 @@
 (async () => {
   'use strict';
   await window.ELIO_CONTENT_READY;
-  const { flavorMetaHtml } = await import('./assets/shop/flavor-details.js');
+  const { flavorMetaHtml, closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
   const { mountHomeBoxes } = await import('./assets/shop/home-boxes.js');
   mountHomeBoxes(window.ELIO_CONTENT);
   const { flavors, featuredOrder, productImage, isAvailable } = window.ELIO_CONTENT;
@@ -336,6 +336,7 @@
     }
   });
   document.querySelector('.dialog-close').addEventListener('click', closeDialog);
+  closeFlavorOnBackdrop(dialog, closeDialog, () => location.hash.startsWith('#flavor-'));
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(); });
   window.addEventListener('popstate', syncRoute);
   window.addEventListener('hashchange', syncRoute);

@@ -36,7 +36,7 @@ async function activateNewsletter(session) {
   if (!customer || !session) return;
   try {
     const result = await (await newsletterModule).activateAccountNewsletter();
-    if (result?.status === 'subscribed') newsletterMessage('Your newsletter subscription is confirmed. If eligible, your personal welcome code will arrive by email.');
+    if (result?.status === 'subscribed') newsletterMessage('Welcome to the Elio Newsletter. Enjoy flavor news, special offers, and exclusive promo codes. New subscribers receive a personal welcome code by email.');
   } catch {
     if (session.user?.user_metadata?.newsletter_opt_in === true) {
       retryNewsletter = () => activateNewsletter(session);
@@ -48,11 +48,11 @@ async function activateNewsletter(session) {
 async function saveAccountNewsletter(email, session) {
   const newsletter = await newsletterModule;
   // The successful Auth signup stored this explicit consent. Keep its popup dismissed
-  // even if the optional pending-record request needs to be retried.
+  // even if the optional newsletter request needs to be retried.
   newsletter.rememberNewsletterOptIn();
   try {
     await newsletter.subscribeNewsletter(email, 'account');
-    newsletterMessage('Your newsletter choice is saved. Confirm your account email to finish joining; there’s no separate newsletter confirmation. If eligible, your welcome code will follow by email.');
+    newsletterMessage('Welcome to the Elio Newsletter. You’ve joined—no newsletter confirmation needed. New subscribers receive a personal welcome code by email. Verify your Elio account to use it at checkout.');
     if (session) await activateNewsletter(session);
   } catch {
     retryNewsletter = () => saveAccountNewsletter(email, session);

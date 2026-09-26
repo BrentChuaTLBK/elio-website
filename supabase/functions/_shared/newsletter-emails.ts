@@ -44,8 +44,8 @@ export function renderNewsletterEmail(payload: any): { html: string; text: strin
     const offer = payload.offer;
     if (!offer?.code || !Number.isFinite(Date.parse(offer.expires_at))) throw new Error("Newsletter welcome offer is incomplete.");
     heading = "Your welcome treat.";
-    subject = "Your 5% Elio welcome code";
-    intro = "You’re on the list. Here’s a little thank-you to enjoy with your next Elio box.";
+    subject = `Your ${Number(offer.value)}% Elio welcome code`;
+    intro = "Welcome to the Elio Newsletter. Stay up to date with new flavors and seasonal collections, and enjoy special offers, discounts, and exclusive promo codes. Here’s a little thank-you for joining.";
     const expiry = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date(offer.expires_at));
     const terms = `${Number(offer.value)}% off products with a minimum order of ${money(offer.min_subtotal_cents)}, up to ${money(offer.cap_cents)} off. Use once by ${expiry} (Manila time). Sign in using ${payload.subscriber.email} at checkout. Delivery is excluded. Cannot be combined with another promo code.`;
     const shop = new URL("order.html", site).toString();
@@ -61,9 +61,17 @@ export function renderNewsletterEmail(payload: any): { html: string; text: strin
     const paragraphs = String(campaign.body).split(/\n\s*\n/).map(p => `<p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:#665649">${e(p).replace(/\n/g, "<br>")}</p>`).join("");
     const photo = safeHttps(campaign.image_url), cta = safeHttps(campaign.cta_url);
     if (campaign.image_url && !photo || campaign.cta_url && !cta) throw new Error("Newsletter links must use HTTPS.");
-    body = emailIntro("Elio Newsletter", heading, "")
-      + (photo ? `<img src="${e(photo)}" alt="${e(heading)}" width="656" style="display:block;width:100%;height:auto;border:0;margin:0 0 24px">` : "")
-      + paragraphs + (cta && campaign.cta_label ? emailButton(String(campaign.cta_label), cta) : "");
+    const layout = campaign.template || 'spotlight';
+    if (!['spotlight','offer','letter'].includes(layout)) throw new Error("Choose a valid newsletter template.");
+    const photoHtml = photo ? `<img src="${e(photo)}" alt="${e(heading)}" width="656" style="display:block;width:100%;height:auto;border:0;margin:0 0 24px">` : "";
+    const button = cta && campaign.cta_label ? emailButton(String(campaign.cta_label), cta) : "";
+    if (layout === 'offer') {
+      body = `<div style="padding:30px 24px 12px;text-align:center;background:#f1e6d6;border:1px solid #d7bea0;margin:0 0 24px">${emailIntro("Exclusively for our subscribers", heading, "")}${paragraphs}${button}</div>` + photoHtml;
+    } else if (layout === 'letter') {
+      body = emailIntro("From the Elio kitchen", heading, "") + `<div style="border-top:1px solid #dfd1bd;padding-top:25px">${paragraphs}<p style="font:italic 21px/1.5 Georgia,serif;color:#63412d;margin:26px 0">With care,<br>The Elio team</p></div>` + button + photoHtml;
+    } else {
+      body = photoHtml + emailIntro("The Elio collection", heading, "") + paragraphs + button;
+    }
     plain = `${heading}\n\n${campaign.body}${cta ? `\n\n${campaign.cta_label || "Visit Elio"}:\n${cta}` : ""}`;
   } else { throw new Error("Unsupported newsletter email type."); }
 

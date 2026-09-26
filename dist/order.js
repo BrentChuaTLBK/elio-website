@@ -1,7 +1,7 @@
 (async () => {
   'use strict';
   await window.ELIO_CONTENT_READY;
-  const { flavorMetaHtml } = await import('./assets/shop/flavor-details.js');
+  const { flavorMetaHtml, closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
   const { flavors, featuredOrder, productImage, boxCollections, isAvailable } = window.ELIO_CONTENT;
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map((id) => flavors.find((flavor) => flavor.id === id)).filter(Boolean);
@@ -37,6 +37,7 @@
   });
   function closeDialog() { history.replaceState(null, '', `${location.pathname}${location.search}${location.hash === '#your-bag' ? '' : '#catalog'}`); syncDialog(); }
   dialog.querySelector('.dialog-close').addEventListener('click', closeDialog);
+  closeFlavorOnBackdrop(dialog, closeDialog, () => location.hash.startsWith('#flavor-'));
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(); });
   window.addEventListener('hashchange', syncDialog);
   window.addEventListener('popstate', syncDialog);

@@ -1,12 +1,20 @@
 import { api, auth, ready, configured, newsletterRequest } from '../admin/client.js';
+import { newsletterOffer, newsletterOfferTerms } from './newsletter-offer.js';
 
 const popupKey = 'elio-newsletter-popup-v1';
 const startedAt = Date.now();
 const dismissalPeriod = 24 * 60 * 60 * 1000;
-const acceptedMessage = 'Thank you. Check your inbox for the next step. If eligible, your personal welcome code will arrive after you confirm your subscription.';
-export const newsletterTerms = 'For new newsletter subscribers, including existing customers. Minimum product subtotal ₱500; maximum discount ₱100. Your unique code is valid for 14 days after confirmation and can be used once. Sign in to an email-verified Elio account with the subscribed email to use it.';
+const acceptedMessage = 'Welcome to the Elio Newsletter. Look forward to flavor news, special offers, and exclusive promo codes. New subscribers receive a personal welcome code by email.';
 let settingsPromise, activeSettings, memoryState, refreshPopup = () => {};
 let settingsVersion = 0;
+
+function updateOfferCopy(settings) {
+  const offer = newsletterOffer(settings);
+  document.querySelectorAll('#newsletter-title strong, .elio-newsletter-offer strong').forEach(node => { node.textContent = `${offer.discount_percent}% OFF`; });
+  document.querySelectorAll('.elio-newsletter-terms, [data-newsletter-offer-terms]').forEach(node => { node.textContent = newsletterOfferTerms(settings); });
+  const accountNote = document.querySelector('#newsletter-note');
+  if (accountNote) accountNote.textContent = `Join immediately for flavor news, special offers, and exclusive promo codes. New subscribers receive a personal ${offer.discount_percent}% code by email. ${newsletterOfferTerms(settings)}`;
+}
 
 export function getNewsletterSettings(refresh = false) {
   if (!settingsPromise || refresh) {
@@ -18,6 +26,7 @@ export function getNewsletterSettings(refresh = false) {
       const settings = await api('newsletter_settings');
       if (version === settingsVersion) {
         activeSettings = settings;
+        updateOfferCopy(settings);
         if (settings?.opted_in || settings?.known_subscriber || ['pending', 'subscribed', 'unsubscribed', 'suppressed'].includes(settings?.own_status)) rememberNewsletterOptIn();
         refreshPopup();
       }
@@ -72,15 +81,26 @@ function bindForm(form) {
     if (form.dataset.busy === 'true' || !form.reportValidity() || !form.elements.consent.checked) return;
     const button = form.querySelector('[type="submit"]'), status = form.querySelector('[data-newsletter-status]');
     const label = button.textContent;
-    form.dataset.busy = 'true';button.disabled = true;button.textContent = 'Sending your request…';status.textContent = '';status.classList.remove('is-error');
+    form.dataset.busy = 'true';button.disabled = true;button.textContent = 'Joining…';status.textContent = '';status.classList.remove('is-error');
     try {
       status.textContent = await subscribeNewsletter(form.elements.email.value, form.dataset.newsletterSource, form.elements.website?.value || '');
+      const dialog = form.closest('#elio-newsletter-dialog');
+      if (dialog) { showWelcome(dialog);return; }
       form.querySelectorAll('input').forEach(input => { input.disabled = true; });
-      button.textContent = 'Check your inbox';
+      button.textContent = 'Joined';
     } catch (error) {
       status.textContent = error.message || 'We couldn’t finish your request. Please try again.';status.classList.add('is-error');button.disabled = false;button.textContent = label;
     } finally { form.dataset.busy = 'false'; }
   });
+}
+
+function showWelcome(dialog) {
+  dialog.classList.add('is-welcome');
+  dialog.querySelector('.elio-newsletter-close').setAttribute('aria-label', 'Close newsletter welcome');
+  dialog.querySelector('.elio-newsletter-copy').innerHTML = `<div class="elio-newsletter-welcome"><p class="elio-newsletter-eyebrow">Elio Newsletter</p><h2 id="elio-newsletter-title" tabindex="-1">A little more Elio,<br>just for you.</h2><p class="elio-newsletter-intro">Welcome to the Elio Newsletter. We’re glad you’re here.</p><ul class="elio-newsletter-benefits"><li><strong>Something new to savor</strong><span>Keep up with new flavors, seasonal collections, and the latest from Elio.</span></li><li><strong>A little extra, just for subscribers</strong><span>Enjoy special offers, discounts, and exclusive promo codes.</span></li></ul><div class="elio-newsletter-welcome-offer"><strong>Your welcome treat</strong><p>New subscribers: look out for your personal code by email. No confirmation needed.</p></div><button class="elio-newsletter-submit" type="button" data-newsletter-done>Continue exploring <span aria-hidden="true">→</span></button><p class="elio-newsletter-welcome-note">A little Elio in your inbox. Unsubscribe anytime.</p></div>`;
+  dialog.querySelector('[data-newsletter-done]').addEventListener('click', () => dialog.querySelector('.elio-newsletter-close').click());
+  dialog.scrollTop = 0;
+  dialog.querySelector('#elio-newsletter-title').focus({ preventScroll: true });
 }
 
 function excludedVisit() {
@@ -113,7 +133,7 @@ function schedulePopup(settings) {
     if (document.hidden || anotherModal) return;
     dialog?.remove();
     dialog = document.createElement('dialog');dialog.id = 'elio-newsletter-dialog';dialog.className = 'elio-newsletter-dialog';dialog.setAttribute('aria-labelledby', 'elio-newsletter-title');
-    dialog.innerHTML = `<button class="elio-newsletter-close" type="button" aria-label="Close newsletter signup"><span aria-hidden="true">×</span></button><div class="elio-newsletter-layout"><div class="elio-newsletter-photo"><img src="assets/trio-story-concept.webp" width="1440" height="960" alt="An Elio box of three square Basque cheesecakes"></div><div class="elio-newsletter-copy"><p class="elio-newsletter-eyebrow">Elio Newsletter</p><h2 id="elio-newsletter-title" class="elio-newsletter-offer"><span>Get</span> <strong>5% OFF</strong> <span>your next order.</span></h2><p class="elio-newsletter-intro">Join the Elio Newsletter for news, special offers, and exclusive promo codes.</p>${formMarkup('elio-popup', 'home_popup')}<p class="elio-newsletter-terms">${newsletterTerms}</p></div></div>`;
+    dialog.innerHTML = `<button class="elio-newsletter-close" type="button" aria-label="Close newsletter signup"><span aria-hidden="true">×</span></button><div class="elio-newsletter-layout"><div class="elio-newsletter-photo"><img src="assets/trio-story-concept.webp" width="1440" height="960" alt="An Elio box of three square Basque cheesecakes"></div><div class="elio-newsletter-copy"><p class="elio-newsletter-eyebrow">Elio Newsletter</p><h2 id="elio-newsletter-title" class="elio-newsletter-offer"><span>Get</span> <strong>${newsletterOffer(activeSettings).discount_percent}% OFF</strong> <span>your next order.</span></h2><p class="elio-newsletter-intro">Join the Elio Newsletter for news, special offers, and exclusive promo codes.</p>${formMarkup('elio-popup', 'home_popup')}<p class="elio-newsletter-terms">${newsletterOfferTerms(activeSettings)}</p></div></div>`;
     document.body.append(dialog);bindForm(dialog.querySelector('form'));
     const dismiss = () => { rememberPopup(popupState()?.state === 'submitted' ? 'submitted' : 'dismissed');dialog.close();show(); };
     dialog.querySelector('.elio-newsletter-close').addEventListener('click', dismiss);

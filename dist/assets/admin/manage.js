@@ -135,6 +135,7 @@ modal.addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 $('#dialog-close').addEventListener('click', closeDialog);
 
 const newsletterAdmin = createNewsletterAdmin({connected:()=>state.connected,owner:()=>state.role==='owner',showDialog,closeDialog});
+const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,owner:()=>state.role==='owner',showDialog,closeDialog,offersOnly:true});
 
 async function refresh() {
   if (!configured) return;
@@ -157,6 +158,7 @@ function render() {
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
   if(state.view==='faqs')bindFaqView(state,$('#workspace'),render);
   if(state.view==='newsletter')newsletterAdmin.mount($('#workspace'));
+  if(state.view==='promos' && owner())newsletterOffers.mount($('#workspace'));
   syncVisitorPolling();
   syncPromoStatuses();
 }
@@ -180,7 +182,7 @@ function overviewView() {
   const reviews = state.orders.filter(needsPaymentReview);
   const upcoming = state.orders.filter(o => o.fulfillment_date >= today && isActiveFulfillment(o)).sort((a, b) => a.fulfillment_date.localeCompare(b.fulfillment_date));
   const activeProducts = state.products.filter(p => p.active).length;
-  return heading('A little overview', `Your kitchen, at a glance. ${humanDate(today)} · Manila`, `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh</button><a class="button" href="order.html">Open shop ↗</a>`) +
+  return heading('A little overview', `Your kitchen, at a glance. ${humanDate(today)} · Manila`, `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh</button>${owner()?'<button class="button button-secondary" data-view="newsletter" data-newsletter-tab="campaigns">Create newsletter</button>':''}<a class="button" href="order.html">Open shop ↗</a>`) +
     `<div class="metric-grid">${[
       ['Today’s orders', todayOrders.length, 'Pickup and delivery, active orders'],
       ['Payments to review', reviews.length, 'Proof received · quantities held'],
@@ -325,8 +327,8 @@ function promoResults(now = Date.now()) {
   return `<p class="muted" role="status">Showing ${promos.length} of ${state.promos.length} promo codes</p><section class="panel">${promos.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Code</th><th>Discount</th><th>Minimum products</th><th>Uses / total limit</th><th>Per account</th><th>Expires · Manila</th><th>Status</th><th></th></tr></thead><tbody>${promos.map(promo => `<tr><td><strong>${esc(promo.code)}</strong></td><td>${promo.kind === 'percent' ? `${promo.value}%` : money(promo.value)}${promo.cap_cents && promo.kind === 'percent' ? `<small>Up to ${money(promo.cap_cents)}</small>` : ''}</td><td>${money(promo.min_subtotal_cents)}</td><td>${promoUsage(promo)}</td><td>${promo.per_account_limit} uses</td><td>${esc(dateTime(promo.expires_at))}</td><td>${badge(promoStatus(promo, now))}</td><td><div class="row-actions"><button class="table-link" data-action="edit-promo" data-id="${esc(promo.id)}">Edit</button><button type="button" class="table-link" data-action="delete-promo" data-id="${esc(promo.id)}" aria-label="Delete promo ${esc(promo.code)}" ${ownerLocked()}>Delete</button></div></td></tr>`).join('')}</tbody></table></div>` : empty(state.promos.length ? 'No matching promo codes' : 'A thoughtful extra, when you’re ready', state.promos.length ? 'Choose another status to see your other promo codes.' : 'Create percentage or fixed-amount discounts with minimum spend and usage limits.')}</section>`;
 }
 function promosView() {
-  return heading('A little treat', 'Promo codes for customers with verified email accounts.', `${owner()?'<button class="button button-secondary" data-view="newsletter" data-newsletter-tab="offers">Newsletter welcome offers</button>':''}<button class="button" data-action="new-promo" ${owner() ? '' : 'disabled'}>+ Create promo code</button>`) + readonly() +
-    `<div class="filter-secondary">${select('promo-status-filter', 'Status', option('', 'All promo codes', state.promoFilter) + option('active', 'Active', state.promoFilter) + option('expired', 'Expired', state.promoFilter) + option('inactive', 'Inactive', state.promoFilter), 'id="promo-status-filter" aria-controls="promo-results" aria-describedby="promo-filter-help"')}<p id="promo-filter-help" class="muted">Inactive codes have not expired, but are disabled or not yet activated.</p></div><div id="promo-results">${promoResults()}</div><p class="muted">Discounts apply to products and option surcharges. Delivery fees are excluded. Paid and reserved uses both count toward the total limit. Reservations include orders awaiting payment or payment review; expired, rejected or cancelled unpaid orders release them. Paid cancellations and refunds remain counted.</p>`;
+  return heading('A little treat', 'Promo codes for customers with verified email accounts.', `<button class="button" data-action="new-promo" ${owner() ? '' : 'disabled'}>+ Create promo code</button>`) + readonly() +
+    `<h2 class="regular-promo-heading">Regular promo codes</h2><div class="filter-secondary">${select('promo-status-filter', 'Status', option('', 'All promo codes', state.promoFilter) + option('active', 'Active', state.promoFilter) + option('expired', 'Expired', state.promoFilter) + option('inactive', 'Inactive', state.promoFilter), 'id="promo-status-filter" aria-controls="promo-results" aria-describedby="promo-filter-help"')}<p id="promo-filter-help" class="muted">Inactive codes have not expired, but are disabled or not yet activated.</p></div><div id="promo-results">${promoResults()}</div><p class="muted">Discounts apply to products and option surcharges. Delivery fees are excluded. Paid and reserved uses both count toward the total limit. Reservations include orders awaiting payment or payment review; expired, rejected or cancelled unpaid orders release them. Paid cancellations and refunds remain counted.</p>${owner()?`<div class="newsletter-promo-section">${newsletterOffers.render()}</div>`:''}`;
 }
 function deletePromoDialog(id) {
   const promo = state.promos.find(item => item.id === id);

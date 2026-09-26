@@ -1,4 +1,4 @@
-.flavors-page .order-header{border-bottom:1px solid var(--line)}
+.flavors-page .order-header{margin:0;padding:0 var(--gutter);background:var(--brown);color:var(--ivory);border-bottom:1px solid #795c46}.flavors-page .order-header .wordmark{color:var(--bronze-light)}.flavors-page .order-header a:focus-visible{outline-color:var(--bronze-light)}
 .flavors-hero{position:relative;isolation:isolate;overflow:hidden;min-height:290px;max-width:1600px;margin:0 auto;background:#eee2d2;display:flex;align-items:center}
 .flavors-hero>img{position:absolute;inset:0 0 0 auto;width:72%;height:100%;object-fit:cover;object-position:68% 58%;z-index:-2}
 .flavors-hero:after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#eee2d2 18%,rgba(238,226,210,.97) 32%,rgba(238,226,210,0) 66%)}
