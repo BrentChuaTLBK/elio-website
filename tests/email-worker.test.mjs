@@ -19,8 +19,9 @@ globalThis.fetch = async (url, options) => {
   }
   if (String(url).endsWith('/elio_email_worker_authorized')) { calls.push('authorize'); return Response.json(setup.authorized !== false); }
   calls.push(body.p_action);
-  if (body.p_action === 'claim_emails') return Response.json(setup.empty ? [] : [{ ...row, ...(setup.old ? { first_attempt_at: '2020-01-01' } : {}) }]);
-  if (body.p_action === 'prepare_email') return Response.json(setup.skip ? { skip: true } : row);
+  const preparedRow = { ...row, ...setup.row };
+  if (body.p_action === 'claim_emails') return Response.json(setup.empty ? [] : [{ ...preparedRow, ...(setup.old ? { first_attempt_at: '2020-01-01' } : {}) }]);
+  if (body.p_action === 'prepare_email') return Response.json(setup.skip ? { skip: true } : preparedRow);
   if (body.p_action === 'email_sent' && setup.ackFailure) return Response.json({}, { status: 500 });
   if (body.p_action === 'email_failed') setup.recordedFailure = body.p_payload;
   return Response.json({});
@@ -71,6 +72,23 @@ try {
     assert.ok(email.html.includes('&lt;img src=x&gt;')); assert.ok(!email.html.includes('<img src=x>'));
     assert.ok(email.text.includes('Vanilla × 2, Matcha × 1'));
     assert.ok(email.text.includes('Please use your order page to upload payment proof'));
+  });
+  await check('tracking follow-up retains branded order details and the new courier link', async () => {
+    setup.row = { event_key: 'delivery-tracking/order-id/version-2', subject: 'Your Elio delivery tracking has been updated', payload: {
+      ...row.payload, event_type: 'delivery_tracking_updated', tracking_change: 'replaced',
+      tracking_url: 'https://tracking.example.test/new', previous_tracking_url: 'https://tracking.example.test/old',
+      product_photos: { box: 'assets/trio-story-concept.webp' },
+      order: { ...row.payload.order, method: 'delivery', access_token: 'private-order-token', delivery_tracking_url: 'https://tracking.example.test/new', items: [{product_id:'box',name:'Signature trio',quantity:1,unit_price_cents:99000,line_total_cents:99000}] }
+    } };
+    assert.equal((await (await handle(request())).json()).accepted, 1);
+    const sent = providerBodies[0];
+    assert.equal(sent.key, 'elio/delivery-tracking/order-id/version-2');
+    assert.ok(sent.body.html.includes('Your delivery tracking has been updated'));
+    assert.ok(sent.body.html.includes('href="https://tracking.example.test/new"'));
+    assert.ok(sent.body.text.includes('https://tracking.example.test/new'));
+    assert.ok(!sent.body.html.includes('https://tracking.example.test/old'));
+    assert.ok(sent.body.html.includes('src="https://eliocheesecakes.com/assets/trio-story-concept.webp"'));
+    assert.ok(sent.body.html.includes('Signature trio'));
   });
   console.log(`Passed ${checks} mocked email-worker checks; no emails sent.`);
 } finally { globalThis.fetch = actualFetch; }

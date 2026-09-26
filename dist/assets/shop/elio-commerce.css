@@ -26,6 +26,16 @@
 .elio-commerce .cart-head{padding-bottom:18px}.elio-commerce .empty-state h3{font-family:Arial,sans-serif;font-weight:600;letter-spacing:0;line-height:1.4}
 .elio-commerce .fulfillment-bar{margin:0;background:#fbf7f0}.elio-commerce .date-field>span{font:25px var(--serif)}
 .elio-commerce .cart-line h3{font-family:var(--serif);font-size:21px;font-weight:400}
+.elio-commerce .order-product{grid-template-columns:88px minmax(0,1fr) auto;gap:16px;align-items:start}
+.order-product-thumbnail{position:relative;display:grid;place-items:center;width:88px;aspect-ratio:1;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#eee2d2}
+.order-product-thumbnail>span{font:18px/1 var(--serif);letter-spacing:2px;color:#926537}
+.order-product-thumbnail img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#eee2d2}
+.order-product-details{min-width:0;overflow-wrap:anywhere}
+.elio-commerce .order-product-details h3{font-size:22px;line-height:1.3;margin:0 0 7px}
+.elio-commerce .order-product .cart-options{font-size:12px;line-height:1.6;margin-bottom:6px}
+.order-product-total{font-size:13px;white-space:nowrap;padding-top:3px}
+.delivery-tracking>p{font-size:12px;line-height:1.7;margin:16px 0}.delivery-tracking>.button{margin:16px 0}.delivery-tracking>small{display:block;font-size:11px}
+@media(max-width:540px){.elio-commerce .order-product{grid-template-columns:64px minmax(0,1fr);column-gap:12px;row-gap:8px}.order-product-thumbnail{width:64px;grid-row:1/3}.elio-commerce .order-product-details h3{font-size:20px}.order-product-total{grid-column:2;padding:0}.order-product-thumbnail>span{font-size:14px}}
 .elio-commerce .cart-footnote{font-size:11px}.elio-commerce .help-card{font-size:12px}
 dialog.elio-commerce{margin:auto;width:min(1060px,calc(100vw - 32px));max-height:90svh;padding:0;border:1px solid #cfb99a;border-radius:18px;background:var(--paper);overflow:auto;box-shadow:0 20px 80px #291b1940}
 dialog.elio-commerce::backdrop{background:#291b1970;backdrop-filter:blur(3px)}

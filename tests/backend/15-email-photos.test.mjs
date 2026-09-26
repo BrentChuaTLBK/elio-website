@@ -13,7 +13,7 @@ export default async function({db,check,state}) {
   await db.query("update elio.outbox set status='sending',attempts=1,lease_token=$2,leased_until=now()+interval '3 minutes',first_attempt_at=now() where id=$1",[entry.id,lease]);
   const prepared=await h.service('prepare_email',{id:entry.id,lease_token:lease});
   assert.deepEqual(prepared.payload.product_photos,{[box.id]:'assets/original.webp'});
-  assert.deepEqual(prepared.payload.order.items,order.items);
+  assert.deepEqual(prepared.payload.order.items,order.items.map(({photo_url,...saved})=>saved));
   await db.query("update elio.products set data=jsonb_set(data,'{photos}','[\"assets/changed.webp\"]') where id=$1",[box.id]);
   const retry=await h.service('prepare_email',{id:entry.id,lease_token:lease});
   assert.deepEqual(retry.payload,prepared.payload);

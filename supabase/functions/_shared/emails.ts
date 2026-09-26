@@ -14,6 +14,16 @@ const selectionParts = (item: any): string[] => (Array.isArray(item.selection_la
 ;
 const selections = (item: any): string => selectionParts(item).join(", ");
 
+function deliveryTrackingUrl(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const raw = value.trim();
+  if (!raw || raw.length > 2048 || /[\s\\\u0000-\u001f\u007f]/.test(raw) || /%(?:0[0-9a-f]|1[0-9a-f]|7f)/i.test(raw) || !/^https?:\/\//i.test(raw)) return "";
+  try {
+    const url = new URL(raw);
+    return ["https:", "http:"].includes(url.protocol) && url.hostname && !url.username && !url.password ? raw : "";
+  } catch { return ""; }
+}
+
 function renderReviewEmail(order: any, settings: any, site: URL, photos: any): { html: string; text: string } {
   const link = new URL("manage.html", site).toString();
   const shop = settings.shop_name || "Elio Basque Cheesecake";
@@ -62,6 +72,8 @@ export function renderEmail(payload: any): { html: string; text: string } {
   const access = new URL("order.html", site);
   access.hash = new URLSearchParams({ order: order.id, token: order.access_token }).toString();
   const link = access.toString();
+  const trackingUpdate = payload.event_type === "delivery_tracking_updated";
+  const trackingUrl = order.method === "delivery" && !(trackingUpdate && payload.tracking_change === "removed") ? deliveryTrackingUrl(order.delivery_tracking_url) : "";
   const contact = [settings.contact_email, settings.contact_phone].filter(Boolean).join(" · ");
   const reason = [...(order.history || [])].reverse().find((event: any) => event.reason && !event.private)?.reason || payload.reason || "See your order page for details.";
   let heading: string;
@@ -108,6 +120,24 @@ export function renderEmail(payload: any): { html: string; text: string } {
       heading = "Your order is out for delivery";
       message = "Our team has marked your order out for delivery. An exact arrival time is not guaranteed. Contact us if you have questions.";
       break;
+    case "delivery_tracking_updated":
+      if (order.method !== "delivery") {
+        heading = "Your order has been updated";
+        message = "Open your secure order page for the latest pickup details.";
+      } else if (payload.tracking_change === "removed") {
+        heading = "Your delivery tracking link has been removed";
+        message = "The previous courier tracking link is no longer available. Open your order page for the latest delivery details, or contact our kitchen if you need a hand.";
+      } else if (trackingUrl) {
+        const replaced = payload.tracking_change === "replaced" || Boolean(deliveryTrackingUrl(payload.previous_tracking_url));
+        heading = replaced ? "Your delivery tracking has been updated" : "Your delivery tracking is ready";
+        message = replaced
+          ? "We’ve updated the courier tracking link for your Elio order. Use the new link below to follow your delivery."
+          : "You can now follow your Elio delivery using the courier tracking link below.";
+      } else {
+        heading = "Your delivery tracking has been updated";
+        message = "Open your secure order page for the latest delivery tracking details, or contact our kitchen if you need a hand.";
+      }
+      break;
     default:
       heading = "Your order has been updated";
       message = "Our team updated your order. Open the secure order page to review the current details and history. For an order already paid, payment remains recorded and our team handles any difference directly with you.";
@@ -123,13 +153,18 @@ export function renderEmail(payload: any): { html: string; text: string } {
   const items = Array.isArray(order.items) ? order.items : [];
   const itemText = items.map((item: any) => `${item.quantity} × ${item.name}${selections(item) ? ` (${selections(item)})` : ""} — ${money(item.line_total_cents)}`).join("\n");
   const totals = `Product subtotal: ${money(order.subtotal_cents)}\nDiscount: ${money(order.discount_cents)}\nDelivery fee: ${money(order.delivery_cents)}\nCurrent order total: ${money(order.total_cents)}`;
-  const text = `${settings.shop_name || "Elio Basque Cheesecake"}\n${heading}\nOrder reference: ${order.reference}\n\n${message}\n\n${instructions ? `${instructions}\n\n` : ""}Fulfillment: ${date(order.fulfillment_date)} · ${order.method}\n${fulfillment}\n\n${itemText}\n\n${totals}\n\nView your order securely:\n${link}\n\nKeep this link private; it grants access to this order.\nThis is an automated update. Please use your order page to upload payment proof and check your status.\nFor changes, cancellations, or payment concerns, contact us${contact ? `: ${contact}` : " using the details on your order page"}.`;
+  const trackingText = trackingUrl ? `Track your delivery:\n${trackingUrl}\n\n` : "";
+  const text = `${settings.shop_name || "Elio Basque Cheesecake"}\n${heading}\nOrder reference: ${order.reference}\n\n${message}\n\n${instructions ? `${instructions}\n\n` : ""}${trackingText}Fulfillment: ${date(order.fulfillment_date)} · ${order.method}\n${fulfillment}\n\n${itemText}\n\n${totals}\n\nView your order securely:\n${link}\n\nKeep this link private; it grants access to this order.\nThis is an automated update. Please use your order page to upload payment proof and check your status.\nFor changes, cancellations, or payment concerns, contact us${contact ? `: ${contact}` : " using the details on your order page"}.`;
   const detailTitle = order.method === "delivery" ? "Delivery details" : "Pickup details";
   const detailsHtml = emailPanel(detailTitle, `<p style="margin:0 0 14px;font-size:15px;font-weight:bold">${escape(date(order.fulfillment_date))}</p><p style="margin:0;font-size:14px;line-height:1.8">${lines(fulfillment || "See your order page for details.")}</p>`, "sand");
   const nextSteps = instructions ? emailPanel(payload.event_type === "order_submitted" ? "Payment instructions" : "What happens next", `<p style="margin:0;font-size:14px;line-height:1.8">${lines(instructions)}</p>`) : "";
+  const trackingPanel = trackingUrl && !trackingUpdate ? emailPanel("Delivery tracking", `<p style="margin:0;font-size:14px;line-height:1.8">Follow your delivery on the courier’s tracking page.</p>${emailButton("Track your delivery", trackingUrl)}`) : "";
+  const action = trackingUpdate && trackingUrl
+    ? emailButton("Track your delivery", trackingUrl) + `<p style="margin:0 0 20px;font-size:14px"><a href="${escape(link)}" style="color:#63412d;text-decoration:underline">View your order details</a></p>`
+    : emailButton(payload.event_type === "order_submitted" ? "View order & upload payment proof" : "View your order", link);
   const body = emailIntro("Your Elio order", heading, message, order.reference)
-    + emailButton(payload.event_type === "order_submitted" ? "View order & upload payment proof" : "View your order", link)
-    + emailColumns((items.length ? emailProducts(items, payload.product_photos, site, selectionParts, money) : "") + emailTotals(order, money), nextSteps + detailsHtml)
+    + action
+    + emailColumns((items.length ? emailProducts(items, payload.product_photos, site, selectionParts, money) : "") + emailTotals(order, money), nextSteps + trackingPanel + detailsHtml)
     + `<div style="margin-top:18px;padding-top:20px;border-top:1px solid #dfd1bd"><p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#786858">Keep this link private; it grants access to this order.</p><p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#786858">This is an automated update. Please use your order page to upload payment proof and check your status.</p><p style="margin:0;font-size:12px;line-height:1.7;color:#786858">For changes, cancellations, or payment concerns, contact us${contact ? `: ${escape(contact)}` : " using the details on your order page"}.</p></div>`;
 
   const html = emailFrame("Your Elio order", heading + " · " + order.reference, body);
