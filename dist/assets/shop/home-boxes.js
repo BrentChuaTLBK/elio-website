@@ -32,7 +32,6 @@ export function mountHomeBoxes(content) {
     const positions = visibleBoxes().map((_, offset) => wrap(first + offset) + 1);
     const range = positions.length === 1 ? positions[0] : first + positions.length > boxes.length ? positions.join(', ') : `${positions[0]}–${positions.at(-1)}`;
     const message = boxes.length ? `${range} of ${boxes.length} boxes` : '';
-    region.querySelector('[data-box-position]').textContent = message;
     if (announce) status.textContent = message + '. ' + visibleBoxes().map(box => box.name).join(', ') + '.';
   }
   function cancelTransition() {
