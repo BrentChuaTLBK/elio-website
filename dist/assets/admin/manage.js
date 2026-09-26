@@ -1,4 +1,5 @@
 import { PHOTO_ACCEPT, PHOTO_HELP, validatePhoto } from './photo-upload.js';
+import { createNewsletterAdmin } from './newsletter-admin.js';
 import { deliveryTrackingUrl } from '../delivery-tracking.js';
 import {faqView,bindFaqView} from './faqs.js';
 import { flavorDetailFields, readFlavorDetails } from './flavor-details.js';
@@ -133,10 +134,13 @@ function closeDialog() { if(catalogOrderController && !catalogOrderController.ca
 modal.addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 $('#dialog-close').addEventListener('click', closeDialog);
 
+const newsletterAdmin = createNewsletterAdmin({connected:()=>state.connected,owner:()=>state.role==='owner',showDialog,closeDialog});
+
 async function refresh() {
   if (!configured) return;
   const result = await api('admin_bootstrap');
   Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
+  state.promos = state.promos.filter(promo => !promo.newsletter_managed);
   state.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
   state.categories.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
   const reviews = state.orders.filter(needsPaymentReview).length;
@@ -146,10 +150,13 @@ async function refresh() {
   render();
 }
 function render() {
+  const newsletterNav = $('[data-view="newsletter"]');
+  if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
-  const views = { overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, faqs:()=>faqView(state), settings: settingsView, team: teamView };
+  const views = { overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
   if(state.view==='faqs')bindFaqView(state,$('#workspace'),render);
+  if(state.view==='newsletter')newsletterAdmin.mount($('#workspace'));
   syncVisitorPolling();
   syncPromoStatuses();
 }
@@ -318,7 +325,7 @@ function promoResults(now = Date.now()) {
   return `<p class="muted" role="status">Showing ${promos.length} of ${state.promos.length} promo codes</p><section class="panel">${promos.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Code</th><th>Discount</th><th>Minimum products</th><th>Uses / total limit</th><th>Per account</th><th>Expires · Manila</th><th>Status</th><th></th></tr></thead><tbody>${promos.map(promo => `<tr><td><strong>${esc(promo.code)}</strong></td><td>${promo.kind === 'percent' ? `${promo.value}%` : money(promo.value)}${promo.cap_cents && promo.kind === 'percent' ? `<small>Up to ${money(promo.cap_cents)}</small>` : ''}</td><td>${money(promo.min_subtotal_cents)}</td><td>${promoUsage(promo)}</td><td>${promo.per_account_limit} uses</td><td>${esc(dateTime(promo.expires_at))}</td><td>${badge(promoStatus(promo, now))}</td><td><div class="row-actions"><button class="table-link" data-action="edit-promo" data-id="${esc(promo.id)}">Edit</button><button type="button" class="table-link" data-action="delete-promo" data-id="${esc(promo.id)}" aria-label="Delete promo ${esc(promo.code)}" ${ownerLocked()}>Delete</button></div></td></tr>`).join('')}</tbody></table></div>` : empty(state.promos.length ? 'No matching promo codes' : 'A thoughtful extra, when you’re ready', state.promos.length ? 'Choose another status to see your other promo codes.' : 'Create percentage or fixed-amount discounts with minimum spend and usage limits.')}</section>`;
 }
 function promosView() {
-  return heading('A little treat', 'Promo codes for customers with verified email accounts.', `<button class="button" data-action="new-promo" ${owner() ? '' : 'disabled'}>+ Create promo code</button>`) + readonly() +
+  return heading('A little treat', 'Promo codes for customers with verified email accounts.', `${owner()?'<button class="button button-secondary" data-view="newsletter" data-newsletter-tab="offers">Newsletter welcome offers</button>':''}<button class="button" data-action="new-promo" ${owner() ? '' : 'disabled'}>+ Create promo code</button>`) + readonly() +
     `<div class="filter-secondary">${select('promo-status-filter', 'Status', option('', 'All promo codes', state.promoFilter) + option('active', 'Active', state.promoFilter) + option('expired', 'Expired', state.promoFilter) + option('inactive', 'Inactive', state.promoFilter), 'id="promo-status-filter" aria-controls="promo-results" aria-describedby="promo-filter-help"')}<p id="promo-filter-help" class="muted">Inactive codes have not expired, but are disabled or not yet activated.</p></div><div id="promo-results">${promoResults()}</div><p class="muted">Discounts apply to products and option surcharges. Delivery fees are excluded. Paid and reserved uses both count toward the total limit. Reservations include orders awaiting payment or payment review; expired, rejected or cancelled unpaid orders release them. Paid cancellations and refunds remain counted.</p>`;
 }
 function deletePromoDialog(id) {
@@ -709,6 +716,7 @@ function exportOrders() {
 
 document.addEventListener('click', async event => {
   const view = event.target.closest('[data-view]');
+  if(view?.dataset.newsletterTab)newsletterAdmin.selectTab(view.dataset.newsletterTab);
   if (view) { state.view = view.dataset.view; state.productFilters = { search: '', status: '', category: '' }; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
   const button = event.target.closest('[data-action]');
   if (!button) return;

@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="assets/admin/ordering.css">
   <link rel="stylesheet" href="assets/admin/elio.css">
   <link rel="stylesheet" href="assets/admin/account.css">
+  <link rel="stylesheet" href="assets/shop/newsletter.css">
 </head>
 <body data-account-context="customer" class="customer-account-page">
   <a class="skip-link" href="#main">Skip to account</a>
@@ -36,11 +37,13 @@
       <p class="account-help" id="password-help" hidden>Use at least 12 characters. A memorable phrase works well.</p>
       <label class="field" id="confirm-password-field" hidden>Confirm your password<input type="password" name="confirm_password" autocomplete="new-password" disabled></label>
       <div class="account-newsletter" id="account-newsletter" hidden>
-        <label><input type="checkbox" disabled aria-describedby="newsletter-note">Subscribe to Elio’s newsletter <span class="coming-soon">Coming soon</span></label>
-        <p id="newsletter-note">An optional way to hear about new flavors and little moments to savor. Sign-up isn’t available yet.</p>
+        <label class="elio-newsletter-consent"><input name="newsletter_opt_in" type="checkbox" disabled aria-describedby="newsletter-note"><span>Join the Elio Newsletter. Unsubscribe anytime. <strong>Optional.</strong></span></label>
+        <p id="newsletter-note">New newsletter subscribers receive 5% off after account email confirmation. Minimum product subtotal ₱500; maximum discount ₱100. One use within 14 days after confirmation, with this email-verified account. Unsubscribe anytime.</p>
+        <p class="elio-newsletter-links"><a href="newsletter.html#terms" target="_blank" rel="noopener">Offer terms</a> · <a href="newsletter.html#privacy" target="_blank" rel="noopener">Email privacy</a></p>
       </div>
       <div class="account-actions"><button class="button" type="submit" id="account-submit">Sign in</button></div>
     </form>
+    <div id="account-newsletter-result" hidden><p class="elio-newsletter-status" id="account-newsletter-status" role="status" aria-live="polite"></p><button class="button button-secondary" id="account-newsletter-retry" type="button" hidden>Retry newsletter signup</button></div>
     <div class="account-recovery" id="account-recovery">
       <button class="button button-quiet" type="button" id="account-reset">Forgot password?</button>
       <button class="button button-quiet" type="button" id="account-resend">Resend verification</button>

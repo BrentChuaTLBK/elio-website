@@ -8,6 +8,11 @@ const submit = document.querySelector('#account-submit');
 const intro = document.querySelector('#account-intro');
 const confirmPassword = form.elements.confirm_password;
 const customer = document.body.dataset.accountContext === 'customer';
+const newsletterModule = customer ? import('../shop/newsletter.js') : Promise.resolve(null);
+const newsletterChoice = form.elements.newsletter_opt_in;
+const newsletterResult = document.querySelector('#account-newsletter-result');
+const newsletterStatus = document.querySelector('#account-newsletter-status');
+const newsletterRetry = document.querySelector('#account-newsletter-retry');
 const googleButton = document.querySelector('#google-signin');
 const googleLabel = googleButton.innerHTML;
 const destination = document.body.dataset.accountContext === 'customer' ? 'account.html' : 'manage.html';
@@ -16,6 +21,85 @@ let mode = 'signin';
 let busy = false;
 let googleAvailable = false;
 let resendAfter = 0;
+let retryNewsletter;
+const oauthNewsletterKey = 'elio-newsletter-oauth-consent-v1';
+
+function newsletterMessage(text, error = false) {
+  if (!newsletterResult) return;
+  newsletterResult.hidden = !text;
+  newsletterStatus.textContent = text;
+  newsletterStatus.classList.toggle('is-error', error);
+  newsletterRetry.hidden = !error;
+}
+
+async function activateNewsletter(session) {
+  if (!customer || !session) return;
+  try {
+    const result = await (await newsletterModule).activateAccountNewsletter();
+    if (result?.status === 'subscribed') newsletterMessage('Your newsletter subscription is confirmed. If eligible, your personal welcome code will arrive by email.');
+  } catch {
+    if (session.user?.user_metadata?.newsletter_opt_in === true) {
+      retryNewsletter = () => activateNewsletter(session);
+      newsletterMessage('Your account is ready, but we couldn’t finish your newsletter signup. You can retry here.', true);
+    }
+  }
+}
+
+async function saveAccountNewsletter(email, session) {
+  const newsletter = await newsletterModule;
+  // The successful Auth signup stored this explicit consent. Keep its popup dismissed
+  // even if the optional pending-record request needs to be retried.
+  newsletter.rememberNewsletterOptIn();
+  try {
+    await newsletter.subscribeNewsletter(email, 'account');
+    newsletterMessage('Your newsletter choice is saved. Confirm your account email to finish joining; there’s no separate newsletter confirmation. If eligible, your welcome code will follow by email.');
+    if (session) await activateNewsletter(session);
+  } catch {
+    retryNewsletter = () => saveAccountNewsletter(email, session);
+    newsletterMessage('Your account signup succeeded, but we couldn’t save the newsletter request yet. You can retry here while your account verification continues.', true);
+  }
+}
+
+async function saveOAuthNewsletterConsent(session) {
+  try {
+    const current = await auth.getSession();
+    if (current.error || current.data?.session?.user?.id !== session.user.id) throw new Error('Sign in again to save your newsletter choice.');
+    const result = await auth.updateUser({ data: { newsletter_opt_in: true, newsletter_consent_version: 'elio-newsletter-v1' } });
+    if (result.error) throw result.error;
+    (await newsletterModule).rememberNewsletterOptIn();
+    await activateNewsletter({ ...session, user: { ...session.user, user_metadata: { ...session.user.user_metadata, newsletter_opt_in: true } } });
+  } catch {
+    retryNewsletter = () => saveOAuthNewsletterConsent(session);
+    newsletterMessage('Your Google sign-in succeeded, but we couldn’t save your newsletter choice. You can retry here.', true);
+  }
+}
+
+async function finishOAuthNewsletterConsent(session) {
+  if (!customer || !authLink.received || authLink.failed) return false;
+  let intent;
+  try { intent = JSON.parse(sessionStorage.getItem(oauthNewsletterKey) || 'null');sessionStorage.removeItem(oauthNewsletterKey); } catch { /* No stored intent means no consent. */ }
+  if (intent?.provider !== 'google' || intent.callback !== callback || !Number.isFinite(intent.createdAt) || Date.now() - intent.createdAt < 0 || Date.now() - intent.createdAt > 15 * 60 * 1000) return false;
+  // AMR only matches the local consent intent to this callback. The endpoint
+  // independently verifies the session identity before activating anything.
+  let methods;
+  try { methods = JSON.parse(atob(session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).amr; } catch { return false; }
+  if (!Array.isArray(methods) || !methods.some(item => item.method === 'oauth' && item.timestamp * 1000 >= intent.createdAt - 60000 && item.timestamp * 1000 <= Date.now() + 60000)) return false;
+  await saveOAuthNewsletterConsent(session);
+  return true;
+}
+
+newsletterRetry?.addEventListener('click', async () => {
+  if (!retryNewsletter || newsletterRetry.disabled) return;
+  newsletterRetry.disabled = true;
+  try { await retryNewsletter(); } finally { newsletterRetry.disabled = false; }
+});
+
+if (newsletterChoice) newsletterModule.then(module => module.getNewsletterSettings()).then(settings => {
+  newsletterChoice.disabled = !settings;
+  const field = document.querySelector('#account-newsletter');
+  field.dataset.available = settings ? 'true' : 'false';
+  field.hidden = mode !== 'signup' || !settings;
+});
 
 async function loadOrders() {
   const section = document.querySelector('#account-orders');
@@ -105,7 +189,7 @@ function setMode(value) {
   if (newPassword) form.password.setAttribute('aria-describedby', 'password-help');
   else form.password.removeAttribute('aria-describedby');
   const newsletter = document.querySelector('#account-newsletter');
-  if (newsletter) newsletter.hidden = value !== 'signup';
+  if (newsletter) newsletter.hidden = value !== 'signup' || newsletter.dataset.available !== 'true';
   document.querySelector('#account-provider').hidden = emailOnly || value === 'recovery';
   document.querySelector('#account-recovery').hidden = emailOnly || value === 'recovery';
   document.querySelector('#account-tabs').hidden = value === 'recovery';
@@ -146,6 +230,12 @@ googleButton.addEventListener('click', async () => {
     await ready;
     if (initializationError) throw initializationError;
     if (!auth) throw new Error('Elio account service is unavailable.');
+    if (customer) {
+      try {
+        sessionStorage.removeItem(oauthNewsletterKey);
+        if (mode === 'signup' && newsletterChoice?.checked && !newsletterChoice.disabled) sessionStorage.setItem(oauthNewsletterKey, JSON.stringify({ provider: 'google', callback, createdAt: Date.now() }));
+      } catch { newsletterMessage('Your browser couldn’t save the optional newsletter choice. You can join through the newsletter form after signing in.'); }
+    }
     const { error } = await auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callback } });
     if (error) throw error;
   } catch (error) {
@@ -173,8 +263,12 @@ form.addEventListener('submit', async event => {
     const password = form.password.value;
     let result;
     if (mode === 'signup') {
-      result = await auth.signUp({ email, password, options: { emailRedirectTo: callback } });
+      const wantsNewsletter = customer && newsletterChoice?.checked && !newsletterChoice.disabled;
+      const options = { emailRedirectTo: callback };
+      if (wantsNewsletter) options.data = { newsletter_opt_in: true, newsletter_consent_version: 'elio-newsletter-v1' };
+      result = await auth.signUp({ email, password, options });
       if (result.error) throw result.error;
+      if (wantsNewsletter) await saveAccountNewsletter(email, result.data?.session);
       if (result.data?.session) { location.assign(destination); return; }
       form.password.value = '';
       confirmPassword.value = '';
@@ -196,6 +290,7 @@ form.addEventListener('submit', async event => {
     } else {
       result = await auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
+      if (customer) await activateNewsletter(result.data?.session);
       location.assign(destination);
     }
   } catch (error) {
@@ -222,7 +317,7 @@ else if (auth) {
     document.querySelector('#account-provider').hidden = true;
     document.querySelector('#signed-in').hidden = false;
     message(`Signed in as ${data.session.user.email}.`);
-    if (customer) loadOrders();
+    if (customer) { loadOrders();finishOAuthNewsletterConsent(data.session).then(handled => { if (!handled) activateNewsletter(data.session); }); }
     const dashboardLink = document.querySelector('#staff-dashboard');
     if (dashboardLink) {
       try {

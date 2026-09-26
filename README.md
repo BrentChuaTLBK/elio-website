@@ -147,7 +147,7 @@ The heading font is **Libre Caslon Display**, chosen to approximate the referenc
 
 Still awaiting launch configuration: actual prices, active products, flavor quantities, final photography, and opening date. Pickup, delivery, and manual-payment defaults were copied from TLB at the owner’s request and are editable in Elio’s dashboard.
 
-The newsletter section is visual only. It has no submitting form, email capture, storage, or email-provider integration. Final signup copy and privacy/consent details need to be supplied before enabling it.
+The newsletter supports optional account signup consent, a public signup form, and a welcome popup. Confirmed subscribers receive a personal 5% code with a ₱500 minimum, ₱100 cap, and 14-day validity. Owners manage subscribers, compose and send branded newsletters, and review welcome-code analytics in the dashboard. See [Newsletter behavior and verification](docs/NEWSLETTER.md).
 
 Account and My orders links open `account.html`; bag links open `order.html#your-bag`. The basket and checkout draft are retained in sessionStorage for up to 24 hours in the same tab. Final orders are stored only in Elio. TLB customer data, accounts, and credentials are never copied.
 
@@ -204,7 +204,7 @@ Monthly lineup panels let owners select flavor chips directly, then save members
 
 The soft launch uses ₱100 placeholder prices for each of the four boxes, including the custom box base price. Flavor surcharges remain editable and apply as saved. The owner will enter daily quantities; no launch stock is assumed. Hidden products never reappear as concept cards, even when all boxes are hidden.
 
-Uploaded flavor cover photos are shared by the shop, public collection, and admin lineup choices. The public full collection contains only flavors outside both monthly lineups. Flavors assigned exclusively to unpublished lineups remain private until publication; the admin Flavor library keeps every record available for editing.
+Uploaded flavor cover photos are shared by the shop, public collection, and admin lineup choices. The flavors page has two tabs: **This Month** shows the current and next published lineups, and **Full Collection** shows every flavor that is not individually Hidden, including flavors in either lineup. Unpublished lineup assignments stay private; they do not hide a visible flavor from the full collection. Both tabs retain saved category filters and ordering.
 
 Daily quantities supports bulk editing every flavor in the selected lineup, with either replacement or filling only unconfigured dates. Bulk input is a draft until Save quantities is clicked; reservation conflicts prevent the entire save. Owners can configure one automatic daily total for all lineup flavors. It applies to unconfigured dates in the current and next month, including re-added flavors, and preserves manually saved zero, finite, unlimited, and disabled quantities. Existing ordered pieces count toward the total and are never removed. Hidden lineups and shop closures still block new orders. The default begins at 0 until the owner changes it.
 

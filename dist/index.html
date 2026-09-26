@@ -12,10 +12,12 @@
   <link rel="preload" href="assets/home-editorial-hero.webp" as="image" fetchpriority="high">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="home.css">
+  <link rel="stylesheet" href="assets/shop/newsletter.css">
+  <script type="module" src="assets/shop/newsletter.js"></script>
   <script src="content.js" defer></script>
   <script src="app.js" defer></script>
 </head>
-<body class="home-page">
+<body class="home-page" data-newsletter-popup>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="header-inner">
@@ -98,17 +100,21 @@
     <section class="newsletter" id="newsletter" aria-labelledby="newsletter-title">
       <div class="newsletter-inner">
         <div class="newsletter-copy">
-          <p class="eyebrow">The Elio letter</p>
-          <h2 id="newsletter-title">A little Elio in your inbox.</h2>
-          <p class="newsletter-intro">New flavors and little moments to savor.</p>
+          <p class="eyebrow">Elio Newsletter</p>
+          <h2 id="newsletter-title">Get <strong>5% OFF</strong><br> your next order.</h2>
+          <p class="newsletter-intro">Join the Elio Newsletter for news, special offers, and exclusive promo codes.</p>
         </div>
         <div class="newsletter-signup">
-          <div class="newsletter-field">
-            <label class="sr-only" for="newsletter-email">Your email address</label>
-            <input id="newsletter-email" type="email" placeholder="Your email address" aria-describedby="newsletter-status" disabled>
-            <button type="button" aria-label="Newsletter sign-up unavailable" disabled><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 4 8 8-8 8"/></svg></button>
-          </div>
-          <p class="newsletter-status" id="newsletter-status">Newsletter sign-up isn’t available yet.</p>
+          <form class="elio-newsletter-form" data-newsletter-form data-newsletter-source="home_footer">
+            <label class="elio-newsletter-label" for="newsletter-email">Email address</label>
+            <input class="elio-newsletter-email" id="newsletter-email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com" required disabled>
+            <div class="newsletter-trap" aria-hidden="true"><label>Website<input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+            <label class="elio-newsletter-consent"><input name="consent" type="checkbox" required disabled><span>Join the Elio Newsletter. Unsubscribe anytime.</span></label>
+            <button class="elio-newsletter-submit" type="submit" disabled>Join</button>
+            <p class="elio-newsletter-status" data-newsletter-status role="status" aria-live="polite"></p>
+            <p class="elio-newsletter-links"><a href="newsletter.html#terms">Offer terms</a> · <a href="newsletter.html#privacy">Email privacy</a></p>
+          </form>
+          <p class="elio-newsletter-terms">New newsletter subscribers, including existing customers. Minimum product subtotal ₱500; maximum discount ₱100. One use within 14 days after confirmation. Sign in to an email-verified Elio account with your subscribed email to use your code.</p>
         </div>
       </div>
     </section>

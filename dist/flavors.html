@@ -12,10 +12,12 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="order.css">
   <link rel="stylesheet" href="flavors.css">
+  <link rel="stylesheet" href="assets/shop/newsletter.css">
+  <script type="module" src="assets/shop/newsletter.js"></script>
   <script src="content.js" defer></script>
   <script src="flavors.js" defer></script>
 </head>
-<body class="flavors-page">
+<body class="flavors-page" data-newsletter-popup>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="order-header">
     <a class="order-back" href="index.html"><span aria-hidden="true">←</span> <span>Back to Elio</span></a>
@@ -24,18 +26,22 @@
   </header>
   <main id="main">
     <section class="flavors-hero" aria-labelledby="flavors-title">
-      <img src="assets/gifting-concept.webp" width="1400" height="1000" alt="Elio's brown and bronze packaging with three square cheesecakes — concept photograph" fetchpriority="high">
-      <div class="flavors-hero-copy"><p class="eyebrow">The Elio collection</p><h1 id="flavors-title">Find your favorite.</h1><p>A rotating menu.<br> An ever-growing collection.</p><a class="text-link" href="order.html">Explore the Elio box <span aria-hidden="true">→</span></a></div>
+      <img src="assets/home-editorial-hero.webp" width="1916" height="821" alt="A golden square Basque cheesecake with a beautifully burnt top" fetchpriority="high">
+      <div class="flavors-hero-copy"><p class="eyebrow">The Elio collection</p><h1 id="flavors-title">Find your favorite.</h1><p>Burnt beautifully. Soft within.</p><p class="flavors-hero-note">A little discovery in every square.</p></div>
     </section>
     <div class="flavors-shell">
+      <div class="flavors-toolbar">
+      <div class="flavor-tabs" role="tablist" aria-label="Explore our flavors">
+        <button type="button" id="monthly-tab" role="tab" data-view="monthly" aria-controls="monthly-panel" aria-selected="true">This month</button>
+        <button type="button" id="collection-tab" role="tab" data-view="collection" aria-controls="collection-panel" aria-selected="false" tabindex="-1">Full collection</button>
+      </div>
       <div class="flavor-filters" role="group" aria-label="Filter flavors by taste">
         <button type="button" data-category="all" aria-pressed="true">All flavors</button>
-        <button type="button" data-category="classic" aria-pressed="false">Classic</button>
-        <button type="button" data-category="tea" aria-pressed="false">Tea</button>
-        <button type="button" data-category="rich" aria-pressed="false">Rich &amp; bold</button>
-        <button type="button" data-category="other" aria-pressed="false">Other</button>
+      </div>
       </div>
       <p class="sr-only" id="filter-status" role="status" aria-atomic="true"></p>
+      <div id="monthly-panel" role="tabpanel" aria-labelledby="monthly-tab" tabindex="0">
+      <p class="flavors-empty" id="monthly-unavailable" hidden>This month’s selection is coming soon. Explore the full collection to find your favorite.</p>
       <section class="flavor-section" id="monthly-menu" aria-labelledby="monthly-title">
         <div class="flavor-section-heading"><h2 id="monthly-title">Flavors of the Month</h2></div>
         <div class="flavors-grid" id="monthly-flavors"></div>
@@ -45,10 +51,17 @@
         <div class="flavor-section-heading"><h2 id="next-month-title">Coming Next Month</h2></div>
         <div class="flavors-grid" id="next-month-flavors"></div><p class="flavors-empty" id="next-month-empty" hidden></p>
       </section>
+      </div>
+      <div id="collection-panel" role="tabpanel" aria-labelledby="collection-tab" tabindex="0" hidden>
       <section class="flavor-section flavor-archive" id="other-flavors" aria-labelledby="other-title">
-        <div class="flavor-section-heading"><div><p class="eyebrow">More to discover</p><h2 id="other-title">The full collection.</h2></div><p>Familiar favorites and new discoveries.<br> Find the flavor that speaks to you.</p></div>
+        <div class="flavor-section-heading"><h2 id="other-title">The full collection.</h2><p>Familiar favorites. New discoveries.</p></div>
         <div class="flavors-grid" id="other-flavors-grid"></div>
         <p class="flavors-empty" id="other-empty" hidden></p>
+      </section>
+      </div>
+      <section class="flavors-box" aria-labelledby="flavors-box-title">
+        <div class="flavors-box-copy"><p class="eyebrow">A little box. A lovely moment.</p><h2 id="flavors-box-title">Find your perfect box.</h2><p>Your favorite flavors, beautifully boxed.<br>Choose a signature set or make it your own.</p><div class="flavors-box-actions"><a class="button" href="order.html#cheesecake-boxes">Shop our boxes <span aria-hidden="true">→</span></a><a class="button button-outline" href="order.html#cheesecake-boxes">Build your own <span aria-hidden="true">→</span></a></div></div>
+        <img src="assets/home-editorial-gift.webp" width="1860" height="846" loading="lazy" alt="An Elio cheesecake gift box in warm brown with gold lettering">
       </section>
       <p class="flavors-footnote">Our selections change throughout the year. Visit the shop for ordering availability on your chosen date.</p>
       <noscript><p>Enable JavaScript to explore the flavor collection and descriptions.</p></noscript>

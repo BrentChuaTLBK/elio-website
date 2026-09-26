@@ -111,6 +111,10 @@ export async function signedProofUrl(orderId) {
   return edge('proof-url', { order_id: orderId });
 }
 
+export async function newsletterRequest(payload) {
+  return edge('newsletter', payload);
+}
+
 export async function websiteVisitorStats({ signal } = {}) {
   return { status: 'not_configured' };
 }

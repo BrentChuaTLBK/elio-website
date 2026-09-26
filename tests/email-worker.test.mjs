@@ -19,6 +19,7 @@ globalThis.fetch = async (url, options) => {
   }
   if (String(url).endsWith('/elio_email_worker_authorized')) { calls.push('authorize'); return Response.json(setup.authorized !== false); }
   calls.push(body.p_action);
+  if (body.p_action === 'newsletter_claim_emails') return Response.json([]);
   const preparedRow = { ...row, ...setup.row };
   if (body.p_action === 'claim_emails') return Response.json(setup.empty ? [] : [{ ...preparedRow, ...(setup.old ? { first_attempt_at: '2020-01-01' } : {}) }]);
   if (body.p_action === 'prepare_email') return Response.json(setup.skip ? { skip: true } : preparedRow);
@@ -42,11 +43,11 @@ try {
     assert.equal((await handle(request())).status, 503); assert.deepEqual(calls, ['authorize']); values.RESEND_API_KEY = key;
   });
   await check('empty queue still performs maintenance', async () => {
-    setup.empty = true; assert.equal((await handle(request())).status, 200); assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails']);
+    setup.empty = true; assert.equal((await handle(request())).status, 200); assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'newsletter_claim_emails']);
   });
   await check('delivery prepares the claim and acknowledges provider acceptance', async () => {
     const response = await (await handle(request())).json(); assert.equal(response.accepted, 1);
-    assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'prepare_email', 'send', 'email_sent']);
+    assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'prepare_email', 'send', 'email_sent', 'newsletter_claim_emails']);
     assert.equal(providerBodies[0].key, 'elio/review/order-id');
     assert.equal(providerBodies[0].body.reply_to, 'elio.cheesecakes@gmail.com');
     assert.ok(providerBodies[0].body.html.includes('&lt;script&gt;'));

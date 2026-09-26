@@ -19,21 +19,21 @@ export default async function({db,check,state}) {
   assert.equal((await api('admin_bootstrap',{},ids.owner)).products.find(p=>p.id===box.id).active,false);
   await save(changed);assert((await api('catalog')).products.some(p=>p.id===box.id));
  })();
- await check('Collection-only flavors exclude both monthly lineups and use the latest uploaded photo',async()=>{
+ await check('The full collection retains monthly flavors and uses the latest uploaded photo',async()=>{
   const months=(await api('admin_bootstrap',{},ids.owner)).flavor_menus;
   const editor={name:'QA collection-only',description:'Uploaded flavor description',current_month:false,next_month:false,hidden:false,expected_month:months.current_month,photos:['https://example.test/new-flavor.webp']};
   await api('save_flavor_editor',editor,ids.owner);
   const f=(await api('admin_bootstrap',{},ids.owner)).products.find(p=>p.name===editor.name);
   const read=async()=> (await api('flavor_collection')).flavors.find(p=>p.id===f.id);
-  assert.equal((await read()).collection_only,true);assert.deepEqual((await read()).photos,editor.photos);
+  assert(!('collection_only' in await read()));assert.deepEqual((await read()).photos,editor.photos);
   await api('save_flavor_editor',{...editor,id:f.id,next_month:true},ids.owner);
-  assert.equal((await read()).collection_only,false);
+  assert(!('collection_only' in await read()));
   await api('save_flavor_menu_visibility',{month:months.next_month,expected_month:months.current_month,published:false},ids.owner);
-  assert.equal(await read(),undefined);
+  assert.deepEqual((await read()).photos,editor.photos);
   await api('save_flavor_editor',{...editor,id:f.id,current_month:true,next_month:true,photos:['https://example.test/replaced.webp']},ids.owner);
-  assert.equal((await read()).collection_only,false);assert.deepEqual((await read()).photos,['https://example.test/replaced.webp']);
+  assert(!('collection_only' in await read()));assert.deepEqual((await read()).photos,['https://example.test/replaced.webp']);
   await api('save_flavor_editor',{...editor,id:f.id},ids.owner);
-  assert.equal((await read()).collection_only,true);
+  assert(!('collection_only' in await read()));
   await api('save_flavor_editor',{...editor,id:f.id,hidden:true},ids.owner);
   assert.equal(await read(),undefined);
  })();

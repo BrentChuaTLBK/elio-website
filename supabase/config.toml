@@ -44,3 +44,8 @@ verify_jwt = false
 
 [functions.proof-url]
 verify_jwt = false
+
+# Public enrollment is consent checked and rate limited; confirmations and
+# unsubscribe require private tokens. Dashboard actions verify owner Auth.
+[functions.newsletter]
+verify_jwt = false

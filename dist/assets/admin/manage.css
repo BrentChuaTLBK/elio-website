@@ -180,3 +180,47 @@
 .calendar-open-key,.calendar-closed-key{position:relative;display:inline-block;width:14px;height:14px;border:1px solid #e1d2bf;border-radius:3px;background:#fffaf3}
 .calendar-closed-key{background:#eee5d9}.calendar-closed-key:after{content:'';position:absolute;width:12px;height:1px;top:50%;left:50%;background:#8b7159;transform:translate(-50%,-50%) rotate(45deg)}
 .calendar-closure-summary{border-top:1px solid var(--line);margin:0;padding-top:10px;color:var(--muted);font-size:11px;line-height:1.5}
+
+/* Newsletter subscriber management and campaign review. */
+.manage-page .sidebar-link[hidden]{display:none}
+.newsletter-admin{min-width:0}
+.newsletter-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.newsletter-metrics .panel{margin:0;min-width:0}
+.newsletter-metrics span{display:block;color:var(--muted);font-size:11px;line-height:1.5}
+.newsletter-metrics strong{display:block;font-size:30px;line-height:1.3;margin-top:8px;font-variant-numeric:tabular-nums}
+.newsletter-tabs{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 20px}
+.newsletter-filters{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:14px}
+.newsletter-filters .field{margin:0;flex:1;min-width:180px}
+.newsletter-filters .field:first-child{flex:2}
+.newsletter-admin .panel{min-width:0}
+.newsletter-subscribers{min-width:790px}
+.newsletter-subscribers td:first-child{max-width:280px;white-space:normal;overflow-wrap:anywhere}
+.newsletter-code{font-family:monospace;letter-spacing:.12em}
+.newsletter-pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-top:18px;font-size:11px;color:var(--muted)}
+.newsletter-empty{font-size:13px;line-height:1.6;color:var(--muted);padding:26px 0}
+.newsletter-error{display:block;margin:0 0 18px;white-space:normal}
+.newsletter-compose-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(270px,1fr);gap:20px;align-items:start}
+.newsletter-editor .section-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px}
+.newsletter-editor h2,.newsletter-campaign-list h2{margin:0 0 8px;font-size:22px}
+.newsletter-editor .section-heading h2{margin:0}
+.newsletter-editor fieldset{border:0;padding:0;margin:0;min-width:0}
+.newsletter-editor textarea{min-height:190px;resize:vertical}
+.newsletter-editor-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.newsletter-save-state{min-height:1.6em;margin:2px 0 16px}
+.newsletter-campaign-list ul{list-style:none;padding:0;margin:18px 0 0}
+.newsletter-campaign-list li{border-top:1px solid var(--line)}
+.newsletter-campaign-list li>button{display:block;width:100%;background:transparent;border:0;padding:17px 0;text-align:left;color:inherit;cursor:pointer;overflow-wrap:anywhere}
+.newsletter-campaign-list li>button:hover strong{text-decoration:underline;text-underline-offset:3px}
+.newsletter-campaign-list li>button:focus-visible{outline:2px solid var(--caramel);outline-offset:4px}
+.newsletter-campaign-list strong{display:block;font-size:13px;line-height:1.5;margin-bottom:9px}
+.newsletter-campaign-list span,.newsletter-campaign-list small{font-size:10px;line-height:1.8}
+.newsletter-campaign-list small{display:block;color:var(--muted);margin-top:6px}
+.newsletter-preview-dialog{min-width:0}
+.newsletter-email-preview{display:block;width:100%;height:590px;max-height:65vh;border:1px solid var(--line);border-radius:8px;background:#fefaef;margin:18px 0}
+.newsletter-send-summary{line-height:1.7;overflow-wrap:anywhere}
+.newsletter-preview-dialog .check-field{margin:18px 0}
+@media(max-width:1100px){.newsletter-compose-layout{grid-template-columns:minmax(0,1fr)}.newsletter-campaign-list ul{max-height:420px;overflow-y:auto}}
+@media(max-width:560px){.newsletter-metrics{grid-template-columns:minmax(0,1fr);gap:10px}.newsletter-metrics .panel{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px}.newsletter-metrics strong{margin:0;font-size:27px}.newsletter-filters{display:grid;grid-template-columns:minmax(0,1fr)}.newsletter-filters .field{min-width:0}.newsletter-editor .section-heading{align-items:start;flex-direction:column}.newsletter-pagination{align-items:start;flex-direction:column}.newsletter-editor-actions>.button{flex:1 1 calc(50% - 10px)}.newsletter-email-preview{height:490px}}
+.newsletter-offer-metrics strong{font-size:clamp(21px,2.4vw,30px);overflow-wrap:anywhere}
+.newsletter-offers{min-width:850px}
+.newsletter-offers td:first-child{max-width:250px;white-space:normal;overflow-wrap:anywhere}

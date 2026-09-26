@@ -19,7 +19,7 @@ export default async function({db,check,state}) {
     assert.equal(result.tagline,edit.tagline);assert.deepEqual(result.photos,edit.photos);
     assert(!('menus' in home));assert(!('current_month' in home));assert(!('available_months' in result));
     assert(!('price_cents' in result));assert(!('inventory' in home));assert(!('settings' in home));
-    assert(!(await api('flavor_collection')).flavors.some(f=>f.id===flavor.id));
+    assert((await api('flavor_collection')).flavors.some(f=>f.id===flavor.id));
     assert(!(await api('catalog')).flavors.find(f=>f.id===flavor.id).available_months.includes(months.next_month));
     const after=await api('admin_bootstrap',{},ids.owner);
     assert.deepEqual(after.inventory,before.inventory);assert.deepEqual(after.flavor_menus,before.flavor_menus);

@@ -1,0 +1,14 @@
+import {mkdir,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {renderNewsletterEmail} from '../supabase/functions/_shared/newsletter-emails.ts';
+const output=resolve(process.argv[2]||'test-results/newsletter-emails');await mkdir(output,{recursive:true});
+const settings={site_url:'https://eliocheesecakes.com',shop_name:'Elio Basque Cheesecake',newsletter_mailing_address:'39 Acacia Drive, Bellevue Subdivision, Quezon City',contact_email:'elio.cheesecakes@gmail.com'};
+const common={settings,subscriber:{email:'preview@example.test'},confirmation_token:'a'.repeat(64),unsubscribe_token:'b'.repeat(64)};
+const examples=[
+ {key:'confirmation',label:'Confirm subscription',event_type:'newsletter_confirmation'},
+ {key:'welcome',label:'Personal 5% code',event_type:'newsletter_welcome',offer:{code:'EL5ABC',value:5,min_subtotal_cents:50000,cap_cents:10000,expires_at:'2026-10-10T08:00:00Z'}},
+ {key:'campaign',label:'Newsletter campaign',event_type:'newsletter_campaign',campaign:{subject:'A new month, a new favorite.',title:'A little something to look forward to.',body:'Familiar favorites and new discoveries, baked with care.\n\nExplore the Elio collection and find your next favorite box to share.',image_url:'https://eliocheesecakes.com/assets/trio-story-concept.webp',cta_label:'Discover the flavors',cta_url:'https://eliocheesecakes.com/flavors.html'}}
+];
+for(const example of examples){const rendered=renderNewsletterEmail({...common,...example});const html=rendered.html.replace(/href="[^"]*"/g,'href="#"');await writeFile(resolve(output,example.key+'.html'),html);await writeFile(resolve(output,example.key+'.txt'),rendered.text);}
+await writeFile(resolve(output,'index.html'),`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Elio newsletter previews</title><style>body{margin:0;background:#f5efe5;color:#39251c;font:15px/1.6 Arial}header{padding:20px 28px;background:#3d251c;color:#ddb57d}h1{font:30px Georgia;margin:0}header p{margin:8px 0;font-size:13px}main{display:grid;grid-template-columns:230px 1fr}nav{padding:22px}a{display:block;color:#795027;padding:12px 0;border-bottom:1px solid #dfd1bd;text-decoration:none}iframe{width:100%;height:calc(100vh - 120px);border:0}@media(max-width:650px){main{display:block}nav{display:flex;gap:20px;padding:10px 16px}a{font-size:12px}iframe{height:100vh}}</style><header><h1>ELIO · Elio Newsletter</h1><p>Newsletter previews · Sample code and expiry · All links inactive · Nothing is sent</p></header><main><nav>${examples.map(x=>`<a target="preview" href="${x.key}.html">${x.label}</a>`).join('')}</nav><iframe name="preview" title="Newsletter email preview" src="welcome.html" sandbox=""></iframe></main></html>`);
+console.log(JSON.stringify({output,templates:examples.length}));

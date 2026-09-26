@@ -1,5 +1,6 @@
 import { env, json, rpc, service } from "../_shared/server.ts";
 import { renderEmail } from "../_shared/emails.ts";
+import { deliverNewsletters } from "./newsletter-worker.ts";
 
 // This worker accepts only the high-entropy credential held privately in Vault.
 // The verifier RPC can be called only by the service role, not browser sessions.
@@ -52,6 +53,7 @@ export async function handle(request: Request): Promise<Response> {
         catch { /* An expired lease can be reclaimed with the same idempotency key. */ }
       }
     }
-    return json(stats);
+    const newsletter = await deliverNewsletters(key, sender);
+    return json({ ...stats, newsletter });
   } catch { return json({ ...stats, error: "Email maintenance unavailable; existing leases remain retryable." }, 503); }
 }
