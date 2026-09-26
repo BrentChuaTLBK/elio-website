@@ -1,4 +1,5 @@
 import { HttpError } from "./server.ts";
+import { emailFrame, emailIntro, emailButton, emailSection, emailColumns, emailProducts, emailTotals } from "./email-design.ts";
 
 const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const money = (value: unknown) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format(Number(value || 0) / 100);
@@ -8,16 +9,17 @@ const date = (value: string, includeTime = false) => {
   return new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", ...(includeTime ? { timeStyle: "short" as const } : {}) }).format(parsed) + (includeTime ? " (Asia/Manila)" : "");
 };
 const lines = (value: unknown) => escape(value).replace(/\n/g, "<br>");
-const selections = (item: any): string => (Array.isArray(item.selection_labels) && item.selection_labels.length ? item.selection_labels : (item.flavor_contents || []).map((f: any) => ({ label: f.name, quantity: f.quantity })))
+const selectionParts = (item: any): string[] => (Array.isArray(item.selection_labels) && item.selection_labels.length ? item.selection_labels : (item.flavor_contents || []).map((f: any) => ({ label: f.name, quantity: f.quantity })))
   .map((choice: any) => typeof choice === "string" ? choice : `${choice.group ? `${choice.group}: ` : ""}${choice.label || "Option"}${choice.quantity ? ` × ${choice.quantity}` : ""}${Number(choice.surcharge_cents) ? ` (+${money(choice.surcharge_cents)} each)` : ""}`)
-  .join(", ");
+;
+const selections = (item: any): string => selectionParts(item).join(", ");
 
-function renderReviewEmail(order: any, settings: any, site: URL): { html: string; text: string } {
+function renderReviewEmail(order: any, settings: any, site: URL, photos: any): { html: string; text: string } {
   const link = new URL("manage.html", site).toString();
   const shop = settings.shop_name || "Elio Basque Cheesecake";
   const heading = "An order is ready for review";
   const message = "A customer has submitted payment proof. Sign in with your staff or owner account, open the order below, and review the proof before approving or rejecting payment.";
-  // Older queued messages must keep their original provider retry body.
+  // Legacy review messages may not have a saved item or payment breakdown.
   const detailed = Array.isArray(order.items) && ["subtotal_cents", "discount_cents", "delivery_cents", "total_cents"]
     .every(key => order[key] !== null && order[key] !== undefined && Number.isFinite(Number(order[key])));
   const items = detailed ? order.items : [];
@@ -26,10 +28,16 @@ function renderReviewEmail(order: any, settings: any, site: URL): { html: string
   const discount = `${Number(order.discount_cents) > 0 ? "−" : ""}${money(order.discount_cents)}`;
   const itemText = items.map((item: any) => `${item.quantity} × ${item.name}${selections(item) ? `\n  ${selections(item)}` : ""}\n  ${money(item.unit_price_cents)} each · Line total: ${money(item.line_total_cents)}`).join("\n\n");
   const breakdown = detailed ? `\n\nProducts ordered\n${itemText || "See the product details in the dashboard."}\n\nPayment breakdown\nSubtotal: ${money(order.subtotal_cents)}\n${discountLabel}: ${discount}\nDelivery fee: ${money(order.delivery_cents)}\nOrder total: ${money(order.total_cents)}` : "";
-  const itemHtml = detailed ? `<h2 style="font-size:18px;margin-top:24px">Products ordered</h2>${items.length ? `<table width="100%" style="border-collapse:collapse"><thead><tr><th align="left" style="font-size:12px;color:#786858;padding:0 8px 8px 0">Product</th><th align="right" style="font-size:12px;color:#786858;padding-bottom:8px">Amount</th></tr></thead><tbody>${items.map((item: any) => `<tr><td style="padding:12px 8px 12px 0;border-bottom:1px solid #dfd1bd;vertical-align:top;line-height:1.5;overflow-wrap:anywhere"><strong>${escape(item.quantity)} × ${escape(item.name)}</strong>${selections(item) ? `<br><span style="font-size:13px;color:#786858">${escape(selections(item))}</span>` : ""}<br><span style="font-size:13px;color:#786858">${escape(money(item.unit_price_cents))} each</span></td><td align="right" style="padding:12px 0;border-bottom:1px solid #dfd1bd;vertical-align:top;white-space:nowrap">${escape(money(item.line_total_cents))}</td></tr>`).join("")}</tbody></table>` : `<p>See the product details in the dashboard.</p>`}<h2 style="font-size:18px;margin-top:24px">Payment breakdown</h2><table width="100%" style="border-collapse:collapse;line-height:1.7"><tr><td>Subtotal</td><td align="right">${escape(money(order.subtotal_cents))}</td></tr><tr><td>${escape(discountLabel)}</td><td align="right">${escape(discount)}</td></tr><tr><td>Delivery fee</td><td align="right">${escape(money(order.delivery_cents))}</td></tr><tr><td style="padding-top:8px;border-top:1px solid #dfd1bd"><strong>Order total</strong></td><td align="right" style="padding-top:8px;border-top:1px solid #dfd1bd"><strong>${escape(money(order.total_cents))}</strong></td></tr></table>` : "";
   const footer = "You received this notification because your account is assigned a Staff or Owner role. The dashboard shows the current order status.";
   const text = `${shop}\n${heading}\n\n${message}\n\n${details}${breakdown}\n\nOpen the admin dashboard:\n${link}\n\n${footer}`;
-  const html = `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Order ready for review</title></head><body style="margin:0;background:#f7f2e9;font-family:Arial,sans-serif;color:#39251c"><table role="presentation" width="100%" style="padding:24px 12px"><tr><td align="center"><table role="presentation" width="100%" style="max-width:600px;background:white;border:1px solid #dfd1bd;border-radius:12px"><tr><td style="padding:28px"><p style="color:#63412d;font-weight:bold">${escape(shop)}</p><h1 style="font-size:25px;line-height:1.25">${heading}</h1><p style="line-height:1.6">${message}</p><p style="line-height:1.8;background:#f7f2e9;padding:16px">${lines(details)}</p>${itemHtml}<p style="margin:28px 0"><a href="${escape(link)}" style="background:#63412d;color:#fff;padding:13px 20px;text-decoration:none;border-radius:6px;display:inline-block">Open orders for review</a></p><p style="font-size:12px;color:#786858;line-height:1.5">${footer}</p></td></tr></table></td></tr></table></body></html>`;
+  const reviewDetails = `<h2 style="margin:0 0 12px;font:normal 22px/1.3 Georgia,serif">Order details</h2><p style="margin:0;font-size:14px;line-height:1.8">${lines(details)}</p>`;
+  const body = emailIntro("For the kitchen", heading, message, order.reference)
+    + (items.length ? emailProducts(items, photos, site, selectionParts, money) : "")
+    + emailColumns(reviewDetails, detailed ? emailTotals(order, money) : "")
+    + emailButton("Open orders for review", link)
+    + `<p style="margin:0;font-size:12px;line-height:1.7;color:#786858">${escape(footer)}</p>`;
+  const html = emailFrame("Order ready for review", heading + " · " + order.reference, body);
+
   return { html, text };
 }
 
@@ -50,7 +58,7 @@ export function renderEmail(payload: any): { html: string; text: string } {
   site.search = "";
   site.hash = "";
   site.pathname = `${site.pathname.replace(/\/$/, "")}/`;
-  if (review) return renderReviewEmail(order, settings, site);
+  if (review) return renderReviewEmail(order, settings, site, payload.product_photos);
   const access = new URL("order.html", site);
   access.hash = new URLSearchParams({ order: order.id, token: order.access_token }).toString();
   const link = access.toString();
@@ -112,6 +120,19 @@ export function renderEmail(payload: any): { html: string; text: string } {
   const itemText = items.map((item: any) => `${item.quantity} × ${item.name}${selections(item) ? ` (${selections(item)})` : ""} — ${money(item.line_total_cents)}`).join("\n");
   const totals = `Product subtotal: ${money(order.subtotal_cents)}\nDiscount: ${money(order.discount_cents)}\nDelivery fee: ${money(order.delivery_cents)}\nCurrent order total: ${money(order.total_cents)}`;
   const text = `${settings.shop_name || "Elio Basque Cheesecake"}\n${heading}\nOrder reference: ${order.reference}\n\n${message}\n\n${instructions ? `${instructions}\n\n` : ""}Fulfillment: ${date(order.fulfillment_date)} · ${order.method}\n${fulfillment}\n\n${itemText}\n\n${totals}\n\nView your order securely:\n${link}\n\nKeep this link private; it grants access to this order.\nThis is an automated update. Please use your order page to upload payment proof and check your status.\nFor changes, cancellations, or payment concerns, contact us${contact ? `: ${contact}` : " using the details on your order page"}.`;
-  const html = `<!doctype html><html lang="en"><head><title>Your Elio order</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f7f2e9;font-family:Arial,sans-serif;color:#39251c"><table role="presentation" width="100%" style="padding:24px 12px"><tr><td align="center"><table role="presentation" width="100%" style="max-width:600px;background:white;border:1px solid #dfd1bd;border-radius:12px"><tr><td style="padding:28px"><p style="color:#63412d;font-weight:bold">${escape(settings.shop_name || "Elio Basque Cheesecake")}</p><h1 style="font-size:25px;line-height:1.25">${escape(heading)}</h1><p><strong>Order ${escape(order.reference)}</strong></p><p style="line-height:1.6">${escape(message)}</p>${instructions ? `<p style="line-height:1.6;background:#f7f2e9;padding:16px">${lines(instructions)}</p>` : ""}<h2 style="font-size:18px">${escape(date(order.fulfillment_date))} · ${escape(order.method)}</h2><p style="line-height:1.6">${lines(fulfillment)}</p><table width="100%" style="border-collapse:collapse">${items.map((item: any) => `<tr><td style="padding:10px 0;border-bottom:1px solid #dfd1bd">${escape(item.quantity)} × ${escape(item.name)}${selections(item) ? `<br><small>${escape(selections(item))}</small>` : ""}</td><td align="right" style="padding:10px 0;border-bottom:1px solid #dfd1bd;white-space:nowrap">${escape(money(item.line_total_cents))}</td></tr>`).join("")}</table><p style="line-height:1.7">${lines(totals)}</p><p style="margin:28px 0"><a href="${escape(link)}" style="background:#63412d;color:#fff;padding:13px 20px;text-decoration:none;border-radius:6px;display:inline-block">View your order</a></p><p style="font-size:12px;color:#786858;line-height:1.5">Keep this link private; it grants access to this order.</p><p style="font-size:12px;color:#786858;line-height:1.5">This is an automated update. Please use your order page to upload payment proof and check your status.</p><p style="font-size:14px;line-height:1.6">For changes, cancellations, or payment concerns, contact us${contact ? `: ${escape(contact)}` : " using the details on your order page"}.</p></td></tr></table></td></tr></table></body></html>`;
+  const detailTitle = order.method === "delivery" ? "Delivery details" : "Pickup details";
+  const detailText = order.method === "delivery" ? fulfillment : [settings.pickup_address, settings.pickup_hours && `Opening hours: ${settings.pickup_hours}`].filter(Boolean).join("\n");
+  const detailsHtml = `<h2 style="margin:0 0 12px;font:normal 22px/1.3 Georgia,serif">${detailTitle}</h2><p style="margin:0;font-size:13px;line-height:1.8">${lines(detailText || "See your order page for details.")}</p>`;
+  const note = (value: string) => `<p style="margin:0;padding:16px 18px;background:#f4ecdf;font-size:13px;line-height:1.8;overflow-wrap:anywhere;word-break:break-word">${lines(value)}</p>`;
+  const body = emailIntro("Your Elio order", heading, message, order.reference)
+    + `<p style="margin:0 0 22px;padding:14px 16px;background:#f4ecdf;font-size:14px;line-height:1.6;color:#63412d"><strong>${escape(date(order.fulfillment_date))}</strong> &nbsp; · &nbsp; ${order.method === "delivery" ? "Delivery" : "Pickup"}</p>`
+    + (instructions ? emailSection(payload.event_type === "order_submitted" ? "Payment instructions" : "What happens next", note(instructions)) : "")
+    + (items.length ? emailProducts(items, payload.product_photos, site, selectionParts, money) : "")
+    + emailColumns(detailsHtml, emailTotals(order, money))
+    + (order.method !== "delivery" && settings.pickup_instructions ? emailSection("Pickup notes", note(settings.pickup_instructions)) : "")
+    + emailButton("View your order", link)
+    + `<p style="margin:0 0 10px;text-align:center;font-size:11px;line-height:1.7;color:#786858">Keep this link private; it grants access to this order.</p><p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#786858">This is an automated update. Please use your order page to upload payment proof and check your status.</p><p style="margin:0;font-size:12px;line-height:1.7;color:#786858">For changes, cancellations, or payment concerns, contact us${contact ? `: ${escape(contact)}` : " using the details on your order page"}.</p>`;
+  const html = emailFrame("Your Elio order", heading + " · " + order.reference, body);
+
   return { html, text };
 }

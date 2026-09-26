@@ -12,6 +12,26 @@ additional_redirect_urls = ["http://127.0.0.1:4173/admin-account.html", "http://
 subject = "Confirm your Elio account"
 content_path = "./supabase/templates/confirmation.html"
 
+[auth.email.template.recovery]
+subject = "Reset your Elio password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "Your Elio sign-in link"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.invite]
+subject = "You're invited to Elio"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your Elio email change"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.reauthentication]
+subject = "Your Elio verification code"
+content_path = "./supabase/templates/reauthentication.html"
+
 # Auth confirmation uses SMTP immediately, independently of this order worker.
 # The worker validates a private Vault credential in its handler before any work.
 [functions.email-worker]

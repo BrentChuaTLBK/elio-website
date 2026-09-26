@@ -1,0 +1,80 @@
+[
+  {
+    "key": "confirmation",
+    "label": "Confirm sign up",
+    "subject": "Confirm your Elio account",
+    "file": "confirmation.html"
+  },
+  {
+    "key": "recovery",
+    "label": "Reset password",
+    "subject": "Reset your Elio password",
+    "file": "recovery.html"
+  },
+  {
+    "key": "magic_link",
+    "label": "Magic link",
+    "subject": "Your Elio sign-in link",
+    "file": "magic_link.html"
+  },
+  {
+    "key": "invite",
+    "label": "Invite user",
+    "subject": "You’re invited to Elio",
+    "file": "invite.html"
+  },
+  {
+    "key": "email_change",
+    "label": "Change email address",
+    "subject": "Confirm your Elio email change",
+    "file": "email_change.html"
+  },
+  {
+    "key": "reauthentication",
+    "label": "Reauthentication",
+    "subject": "Your Elio verification code",
+    "file": "reauthentication.html"
+  },
+  {
+    "key": "password_changed_notification",
+    "label": "Password changed",
+    "subject": "Your Elio password was changed",
+    "file": "password_changed_notification.html"
+  },
+  {
+    "key": "email_changed_notification",
+    "label": "Email address changed",
+    "subject": "Your Elio email address was changed",
+    "file": "email_changed_notification.html"
+  },
+  {
+    "key": "phone_changed_notification",
+    "label": "Phone number changed",
+    "subject": "Your Elio phone number was changed",
+    "file": "phone_changed_notification.html"
+  },
+  {
+    "key": "identity_linked_notification",
+    "label": "Sign-in method linked",
+    "subject": "A sign-in method was linked to Elio",
+    "file": "identity_linked_notification.html"
+  },
+  {
+    "key": "identity_unlinked_notification",
+    "label": "Sign-in method removed",
+    "subject": "A sign-in method was removed from Elio",
+    "file": "identity_unlinked_notification.html"
+  },
+  {
+    "key": "mfa_factor_enrolled_notification",
+    "label": "Verification method added",
+    "subject": "A verification method was added to Elio",
+    "file": "mfa_factor_enrolled_notification.html"
+  },
+  {
+    "key": "mfa_factor_unenrolled_notification",
+    "label": "Verification method removed",
+    "subject": "A verification method was removed from Elio",
+    "file": "mfa_factor_unenrolled_notification.html"
+  }
+]

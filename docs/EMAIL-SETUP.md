@@ -4,7 +4,9 @@
 
 Use `supabase/templates/confirmation.html` in Elio's Supabase dashboard → Authentication → Email → Templates → Confirm sign up. Set the subject to **Confirm your Elio account** and save. The `{{ .ConfirmationURL }}` values must remain intact. They support both the customer and staff redirect URLs supplied by the account form.
 
-The template uses Elio's text wordmark, a small “by TLB Kitchen” byline, bronze accents, warm ivory, and a brown confirmation button. It has no marketing opt-in or promotional offer. The account page newsletter checkbox is disabled; creating an account does not subscribe anyone.
+All email templates share the dark brown ELIO header, gold wordmark, warm ivory background, serif headings, and bronze action buttons. They have no marketing opt-in or promotional offer. The account page newsletter checkbox is disabled; creating an account does not subscribe anyone.
+
+Run `node --experimental-transform-types scripts/build-auth-emails.mjs` on Node 24 after changing the shared design. This generates all six authentication templates and seven optional security-notification templates in `supabase/templates/`; `manifest.json` lists their dashboard labels and subjects. Changing a template does not enable a feature or notification. Preserve existing notification settings. Signup, recovery, invite, magic-link and email-change templates retain `{{ .ConfirmationURL }}`; reauthentication retains `{{ .Token }}`.
 
 `supabase/config.toml` records the template for local development. Publishing the website or syncing the GitHub fork does **not** apply hosted Auth templates. Avoid pushing an incomplete Auth config over existing Google or SMTP settings; use the dashboard or a narrowly scoped Management API patch.
 
@@ -25,11 +27,17 @@ The scheduler credential is generated privately in Supabase Vault by the migrati
 
 Missing Resend configuration returns HTTP 503 **before claiming messages**. Check the pg_net HTTP response and Edge Function logs as well as the cron status: a successful SQL invocation alone does not prove that a message was accepted or delivered. No emails are sent by deployment tests.
 
-The secure order view and payment proof integration use `/order.html`; the worker’s customer links target that route. Checkout remains paused until the catalog is confirmed. Test real delivery with an explicitly authorized test order before opening customer orders. The newsletter is not handled by this worker.
+The secure order view and payment proof integration use `/order.html`; the worker’s customer links target that route. The newsletter is not handled by this worker.
+
+Every order event uses `_shared/email-design.ts`: order received, payment approval/rejection, cancellation, expiry, scheduled-day reminder, ready for pickup, out for delivery, order amendments, and staff payment review. Product photos sit beside the saved names and flavors. Fulfillment details and payment totals sit side by side on desktop and stack on phones. Missing photos omit the image cell; item names and contents remain visible when an email client blocks remote images.
+
+The private `prepare_email` operation snapshots the current ordered products’ public cover URLs into the outbox payload after lease and recipient checks. Retries reuse that map, including an empty map. It does not replace saved names, recipes, prices, contact details, or instructions. URLs reference public catalog photos; private payment proofs are never embedded. Deploy the photo migration and the worker together when no messages are awaiting retry, since the rendered HTML changes with this release.
 
 ## Verification
 
-Run `node --experimental-transform-types tests/email-worker.test.mjs` on Node 24 for mocked worker checks. The regular PGlite backend suite intentionally skips the hosted-only scheduling migration because PGlite does not supply pg_cron, pg_net, or Supabase Vault.
+Run `node --experimental-transform-types tests/email-worker.test.mjs` and `node --experimental-transform-types tests/email-design.test.mjs` on Node 24. The backend suite also checks photo snapshots, missing images, reminder retries, cancellation checks, and service-only preparation. The regular PGlite backend suite intentionally skips the hosted-only scheduling migration because PGlite does not supply pg_cron, pg_net, or Supabase Vault.
+
+On September 26, 2026, an authorized live test verified guest checkout, private proof upload, manual payment approval, production counts, confirmation delivery, and cancellation with stock restored. All four order/staff emails were delivered. A separate signup verified the previously saved branded Auth template; the unconfirmed test account was removed. The new dark-header Auth templates require a separate hosted save. The redesign was checked in Chrome at 760, 390 and 320 pixels, including public image loading; this is not a full Outlook or Apple Mail client certification.
 
 On hosted Supabase, verify the schedule and execution without selecting Vault values or HTTP request headers:
 
