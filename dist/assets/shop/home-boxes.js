@@ -15,15 +15,27 @@ export function mountHomeBoxes(content) {
   let transition = null;
   const wrap = index => (index % boxes.length + boxes.length) % boxes.length;
   const visibleBoxes = () => Array.from({length:Math.min(pageSize, boxes.length)}, (_, offset) => boxes[wrap(first + offset)]);
-  const card = box => {
+  const card = (box, custom = false) => {
     const href = `order.html?product=${encodeURIComponent(box.id)}`;
     const image = imageUrl(box);
-    return `<article class="home-box-card" data-home-box="${escape(box.id)}"><a class="home-box-photo" href="${href}" tabindex="-1" aria-hidden="true">${image ? `<img src="${escape(image)}" alt="" width="1440" height="960" loading="lazy">` : '<span class="home-box-placeholder">ELIO</span>'}</a><h3><a href="${href}">${escape(box.name)}</a></h3><p class="home-box-description">${escape(box.description ?? box.line)}</p>${Number.isFinite(box.price_cents) ? `<p class="home-box-price">${money(box.price_cents)}</p>` : ''}<a class="button" href="${href}" aria-label="View ${escape(box.name)}">View box</a></article>`;
+    const photo = `<a class="home-box-photo" href="${href}" tabindex="-1" aria-hidden="true">${image ? `<img src="${escape(image)}" alt="" width="1440" height="960" loading="lazy">` : '<span class="home-box-placeholder">ELIO</span>'}</a>`;
+    const details = `<h3><a href="${href}">${escape(box.name)}</a></h3><p class="home-box-description">${escape(box.description ?? box.line)}</p>`;
+    const price = Number.isFinite(box.price_cents) ? `<p class="home-box-price">${custom ? 'From ' : ''}${money(box.price_cents)}</p>` : '';
+    if (custom) return `<article class="home-box-card home-custom-card" data-home-custom-product="${escape(box.id)}"><div class="home-custom-copy"><p class="eyebrow">Make it uniquely yours</p>${details}</div>${photo}${price}<a class="button" href="${href}" data-custom-box-link aria-label="Customize ${escape(box.name)}">Build your box</a></article>`;
+    return `<article class="home-box-card" data-home-box="${escape(box.id)}">${photo}${details}${price}<a class="button" href="${href}" aria-label="View ${escape(box.name)}">View box</a></article>`;
   };
+  const customContainer = document.querySelector('[data-home-custom-box]');
+  if (customContainer) {
+    const customBox = content.homeCustomBox;
+    const hasCustomBox = Boolean(customBox?.id);
+    customContainer.hidden = !hasCustomBox;
+    customContainer.closest('.home-boxes-layout')?.classList.toggle('has-custom-box', hasCustomBox);
+    customContainer.innerHTML = hasCustomBox ? card(customBox, true) : '';
+  }
   function makePage() {
     const page = document.createElement('div');
     page.className = 'home-box-page';
-    page.innerHTML = visibleBoxes().map(card).join('');
+    page.innerHTML = visibleBoxes().map(box => card(box)).join('');
     return page;
   }
   function updateControls(announce = false) {

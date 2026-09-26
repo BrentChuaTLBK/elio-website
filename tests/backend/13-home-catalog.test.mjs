@@ -39,6 +39,34 @@ export default async function({db,check,state}) {
     assert.deepEqual(home.boxes.map(b=>b.id),expected.map(b=>b.id));
   })();
 
+  await check('Homepage custom-box display matches its existing selection and exposes only current public fields',async()=>{
+    const before=await api('admin_bootstrap',{},ids.owner);
+    const firstSort=Math.min(...before.products.filter(p=>p.kind==='custom_box').map(p=>p.sort_order||0))-1;
+    await db.query("update elio.products set data=jsonb_set(data,'{sort_order}',to_jsonb($2::integer)) where id=$1",[custom.id,firstSort]);
+    let selected=await api('save_product',{product:{...custom,
+      description:'Choose your favorite three',photos:['https://example.test/custom-first.webp'],price_cents:54321}},ids.owner);
+    const display=p=>({id:p.id,slug:p.slug??null,name:p.name,description:p.description,photos:p.photos,price_cents:p.price_cents});
+    let home=await api('home_catalog');
+    assert.equal(home.custom_box_id,selected.id);
+    assert.deepEqual(home.custom_box,display(selected));
+    assert(!home.boxes.some(box=>box.id===selected.id));
+    selected=await api('save_product',{product:{...selected,name:'QA updated homepage custom',description:'A fresh custom description',photos:['https://example.test/custom-latest.webp'],price_cents:65432}},ids.owner);
+    home=await api('home_catalog');assert.deepEqual(home.custom_box,display(selected));
+    await api('save_product',{product:{...selected,active:false}},ids.owner);
+    home=await api('home_catalog');assert.notEqual(home.custom_box_id,selected.id);
+    assert.equal(home.custom_box?.id??null,home.custom_box_id);
+    const active=(await db.query("select id,data from elio.products where data->>'kind'='custom_box' and coalesce((data->>'active')::boolean,false)")).rows;
+    try {
+      await db.query("update elio.products set data=data||'{\"active\":false}'::jsonb where data->>'kind'='custom_box' and coalesce((data->>'active')::boolean,false)");
+      home=await api('home_catalog',{include_hidden:true});
+      assert.equal(home.custom_box,null);assert.equal(home.custom_box_id,null);
+    } finally {
+      for(const product of active)await db.query('update elio.products set data=$2::jsonb where id=$1',[product.id,JSON.stringify(product.data)]);
+    }
+    const after=await api('admin_bootstrap',{},ids.owner);
+    assert.deepEqual(after.inventory,before.inventory);assert.deepEqual(after.flavor_menus,before.flavor_menus);
+  })();
+
   await check('Individually hidden flavors cannot be exposed through homepage payload options',async()=>{
     await api('save_flavor_editor',{...edit,id:flavor.id,hidden:true},ids.owner);
     for(const user of [null,ids.customer,ids.owner]) {

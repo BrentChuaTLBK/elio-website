@@ -52,6 +52,7 @@
   let navigationTarget = null;
   let touching = false;
   let touchSettling = false;
+  let hovering = false;
   const wrap = (index) => ((index % catalog.length) + catalog.length) % catalog.length;
   function slidePosition(slide) {
     return slide.getBoundingClientRect().left - track.getBoundingClientRect().left + track.scrollLeft - parseFloat(getComputedStyle(track).paddingLeft);
@@ -209,7 +210,7 @@
     // Keep the fractional position while paused; restoring snap here would jump.
   }
   function canAutoplay() {
-    return !reducedMotion.matches && canLoop && layout && inView && pageActive && !document.hidden && !touching && !touchSettling && navigationTarget === null && !document.querySelector('dialog[open]');
+    return !reducedMotion.matches && canLoop && layout && inView && pageActive && !document.hidden && !touching && !touchSettling && !hovering && navigationTarget === null && !document.querySelector('dialog[open]');
   }
   function animateCarousel(time) {
     if (!canAutoplay()) { stopAutoplay(); return; }
@@ -248,6 +249,18 @@
     track.classList.remove('is-drifting');
   }
   carousel.addEventListener('focusin', holdAutoplay);
+  // Pause reading under a hovering pointer without snapping the moving strip.
+  // Touch pointers have their own gesture handling and must not create sticky hover.
+  carousel.addEventListener('pointerenter', event => {
+    if (event.pointerType === 'touch') return;
+    hovering = true;
+    syncAutoplay();
+  });
+  carousel.addEventListener('pointerleave', event => {
+    if (event.pointerType === 'touch') return;
+    hovering = false;
+    syncAutoplay();
+  });
   reducedMotion.addEventListener('change', syncAutoplay);
   document.addEventListener('visibilitychange', syncAutoplay);
   window.addEventListener('pagehide', () => { pageActive = false; clearTimeout(autoplayTimer); stopAutoplay(); });

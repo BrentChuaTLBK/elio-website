@@ -5,10 +5,14 @@ import { mapPublicFlavors } from './flavor-content.js';
 export async function loadHomeContent(content) {
   if (new URLSearchParams(location.search).get('preview') === '1') {
     content.homeBoxes = content.boxCollections.filter(box => !box.customizable);
+    content.homeCustomBox = content.boxCollections.find(box => box.customizable) || null;
+    content.customBoxId = content.homeCustomBox?.id || null;
     content.homeLoaded = true;
     return content;
   }
   content.homeBoxes = [];
+  content.homeCustomBox = null;
+  content.customBoxId = null;
   content.monthlyMenu = [];
   content.nextMonthlyMenu = [];
   content.currentMenuShown = false;
@@ -25,7 +29,8 @@ export async function loadHomeContent(content) {
     content.flavors = mapPublicFlavors(data.flavors, content.flavors);
     content.featuredOrder = [];
     content.homeBoxes = data.boxes;
-    content.customBoxId = data.custom_box_id;
+    content.homeCustomBox = data.custom_box || null;
+    content.customBoxId = content.homeCustomBox?.id || data.custom_box_id || null;
     content.homeLoaded = true;
   } catch {
     // A failed request must not bring hidden or removed products back into view.
