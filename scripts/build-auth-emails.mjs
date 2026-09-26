@@ -21,7 +21,7 @@ const templates = [
 const manifest=[];
 for(const [key,label,subject,heading,message,button,note] of templates){
  let body=emailIntro('Your Elio account',heading,message);
- if(button)body+=emailButton(button,'{{ .ConfirmationURL }}')+'<p style="margin:0 0 24px;text-align:center;font-size:12px;line-height:1.7;color:#786858">Button not working? <a href="{{ .ConfirmationURL }}" style="color:#63412d;text-decoration:underline">Use this secure link.</a></p>';
+ if(button)body+=emailButton(button,'{{ .ConfirmationURL }}')+'<p style="margin:0 0 24px;text-align:left;font-size:12px;line-height:1.7;color:#786858">Button not working? <a href="{{ .ConfirmationURL }}" style="color:#63412d;text-decoration:underline">Use this secure link.</a></p>';
  if(key==='reauthentication')body+='<p style="margin:0 0 24px;padding:20px;text-align:center;background:#f4ecdf;font:bold 32px/1.5 Arial,sans-serif;letter-spacing:6px;color:#63412d">{{ .Token }}</p>';
  body+=`<p style="margin:24px 0 0;padding-top:20px;border-top:1px solid #dfd1bd;font:13px/1.8 Arial,sans-serif;color:#786858">${e(note)}</p>`;
  await writeFile(new URL(`../supabase/templates/${key}.html`,import.meta.url),emailFrame(subject,message,body)+'\n');

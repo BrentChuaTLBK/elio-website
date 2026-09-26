@@ -6,7 +6,7 @@ const order={id:'order-id',reference:'ELIO-TEST',access_token:'private-order-tok
 const settings={site_url:'https://eliocheesecakes.com',pickup_address:'Saved pickup address',pickup_hours:'10am–8pm',contact_email:'elio.cheesecakes@gmail.com',payment_instructions:'Saved payment instructions'};
 const site=new URL(settings.site_url+'/');
 let checks=0;
-for(const event_type of ['order_submitted','payment_approved','payment_rejected','order_cancelled','order_expired','fulfillment_reminder','ready_for_pickup','out_for_delivery','order_updated','order_review_required']){
+for(const event_type of ['order_submitted','payment_approved','payment_rejected','order_cancelled','order_expired','fulfillment_reminder','ready_for_pickup','pickup_reminder','out_for_delivery','order_updated','order_review_required']){
  const {html,text}=renderEmail({event_type,order,settings,product_photos:{'box-id':'assets/box.webp'}});
  assert(html.includes('bgcolor="#3d251c"'));
  assert(html.includes('src="https://eliocheesecakes.com/assets/box.webp"'));
