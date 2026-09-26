@@ -22,7 +22,11 @@ globalThis.fetch = async (url, options) => {
   if (body.p_action === 'newsletter_claim_emails') return Response.json([]);
   const preparedRow = { ...row, ...setup.row };
   if (body.p_action === 'claim_emails') return Response.json(setup.empty ? [] : [{ ...preparedRow, ...(setup.old ? { first_attempt_at: '2020-01-01' } : {}) }]);
-  if (body.p_action === 'prepare_email') return Response.json(setup.skip ? { skip: true } : preparedRow);
+  if (body.p_action === 'prepare_email') {
+    if (setup.skip || (setup.skipBeforeFreeze && body.p_payload.provider_payload)) return Response.json({ skip: true });
+    if (body.p_payload.provider_payload && !setup.frozen && !setup.freezeFails) setup.frozen = structuredClone(body.p_payload.provider_payload);
+    return Response.json({ ...preparedRow, provider_payload: setup.frozen || null });
+  }
   if (body.p_action === 'email_sent' && setup.ackFailure) return Response.json({}, { status: 500 });
   if (body.p_action === 'email_failed') setup.recordedFailure = body.p_payload;
   return Response.json({});
@@ -47,7 +51,7 @@ try {
   });
   await check('delivery prepares the claim and acknowledges provider acceptance', async () => {
     const response = await (await handle(request())).json(); assert.equal(response.accepted, 1);
-    assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'prepare_email', 'send', 'email_sent', 'newsletter_claim_emails']);
+    assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'prepare_email', 'prepare_email', 'send', 'email_sent', 'newsletter_claim_emails']);
     assert.equal(providerBodies[0].key, 'elio/review/order-id');
     assert.equal(providerBodies[0].body.reply_to, 'elio.cheesecakes@gmail.com');
     assert.ok(providerBodies[0].body.html.includes('&lt;script&gt;'));
@@ -66,6 +70,26 @@ try {
   await check('acknowledgement retry retains exactly the same provider body and key', async () => {
     setup.ackFailure = true; assert.equal((await (await handle(request())).json()).acknowledgement_pending, 1);
     setup.ackFailure = false; await handle(request()); assert.deepEqual(providerBodies[0], providerBodies[1]);
+  });
+  await check('accepted order retries retain original sender and rendered content after configuration changes', async () => {
+    setup.ackFailure = true; await handle(request());
+    const originalSender = values.EMAIL_FROM;
+    try {
+      values.EMAIL_FROM = 'Changed sender <changed@example.test>';
+      setup.ackFailure = false;
+      setup.row = { ...row, subject: 'Changed subject', payload: { event_type: 'unknown-after-template-change' } };
+      await handle(request());
+      assert.equal(providerBodies.length, 2); assert.deepEqual(providerBodies[1], providerBodies[0]);
+      assert.equal(providerBodies[1].body.from, originalSender);
+    } finally { values.EMAIL_FROM = originalSender; }
+  });
+  await check('a failed payload freeze never sends an unrecorded message', async () => {
+    setup.freezeFails = true; await handle(request());
+    assert.equal(providerBodies.length, 0); assert.ok(calls.includes('email_failed'));
+  });
+  await check('eligibility revoked between rendering and snapshot skips delivery', async () => {
+    setup.skipBeforeFreeze = true;
+    assert.equal((await (await handle(request())).json()).skipped, 1); assert.equal(providerBodies.length, 0);
   });
   await check('customer order links and HTML values are escaped', async () => {
     const email = renderEmail({ ...row.payload, event_type: 'payment_approved', order: { ...row.payload.order, access_token: 'private-order-token', items: [{ name: '<img src=x>', quantity: 1, line_total_cents: 99000, selection_labels: [], flavor_contents: [{ name: 'Vanilla', quantity: 2 }, { name: 'Matcha', quantity: 1 }] }] } });

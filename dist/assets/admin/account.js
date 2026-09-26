@@ -306,7 +306,8 @@ else if (auth) {
   else if (authLink.failed) {
     const params = new URLSearchParams(location.hash.slice(1));
     message(params.get('error_description') || 'The sign-in link could not be used. Please try again.', true);
-  } else if (authLink.recovery || authLink.type === 'recovery') setMode('recovery');
+  } else if (authLink.recovery && data.session) setMode('recovery');
+  else if (authLink.recovery || authLink.type === 'recovery') message('This password reset link is incomplete or no longer valid. Request a new reset link.', true);
   else if (data.session) {
     heading.textContent = 'Your Elio account.';
     intro.hidden = true;

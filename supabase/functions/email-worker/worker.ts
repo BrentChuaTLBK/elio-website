@@ -29,13 +29,23 @@ export async function handle(request: Request): Promise<Response> {
           stats.failed++;
           continue;
         }
-        const current = await service("prepare_email", { id: row.id, lease_token: row.lease_token });
+        let current = await service("prepare_email", { id: row.id, lease_token: row.lease_token });
         if (current?.skip) { stats.skipped++; continue; }
         if (!current?.payload || !current.to_email || !current.event_key) throw new Error("Invalid leased message.");
-        const rendered = renderEmail(current.payload);
+        if (!current.provider_payload) {
+          const rendered = renderEmail(current.payload);
+          // Persist the complete provider body before the network call. The second
+          // preparation also rechecks order eligibility after rendering.
+          current = await service("prepare_email", { id: row.id, lease_token: row.lease_token, provider_payload: {
+            from: sender, to: [current.to_email], reply_to: "elio.cheesecakes@gmail.com",
+            subject: String(current.subject || "Elio order update").replace(/[\r\n]/g, " "), ...rendered,
+          } });
+          if (current?.skip) { stats.skipped++; continue; }
+        }
+        if (!current?.provider_payload || !current.event_key) throw new Error("Email provider payload was not saved.");
         const response = await fetch("https://api.resend.com/emails", {
           method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "Idempotency-Key": `elio/${current.event_key}` },
-          body: JSON.stringify({ from: sender, to: [current.to_email], reply_to: "elio.cheesecakes@gmail.com", subject: String(current.subject || "Elio order update").replace(/[\r\n]/g, " "), ...rendered }),
+          body: JSON.stringify(current.provider_payload),
           signal: AbortSignal.timeout(12000),
         });
         const result = await response.json().catch(() => null);
