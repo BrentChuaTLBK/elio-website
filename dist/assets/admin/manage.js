@@ -1,4 +1,5 @@
 import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=elio-accounting-1';
+import {mountAffiliates} from './affiliates-admin.js';
 import {monthRange} from './accounting.js?v=shared-categories-1';
 import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';
 import { PHOTO_ACCEPT, PHOTO_HELP, validatePhoto } from './photo-upload.js';
@@ -49,6 +50,7 @@ let activeOrder = null;
 let productDraft = null;
 let clearPhotoDrag = () => {};
 let catalogOrderController = null;
+let affiliatesController = null;
 const catalogScope = () => ['menus','flavors'].includes(state.view) ? 'flavors' : 'boxes';
 const areaCategories = () => state.categories.filter(c => c.scope === catalogScope());
 let editDraft = null;
@@ -144,9 +146,9 @@ const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,ow
 async function refresh() {
   if (!configured) return;
   const result = await api('admin_bootstrap');
-  if(!state.connected && location.hash==='#accounting' && result.role==='owner')state.view='accounting';
+  if(!state.connected && ['#accounting','#affiliates'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
   Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
-  state.promos = state.promos.filter(promo => !promo.newsletter_managed);
+  state.promos = state.promos.filter(promo => !promo.newsletter_managed && !promo.affiliate_managed);
   state.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
   state.categories.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
   const reviews = state.orders.filter(needsPaymentReview).length;
@@ -156,6 +158,10 @@ async function refresh() {
   render();
 }
 function render() {
+  const affiliatesNav = $('[data-view="affiliates"]');
+  if(affiliatesNav)affiliatesNav.hidden=!state.connected||state.role!=='owner';
+  if(state.view==='affiliates' && state.connected && state.role==='owner' && $('#affiliates-manager')){affiliatesController?.refresh();return;}
+  affiliatesController?.destroy();affiliatesController=null;
   const accountingNav = $('[data-view="accounting"]');
   if(accountingNav)accountingNav.hidden=!state.connected||state.role!=='owner';
   if(state.view==='accounting' && state.connected && state.role==='owner' && $('#accounting-manager')){
@@ -165,9 +171,10 @@ function render() {
   const newsletterNav = $('[data-view="newsletter"]');
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
-  const views = { accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
+  const views = { affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
   if(state.view==='accounting')mountAccounting($('#accounting-manager'),{api,role:state.role,connected:state.connected,money,escapeHtml:esc,today:manilaDate(),filters:state.accountingFilter,openOrder});
+  if(state.view==='affiliates')affiliatesController=mountAffiliates($('#affiliates-manager'),{role:state.role,connected:state.connected});
   if(state.view==='faqs')bindFaqView(state,$('#workspace'),render);
   if(state.view==='newsletter')newsletterAdmin.mount($('#workspace'));
   if(state.view==='promos' && owner())newsletterOffers.mount($('#workspace'));
@@ -734,6 +741,11 @@ function exportOrders() {
 
 document.addEventListener('click', async event => {
   const view = event.target.closest('[data-view]');
+  if(view && state.view==='affiliates' && view.dataset.view!==state.view){
+    const manager=$('#affiliates-manager');
+    if(manager?.dataset.busy==='true'){toast('Please wait for the affiliate payment or changes to finish saving.','error');return;}
+    if(manager?.dataset.dirty==='true' && !await confirmDialog('Leave affiliates and discard these unsaved changes?',{title:'Unsaved affiliate changes',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;
+  }
   if(view && state.view==='accounting' && view.dataset.view!==state.view){
     const manager=$('#accounting-manager');
     if(manager?.dataset.busy==='true'){toast('Please wait for accounting to finish saving.','error');return;}
@@ -1116,4 +1128,4 @@ async function init() {
 }
 init();
 
-window.addEventListener('beforeunload',event=>{if($('#accounting-manager')?.dataset.dirty==='true'){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{if($('#accounting-manager')?.dataset.dirty==='true'||$('#affiliates-manager')?.dataset.dirty==='true'||$('#affiliates-manager')?.dataset.busy==='true'){event.preventDefault();event.returnValue='';}});

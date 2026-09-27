@@ -37,9 +37,11 @@ export default async function({db,check,state}) {
  })();
  await check('entry-details migration can be replayed without losing saved names or payment methods',async()=>{
   const e=await call('save_entry',{...base(),client_name:'Replay fixture',payment_method:'cash'});
+  const latestRows=await h.scalar("select pg_get_functiondef('elio.accounting_rows_v2(date,date)'::regprocedure)");
   await db.exec(await readFile(new URL('../../supabase/migrations/20260927120233_elio_accounting_shared_categories.sql',import.meta.url),'utf8'));
   const r=await call('report',{start:today,end:today}),entry=r.entries.find(x=>x.id===e.id);
   assert.equal(entry.client_name,'Replay fixture');assert.equal(entry.payment_method,'cash');assert.equal(entry.revision,1);
   assert.equal(await h.scalar("select has_function_privilege('authenticated','elio.accounting_api(uuid,text,jsonb)','execute')"),false);
+  await db.exec(latestRows); // Preserve integrations added after this historical migration.
  })();
 }

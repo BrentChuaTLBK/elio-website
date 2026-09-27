@@ -49,3 +49,7 @@ verify_jwt = false
 # unsubscribe require private tokens. Dashboard actions verify owner Auth.
 [functions.newsletter]
 verify_jwt = false
+
+# Every request verifies Auth; the database checks owner or assigned affiliate.
+[functions.affiliate-proof]
+verify_jwt = false

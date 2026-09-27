@@ -320,6 +320,10 @@ else if (auth) {
     message(`Signed in as ${data.session.user.email}.`);
     if (customer) { loadOrders();finishOAuthNewsletterConsent(data.session).then(handled => { if (!handled) activateNewsletter(data.session); }); }
     const dashboardLink = document.querySelector('#staff-dashboard');
+    const affiliateLink = document.querySelector('#affiliate-dashboard');
+    if(affiliateLink){
+      api('affiliate_status').then(status=>{affiliateLink.hidden=!status?.assigned;}).catch(()=>{affiliateLink.hidden=true;});
+    }
     if (dashboardLink) {
       try {
         const access = await api('account_access');
