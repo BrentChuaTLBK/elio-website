@@ -21,24 +21,26 @@ async function decode(file) {
   }
 }
 
-self.onmessage = async ({data:file}) => {
+self.onmessage = async ({data}) => {
+  const file=data instanceof Blob?data:data.file;
+  const receipt=data.purpose==='receipt',quality=receipt?0.94:0.88;
   let bitmap;
   try {
     bitmap = await decode(file);
     if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 60000000) throw new Error('Choose a photo with no more than 60 megapixels.');
-    const scale = Math.min(1, 2400 / Math.max(bitmap.width,bitmap.height));
+    const scale = Math.min(1, (receipt?3200:2400) / Math.max(bitmap.width,bitmap.height));
     const canvas = new OffscreenCanvas(Math.max(1,Math.round(bitmap.width*scale)),Math.max(1,Math.round(bitmap.height*scale)));
     const ctx = canvas.getContext('2d');
     ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
     bitmap.close(); bitmap = null;
-    let blob = await canvas.convertToBlob({type:'image/webp',quality:0.88});
+    let blob = await canvas.convertToBlob({type:'image/webp',quality});
     // Some browsers return PNG for unsupported encoders. Never upload it as WebP.
     if (blob.type !== 'image/webp') {
       let codec;
       try { codec = await import(WEBP_CODEC); }
       catch { throw new Error('The WebP converter could not load. Check your connection and try again.'); }
       await codec.init(undefined,{locateFile:path => `https://cdn.jsdelivr.net/npm/@jsquash/webp@1.5.0/codec/enc/${path}`});
-      const bytes = await codec.default(ctx.getImageData(0,0,canvas.width,canvas.height),{quality:88});
+      const bytes = await codec.default(ctx.getImageData(0,0,canvas.width,canvas.height),{quality:quality*100});
       blob = new Blob([bytes],{type:'image/webp'});
     }
     self.postMessage({blob});

@@ -100,6 +100,7 @@ try{
    await entryRow.getByText('Payment: Bank Transfer',{exact:true}).waitFor();
    await page.locator('.accounting-net').getByText('₱3,349.75',{exact:true}).waitFor();
    const deliveryRow=page.locator('.accounting-report table tr').filter({hasText:order.reference}).last();await deliveryRow.locator('[data-accounting=order]').click();
+   assert.equal(await page.locator('.delivery-accounting').evaluate(el=>el.nextElementSibling?.classList.contains('private-staff')),true,'Delivery accounting appears immediately before private staff notes');
    await page.locator('.delivery-accounting > summary').click();await page.locator('.delivery-accounting-form').waitFor();
    await page.locator('.delivery-accounting-form [name=amount]').fill('225.50');await pickDate(page.locator('.delivery-accounting-form'),'cost_date','2026-09-25');
    assert.match(await page.locator('.delivery-difference').textContent(),/75\.50.*shortfall/);
@@ -129,4 +130,3 @@ try{
   assert.deepEqual(errors,[]);console.log(`PASS accounting ${width}px ${role}: permissions, summary, categories, manual entries, delivery cost, timeframe and real Excel download`);await ctx.close();
  }
 }finally{await browser.close();}
-

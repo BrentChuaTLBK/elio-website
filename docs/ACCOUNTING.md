@@ -11,8 +11,10 @@ reviewed against tree `70a54b2ca3c8b1687e3430530f61896efa313b61`.
 
 - Website product sales are recorded on payment approval, using the Manila date.
 - Discounts appear separately under expenses and are subtracted once.
-- Customer delivery fees appear under income; actual courier costs are separate
-  expenses on the cost date entered by the owner.
+- **Delivery** is one shared category. Customer delivery fees appear as income;
+  actual courier costs appear as expenses on the cost date entered by the owner.
+  Historical entries resolve to the same category without changing their amounts,
+  dates or income/expense types. Excel has one Delivery category worksheet.
 - Later changes to paid order amounts create adjustment entries on the change
   date. They do not overwrite the original recorded amounts.
 - Only paid orders in confirmed, preparing, ready for pickup, out for delivery,
@@ -35,7 +37,8 @@ archived; old entries remain. Optional client/supplier names, payment methods,
 and notes are private. Revisions reject stale edits, retries are idempotent, and
 removal retains audit history.
 
-Each delivery order has an owner-only Delivery accounting section. Recording a
+Each delivery order has an owner-only Delivery accounting section directly above
+Private staff notes. Recording a
 courier cost does not change customer pricing, payment status, emails, or stock.
 
 Excel export refreshes eligibility, then includes the whole selected date range,

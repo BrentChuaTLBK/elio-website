@@ -120,9 +120,7 @@ export async function affiliateReceipt(id) {
 }
 
 export async function affiliatePayout(file, payload) {
-  if (!(file instanceof File) || !file.size) throw new Error('Choose a payment receipt image.');
-  if (!['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP receipt.');
-  if (file.size > 5 * 1024 * 1024) throw new Error('Receipt images must be 5 MB or smaller.');
+  file=await preparePhoto(file,{receipt:true});
   const body = new FormData();
   for (const [key,value] of Object.entries(payload)) body.set(key,String(value));
   body.set('file',file);
@@ -146,8 +144,7 @@ export async function upload(file, { kind = 'proof', order_id, token, payment_re
     if (error) throw new Error(error.message || 'The photo could not be uploaded.');
     return { url: client.storage.from('product-images').getPublicUrl(path).data.publicUrl };
   }
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP image.');
-  if (file.size > 5 * 1024 * 1024) throw new Error('The image must be 5 MB or smaller.');
+  file=await preparePhoto(file,{receipt:true});
   const body = new FormData();
   body.set('file', file);
   body.set('kind', kind);

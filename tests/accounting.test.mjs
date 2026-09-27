@@ -64,3 +64,15 @@ test('a shared category exports two independently filterable tables and one summ
  assert.equal(rows[0].getCell(2).value.result,2500);assert.equal(rows[0].getCell(3).value.result,125.25);assert.equal(rows[0].getCell(4).value.result,2374.75);
  sheet.eachRow(row=>row.eachCell(cell=>assert.notEqual(cell.value,'Net')));
 });
+
+test('Delivery exports one worksheet and summary category while preserving income, expenses and net',async()=>{
+ const require=createRequire(import.meta.url),ExcelJS=require(process.env.EXCELJS_TEST_PATH||resolve(import.meta.dirname,'../work/exceljs-4.4.0.min.cjs'));
+ const report=structuredClone(fixture),fee=report.categories.find(c=>c.id==='fee');fee.name='Delivery';report.categories=report.categories.filter(c=>c.id!=='cost');
+ for(const e of report.entries)if(e.category_id==='cost')e.category_id='fee';
+ const summary=report.summary.find(c=>c.id==='fee');summary.name='Delivery';summary.expense_cents=22550;report.summary=report.summary.filter(c=>c.id!=='cost');
+ assert.deepEqual(accountingTotals(report),accountingTotals(fixture));
+ const workbook=buildAccountingWorkbook(report,ExcelJS),bytes=await workbook.xlsx.writeBuffer(),saved=new ExcelJS.Workbook();await saved.xlsx.load(bytes);
+ assert(saved.getWorksheet('Delivery'));assert(!saved.getWorksheet('Delivery fees'));assert(!saved.getWorksheet('Delivery costs'));
+ const sheet=saved.getWorksheet('Delivery');assert.equal(Object.keys(sheet.tables).length,2);assert.equal(sheet.getCell('G7').value,150);assert.equal(sheet.getCell('G13').value,225.5);
+ const rows=[];saved.getWorksheet('Summary').eachRow(row=>{if(row.getCell(1).value==='Delivery')rows.push(row);});assert.equal(rows.length,1);assert.equal(rows[0].getCell(2).value.result,150);assert.equal(rows[0].getCell(3).value.result,225.5);assert.equal(rows[0].getCell(4).value.result,-75.5);
+});

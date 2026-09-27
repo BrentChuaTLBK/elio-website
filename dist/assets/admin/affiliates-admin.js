@@ -1,6 +1,7 @@
 import {api,money,escapeHtml as esc,manilaDate,affiliatePayout} from './client.js';
-import {percent,decimalHundredths,manilaInput,manilaTimestamp,paymentMethods,renderAffiliateReport,openAffiliateReceipt,liveAffiliateRefresh,dateTime} from '../affiliates.js';
+import {percent,decimalHundredths,manilaInput,manilaTimestamp,paymentMethods,renderAffiliateReport,renderPayoutDetails,openAffiliateReceipt,liveAffiliateRefresh,dateTime} from '../affiliates.js';
 import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';
+import {PHOTO_ACCEPT,RECEIPT_HELP} from './photo-upload.js';
 
 export function mountAffiliates(root,{role,connected}){
  if(!root)return;
@@ -58,7 +59,7 @@ export function mountAffiliates(root,{role,connected}){
   editor('code',c?'Edit affiliate code':'Add affiliate code',`${field('code','Custom promo code',c?.code||'','text','required maxlength="40" pattern="[A-Za-z0-9_\\-]{1,40}" autocomplete="off"')}<div class="field-row"><label class="field">Discount type<select name="discount_kind">${option('percent','Percentage (%)',c?.kind||'percent')}${option('fixed','Fixed amount (PHP)',c?.kind||'percent')}</select></label>${field('value','Discount value',c?(c.kind==='fixed'?(c.value/100).toFixed(2):c.value):'','number',`required min="${c?.kind==='fixed'?'0.01':'1'}" step="${c?.kind==='fixed'?'0.01':'1'}" ${c?.kind==='fixed'?'':'max="100"'} inputmode="decimal"`)}</div><div class="field-row">${field('minimum','Minimum product subtotal · PHP',((c?.min_subtotal_cents||0)/100).toFixed(2),'number','required min="0" max="9999999.99" step="0.01" inputmode="decimal"')}${field('cap','Maximum discount · PHP · optional',c?.cap_cents==null?'':(c.cap_cents/100).toFixed(2),'number','min="0" max="9999999.99" step="0.01" inputmode="decimal"')}</div><div class="field-row">${field('starts','Starts · Manila time',manilaInput(start),'datetime-local','required')}${field('expires','Expires · Manila time',manilaInput(end),'datetime-local','required')}</div><div class="field-row">${field('per_account','Uses per account',c?.per_account_limit||1,'number','required min="1" max="2147483647" step="1" inputmode="numeric"')}${field('total','Total uses across customers',c?.global_limit||100,'number','required min="1" max="2147483647" step="1" inputmode="numeric"')}</div>${check('active','Code active',c?.active??true)}<p class="help-text">Edits affect future orders. Existing orders keep their saved discount and commission terms. Pause a code to stop new uses while keeping its history.</p>`,c||{id:crypto.randomUUID(),revision:0});
  }
  function payoutForm(){
-  editor('payout','Record a manual payment',`<p>Available to pay: <strong>${money(Math.max(0,report.stats.balance_cents))}</strong></p><p class="help-text">Record a payment you have already made. This reduces the affiliate’s payable balance and adds an expense in Accounting.</p><div class="field-row">${field('amount','Amount paid · PHP','','number',`required min="0.01" max="${(Math.max(0,report.stats.balance_cents)/100).toFixed(2)}" step="0.01" inputmode="decimal"`)}${field('paid_on','Payment date · Manila',manilaDate(),'date',`required max="${manilaDate()}"`)}</div><div class="field-row"><label class="field">Payment method<select name="method">${Object.entries(paymentMethods).map(([v,l])=>option(v,l,'gcash')).join('')}</select></label>${field('reference','Payment reference · optional','','text','maxlength="200"')}</div><label class="field">Notes shared with affiliate · optional<textarea name="note" maxlength="2000"></textarea></label>${field('proof','Proof of payment','','file','required accept="image/jpeg,image/png,image/webp"')}<p class="help-text">JPG, PNG or WebP · up to 5 MB. Only owners and this affiliate can view the receipt. Upload a receipt showing only this payment.</p>`,{id:crypto.randomUUID(),affiliate_id:selected});
+  editor('payout','Record a manual payment',`${renderPayoutDetails(report.payout_details,true)}<p>Available to pay: <strong>${money(Math.max(0,report.stats.balance_cents))}</strong></p><p class="help-text">Record a payment you have already made. This reduces the affiliate’s payable balance and adds an expense in Accounting.</p><div class="field-row">${field('amount','Amount paid · PHP','','number',`required min="0.01" max="${(Math.max(0,report.stats.balance_cents)/100).toFixed(2)}" step="0.01" inputmode="decimal"`)}${field('paid_on','Payment date · Manila',manilaDate(),'date',`required max="${manilaDate()}"`)}</div><div class="field-row"><label class="field">Payment method<select name="method">${Object.entries(paymentMethods).map(([v,l])=>option(v,l,report.payout_details?.method||'gcash')).join('')}</select></label>${field('reference','Payment reference · optional','','text','maxlength="200"')}</div><label class="field">Notes shared with affiliate · optional<textarea name="note" maxlength="2000"></textarea></label>${field('proof','Proof of payment','','file',`required accept="${PHOTO_ACCEPT}"`)}<p class="help-text">${RECEIPT_HELP} Only owners and this affiliate can view the receipt. Upload a receipt showing only this payment.</p>`,{id:crypto.randomUUID(),affiliate_id:selected});
  }
  root.addEventListener('input',e=>{if(e.target.closest('.aff-form'))root.dataset.dirty='true';});
  root.addEventListener('change',async e=>{
@@ -95,6 +96,7 @@ export function mountAffiliates(root,{role,connected}){
   try{
    if(action==='refresh'){await load();return;}
    if(action==='copy-code'){await navigator.clipboard.writeText(report.codes.find(c=>c.id===b.dataset.id).code);message('Code copied.');return;}
+   if(action==='copy-payout-number'){await navigator.clipboard.writeText(b.closest('.aff-payment-details').querySelector('.aff-account-number').textContent);message('Account number copied.');return;}
    if(action==='receipt'){b.disabled=true;await openAffiliateReceipt(b.dataset.id);return;}
    if(loading)return;
    if(action.startsWith('orders-')||action.startsWith('payouts-')){const direction=action.endsWith('next')?1:-1;if(action.startsWith('orders'))orderOffset=Math.max(0,orderOffset+direction*50);else payoutOffset=Math.max(0,payoutOffset+direction*20);await load();return;}
@@ -103,7 +105,13 @@ export function mountAffiliates(root,{role,connected}){
    if(action==='edit-affiliate')affiliateForm(report.affiliate);
    if(action==='new-code')codeForm();
    if(action==='edit-code')codeForm(report.codes.find(c=>c.id===b.dataset.id));
-   if(action==='new-payout')payoutForm();
+   if(action==='new-payout'){
+    b.disabled=true;root.dataset.busy='true';
+    try{
+     const next=await api('affiliate_report',{id:selected,order_offset:orderOffset,payout_offset:payoutOffset});
+     if(disposed||!root.isConnected)return;report=next;$('.aff-report').innerHTML=renderAffiliateReport(report,true);payoutForm();
+    }finally{root.dataset.busy='false';}
+   }
    if(action==='void-payout'){const p=report.payouts.find(p=>p.id===b.dataset.id);editor('void','Correct a payment record',`<p>${money(p.amount_cents)} · ${esc(p.reference||p.paid_on)}</p><p class="help-text">Use this only to correct an incorrect payment record. Voiding does not retrieve money already transferred.</p><label class="field">Reason shared with affiliate<textarea name="reason" required minlength="3" maxlength="2000"></textarea></label>`,p);}
    if(action==='open'){selected=b.dataset.id;report=null;orderOffset=0;payoutOffset=0;await load();$('.aff-detail').scrollIntoView({behavior:'smooth',block:'start'});}
   }catch(err){message(err.message,true);}finally{b.disabled=false;}
