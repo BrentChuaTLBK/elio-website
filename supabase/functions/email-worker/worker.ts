@@ -1,5 +1,6 @@
 import { env, json, rpc, service } from "../_shared/server.ts";
 import { renderEmail } from "../_shared/emails.ts";
+import { syncNewsletterContacts } from "./newsletter-contacts.ts";
 import { deliverNewsletters } from "./newsletter-worker.ts";
 import { deliverBroadcasts, checkBroadcastConfiguration } from "./newsletter-broadcasts.ts";
 
@@ -19,6 +20,9 @@ export async function handle(request: Request): Promise<Response> {
   if (new URL(request.url).searchParams.get("action") === "check_broadcasts") {
     try { return json(await checkBroadcastConfiguration(key)); }
     catch (error) { return json({ configured: false, error: error instanceof Error ? error.message : "Broadcast configuration unavailable." }, 503); }
+  }
+  if (new URL(request.url).searchParams.get("action") === "sync_contacts") {
+    return json(await syncNewsletterContacts(key));
   }
   const stats = { accepted: 0, skipped: 0, failed: 0, acknowledgement_pending: 0, maintenance: null as any };
   try {
@@ -68,8 +72,9 @@ export async function handle(request: Request): Promise<Response> {
         catch { /* An expired lease can be reclaimed with the same idempotency key. */ }
       }
     }
+    const contacts = await syncNewsletterContacts(key);
     const newsletter = await deliverNewsletters(key);
     const broadcasts = await deliverBroadcasts(key);
-    return json({ ...stats, newsletter, broadcasts });
+    return json({ ...stats, contacts, newsletter, broadcasts });
   } catch { return json({ ...stats, error: "Email maintenance unavailable; existing leases remain retryable." }, 503); }
 }

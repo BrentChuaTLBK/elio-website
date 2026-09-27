@@ -66,7 +66,7 @@ function formMarkup(id, source) {
     <label class="elio-newsletter-label" for="${id}-email">Email address</label>
     <input class="elio-newsletter-email" id="${id}-email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com" required>
     <div class="newsletter-trap" aria-hidden="true"><label>Website<input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
-    <label class="elio-newsletter-consent"><input type="checkbox" name="consent" required><span>Join the Elio Newsletter. Unsubscribe anytime.</span></label>
+    <p class="elio-newsletter-consent-note">By joining, you agree to receive the Elio Newsletter. Unsubscribe anytime.</p>
     <button class="elio-newsletter-submit" type="submit">Join</button>
     <p class="elio-newsletter-status" data-newsletter-status role="status" aria-live="polite"></p>
     <p class="elio-newsletter-links"><a href="newsletter.html#terms" target="_blank" rel="noopener">Offer terms</a> · <a href="newsletter.html#privacy" target="_blank" rel="noopener">Email privacy</a></p>
@@ -78,7 +78,7 @@ function bindForm(form) {
   form.dataset.newsletterBound = 'true';
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (form.dataset.busy === 'true' || !form.reportValidity() || !form.elements.consent.checked) return;
+    if (form.dataset.busy === 'true' || !form.reportValidity()) return;
     const button = form.querySelector('[type="submit"]'), status = form.querySelector('[data-newsletter-status]');
     const label = button.textContent;
     form.dataset.busy = 'true';button.disabled = true;button.textContent = 'Joining…';status.textContent = '';status.classList.remove('is-error');
@@ -197,4 +197,3 @@ ready.then(() => {
     setTimeout(() => getNewsletterSettings(true), 0);
   });
 });
-

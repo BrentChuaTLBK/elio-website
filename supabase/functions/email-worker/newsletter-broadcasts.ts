@@ -3,37 +3,8 @@ import { renderNewsletterEmail } from "../_shared/newsletter-emails.ts";
 
 // A single, leased Elio segment is prepared for the reviewed recipient snapshot.
 // It stays locked until Resend finishes sending. Other brands are never changed.
-export function resendMarketing(key: string) {
-  let previous = 0;
-  async function request(path: string, method = "GET", body?: unknown, allowMissing = false): Promise<any> {
-    await new Promise(resolve => setTimeout(resolve, Math.max(0, 180 - (Date.now() - previous))));
-    previous = Date.now();
-    const response = await fetch(`https://api.resend.com${path}`, {
-      method, headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(8000),
-    });
-    if (allowMissing && response.status === 404) return null;
-    const result = await response.json().catch(() => null);
-    if (!response.ok || !result) throw new Error(response.status === 401 || response.status === 403
-      ? "Broadcast access unavailable. Configure RESEND_BROADCAST_API_KEY with full access."
-      : `Resend marketing request failed (${response.status}). The campaign was not sent through the email API.`);
-    return result;
-  }
-  async function list(path: string): Promise<any[]> {
-    const rows: any[] = []; let after = "";
-    for (let page = 0; page < 1000; page++) {
-      const result = await request(`${path}${path.includes("?") ? "&" : "?"}limit=100${after ? `&after=${encodeURIComponent(after)}` : ""}`);
-      if (!Array.isArray(result.data)) throw new Error("Invalid marketing list response.");
-      rows.push(...result.data);
-      if (!result.has_more) return rows;
-      const next = result.data.at(-1)?.id;
-      if (!next || next === after) throw new Error("Marketing pagination did not advance.");
-      after = next;
-    }
-    throw new Error("Marketing pagination exceeded the safety limit.");
-  }
-  return { request, list };
-}
+import { resendMarketing } from "../_shared/resend-marketing.ts";
+export { resendMarketing } from "../_shared/resend-marketing.ts";
 
 export async function checkBroadcastConfiguration(key: string) {
   const config = await service("newsletter_broadcast_config");
@@ -46,32 +17,12 @@ export async function checkBroadcastConfiguration(key: string) {
   return { configured: true, transport: "resend_broadcasts" };
 }
 
-async function reconcilePreferences(api: ReturnType<typeof resendMarketing>, topic: string) {
-  const rows = await service("newsletter_broadcast_contacts");
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const contact = await api.request(`/contacts/${row.contact_id}`, "GET", undefined, true);
-    if (!contact) {
-      await service("newsletter_broadcast_contact_checked", { subscriber_id: row.id, unsubscribed: true });
-      continue;
-    }
-    const topics = await api.list(`/contacts/${row.contact_id}/topics`);
-    const preference = topics.find(t => t.id === topic);
-    const unsubscribed = contact.unsubscribed === true || preference?.subscription !== "opt_in";
-    if (row.status !== "subscribed" && !unsubscribed) {
-      await api.request(`/contacts/${row.contact_id}/topics`, "PATCH", [{ id: topic, subscription: "opt_out" }]);
-    }
-    await service("newsletter_broadcast_contact_checked", { subscriber_id: row.id, unsubscribed });
-  }
-}
-
 export async function deliverBroadcasts(key: string) {
   const stats = { transport: "resend_broadcasts", accepted: 0, pending: false, failed: false, configured: true };
   const api = resendMarketing(env("RESEND_BROADCAST_API_KEY") || key);
   let lease: any = null;
   const started = Date.now();
   try {
-    const config = await service("newsletter_broadcast_config");
-    if (config?.topic_id) await reconcilePreferences(api, config.topic_id);
     const claim = await service("newsletter_broadcast_claim");
     if (claim?.configured === false) { stats.configured = false; return stats; }
     if (claim?.busy) { stats.pending = true; return stats; }
@@ -85,22 +36,14 @@ export async function deliverBroadcasts(key: string) {
     if (job.status === "preparing") {
       for (const row of job.recipients.filter((r: any) => !r.synced)) {
         if (Date.now() - started > 35000) { stats.pending = true; return stats; }
-        let contact = await api.request(`/contacts/${encodeURIComponent(row.email)}`, "GET", undefined, true);
-        if (!contact) {
-          const created = await api.request("/contacts", "POST", { email: row.email });
-          if (!created.id) throw new Error("Contact creation was not confirmed.");
-          contact = await api.request(`/contacts/${created.id}`);
-        }
-        if (!contact.id || String(contact.email).toLowerCase() !== row.email) throw new Error("Contact identity mismatch.");
-        const topics = await api.list(`/contacts/${contact.id}/topics`);
-        const preference = topics.find(t => t.id === topic);
-        // A known opt-out must never be overwritten by list synchronization.
-        if (contact.unsubscribed || (row.contact_id && preference?.subscription !== "opt_in")) {
+        // Signup synchronization owns consent. Campaign preparation only checks it.
+        if (!row.contact_ready || !row.contact_id) { stats.pending = true; return stats; }
+        const contact = await api.request(`/contacts/${row.contact_id}`, "GET", undefined, true);
+        if (contact && String(contact.email).toLowerCase() !== row.email) throw new Error("Contact identity mismatch.");
+        const topics = contact ? await api.list(`/contacts/${contact.id}/topics`) : [];
+        if (!contact || contact.unsubscribed || topics.find(t => t.id === topic)?.subscription !== "opt_in") {
           await action("contact", { subscriber_id: row.id, unsubscribed: true });
           continue;
-        }
-        if (!row.contact_id && preference?.subscription !== "opt_in") {
-          await api.request(`/contacts/${contact.id}/topics`, "PATCH", [{ id: topic, subscription: "opt_in" }]);
         }
         await api.request(`/contacts/${contact.id}/segments/${segment}`, "POST");
         job = await action("contact", { subscriber_id: row.id, contact_id: contact.id });

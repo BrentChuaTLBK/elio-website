@@ -55,6 +55,16 @@ export function renderNewsletterEmail(payload: any): { html: string; text: strin
       + emailPanel("A little something for your next box", `<p style="margin:0 0 10px;font:32px/1.2 Georgia,serif;color:#63412d">${e(offer.value)}% off</p><p style="margin:0 0 16px;font:bold 27px/1.4 Arial,sans-serif;letter-spacing:4px;color:#39251c">${e(offer.code)}</p><p style="margin:0;font-size:13px;line-height:1.8">${e(terms)}</p>`, "sand")
       + emailButton("Explore our boxes", shop);
     plain = `${heading}\n\n${intro}\n\nYour personal code: ${offer.code}\n\n${terms}\n\nExplore our boxes:\n${shop}`;
+  } else if (payload.event_type === "newsletter_welcome_back") {
+    heading = "Welcome back.";
+    subject = "Welcome back to the Elio Newsletter";
+    intro = "It’s lovely to have you back. You’re on the list again for new flavors, seasonal collections, special offers, and exclusive promo codes.";
+    const shop = new URL("order.html", site).toString();
+    body = emailIntro("Elio Newsletter", heading, intro)
+      + `<img src="${e(hero)}" width="656" alt="Elio square Basque cheesecake" style="display:block;width:100%;height:auto;border:0;margin:22px 0">`
+      + `<p style="margin:0 0 22px;font-size:15px;line-height:1.8;color:#665649">A little Elio in your inbox, and something delicious to look forward to.</p>`
+      + emailButton("Discover what’s baking", shop);
+    plain = `${heading}\n\n${intro}\n\nA little Elio in your inbox, and something delicious to look forward to.\n\nDiscover what’s baking:\n${shop}`;
   } else if (["newsletter_campaign", "newsletter_test_campaign"].includes(payload.event_type)) {
     const campaign = payload.campaign || {};
     heading = String(campaign.title || ""); subject = String(campaign.subject || "");

@@ -21,6 +21,7 @@ globalThis.fetch = async (url, options) => {
   calls.push(body.p_action);
   const newsletterRow = { ...row, id: 'newsletter-id', event_key: 'newsletter-test/sender-check', subject: 'Newsletter test', payload: { event_type: 'newsletter_test_campaign', settings: { site_url: 'https://eliocheesecakes.com', newsletter_mailing_address: 'Test address' }, subscriber: { email: 'qa@example.test' }, campaign: { subject: 'Newsletter test', title: 'A little Elio', body: 'A subscriber update.', template: 'letter' } } };
   if (body.p_action === 'newsletter_claim_emails') return Response.json(setup.newsletter ? [newsletterRow] : []);
+  if (body.p_action === 'newsletter_contact_claim') return Response.json({idle:true});
   if (body.p_action === 'newsletter_broadcast_claim') return Response.json({configured:false});
   if (body.p_action === 'newsletter_prepare_email') {
     if (body.p_payload.provider_payload && !setup.newsletterFrozen) setup.newsletterFrozen = structuredClone(body.p_payload.provider_payload);
@@ -53,11 +54,11 @@ try {
     assert.equal((await handle(request())).status, 503); assert.deepEqual(calls, ['authorize']); values.RESEND_API_KEY = key;
   });
   await check('empty queue still performs maintenance', async () => {
-    setup.empty = true; assert.equal((await handle(request())).status, 200); assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'newsletter_claim_emails', 'newsletter_broadcast_config', 'newsletter_broadcast_claim']);
+    setup.empty = true; assert.equal((await handle(request())).status, 200); assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'newsletter_contact_claim', 'newsletter_claim_emails', 'newsletter_broadcast_claim']);
   });
   await check('delivery prepares the claim and acknowledges provider acceptance', async () => {
     const response = await (await handle(request())).json(); assert.equal(response.accepted, 1);
-    assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'prepare_email', 'prepare_email', 'send', 'email_sent', 'newsletter_claim_emails', 'newsletter_broadcast_config', 'newsletter_broadcast_claim']);
+    assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'prepare_email', 'prepare_email', 'send', 'email_sent', 'newsletter_contact_claim', 'newsletter_claim_emails', 'newsletter_broadcast_claim']);
     assert.equal(providerBodies[0].key, 'elio/review/order-id');
     assert.equal(providerBodies[0].body.reply_to, 'elio.cheesecakes@gmail.com');
     assert.equal(providerBodies[0].body.from, values.EMAIL_FROM);

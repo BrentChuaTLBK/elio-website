@@ -10,7 +10,7 @@ let state,calls,job,members,remote,checks=0;
 const sample={event_type:'newsletter_campaign',campaign:{subject:'Elio news',title:'A little Elio',body:'Our latest flavors',template:'editorial'},settings:{site_url:'https://eliocheesecakes.com',newsletter_mailing_address:'Test address'}};
 const reset=()=>{
  state={};calls=[];members=[];remote=null;
- job={campaign_id:'campaign',status:'preparing',provider_id:null,provider_payload:null,payload:structuredClone(sample),recipients:[{id:'subscriber',email:'reader@example.test',synced:false,contact_id:null}]};
+ job={campaign_id:'campaign',status:'preparing',provider_id:null,provider_payload:null,payload:structuredClone(sample),recipients:[{id:'subscriber',email:'reader@example.test',synced:false,contact_id:contactId,contact_ready:true}]};
 };
 globalThis.fetch=async(url,options={})=>{
  const u=new URL(url),body=options.body?JSON.parse(options.body):null;
@@ -80,8 +80,8 @@ try{
   state.globalOptout=true;await deliverBroadcasts('key');assert(!state.sends);assert.equal(state.status,'cancelled');assert(!state.topicPatch);
   reset();job.recipients[0].contact_id=contactId;state.optout=true;await deliverBroadcasts('key');assert(!state.sends);assert(!state.topicPatch);
  });
- await check('Initial recorded consent opts into only the Elio topic',async()=>{
-  state.optout=true;await deliverBroadcasts('key');assert.deepEqual(state.topicPatch,[{id:topic,subscription:'opt_in'}]);assert.equal(state.sends,1);
+ await check('Campaign waits for signup synchronization and cannot grant topic consent',async()=>{
+  job.recipients[0].contact_ready=false;const result=await deliverBroadcasts('key');assert(result.pending);assert(!state.sends);assert(!state.topicPatch);
  });
  await check('Consent changes after segment synchronization prevent send',async()=>{
   state.consentChanged=true;await deliverBroadcasts('key');assert(!state.sends);assert(state.error);assert.equal(job.status,'preparing');
@@ -101,10 +101,6 @@ try{
  await check('Resend edits and insufficient key permissions fail closed without transactional fallback',async()=>{
   state.modified=true;await deliverBroadcasts('key');assert(!state.sends);assert.match(state.error,/content changed/);
   reset();state.denied=true;await deliverBroadcasts('key');assert(!state.sends);assert.match(state.error,/full access/);
- });
- await check('Website and provider unsubscribe preferences reconcile while campaigns are idle',async()=>{
-  state.idle=true;state.preferenceRows=[{id:'subscriber',contact_id:contactId,status:'unsubscribed'}];await deliverBroadcasts('key');assert.deepEqual(state.topicPatch,[{id:topic,subscription:'opt_out'}]);
-  reset();state.idle=true;state.optout=true;state.preferenceRows=[{id:'subscriber',contact_id:contactId,status:'subscribed'}];await deliverBroadcasts('key');assert.equal(state.preference.unsubscribed,true);
  });
  await check('Marketing key and read-only configuration check cannot send or mutate contacts',async()=>{
   vars.RESEND_BROADCAST_API_KEY='marketing-key';try{assert.equal((await checkBroadcastConfiguration('regular-key')).configured,true);assert(calls.filter(c=>c.path.startsWith('/segments')||c.path.startsWith('/topics')||c.path.startsWith('/broadcasts')).every(c=>c.method==='GET'&&c.auth==='Bearer marketing-key'));}finally{delete vars.RESEND_BROADCAST_API_KEY;}
