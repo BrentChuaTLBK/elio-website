@@ -20,6 +20,7 @@ export default async function({db,check,state}){
   for(const user of [null,ids.customer,ids.staff,ids.unverified])await assert.rejects(api('affiliate_admin',{},user),/Sign in|owner|authorized/i);
   await assert.rejects(owner('save',{id:randomUUID(),revision:0,email:'missing@example.test',name:'Missing',commission_bps:1000}),/create.*account/i);
   affiliate=await owner('save',{id:randomUUID(),revision:0,email:'stranger@example.test',name:'QA Affiliate',commission_bps:1000,active:true});
+  const listing=await owner('admin');assert.equal(listing.affiliates.length,1);assert.equal(listing.affiliates[0].id,affiliate.id);assert.equal(listing.affiliates[0].balance_cents,0);assert.equal(listing.affiliates[0].email,'stranger@example.test');
   assert.equal((await api('affiliate_status',{},ids.stranger)).assigned,true);
   assert.equal((await api('affiliate_status',{},ids.customer)).assigned,false);
   for(const table of ['affiliates','affiliate_codes','affiliate_orders','affiliate_ledger','affiliate_payouts','affiliate_audit'])for(const role of ['anon','authenticated','service_role'])
@@ -130,6 +131,11 @@ export default async function({db,check,state}){
   await db.query("update elio.orders set fulfillment_status='cancelled' where id=$1",[o.id]);
   assert.equal((await mine()).orders.find(r=>r.order_id===o.id).earned_cents,0);
   assert.equal(await scalar('select sum(amount_cents)::int from elio.affiliate_ledger where order_id=$1',[o.id]),0);
+ })();
+ await check('owner list and affiliate report reconcile current code counts, earnings and payment balances',async()=>{
+  const list=(await owner('admin')).affiliates.find(a=>a.id===affiliate.id),report=await mine();
+  assert.equal(list.balance_cents,report.stats.balance_cents);assert.equal(list.earned_cents,report.stats.earned_cents);assert.equal(list.code_count,report.codes.length);
+  assert.equal((await owner('report',{id:affiliate.id})).affiliate.id,affiliate.id);
  })();
  state.affiliate={affiliate,code,payout};
 }

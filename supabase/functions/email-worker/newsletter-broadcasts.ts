@@ -6,6 +6,17 @@ import { renderNewsletterEmail } from "../_shared/newsletter-emails.ts";
 import { resendMarketing } from "../_shared/resend-marketing.ts";
 export { resendMarketing } from "../_shared/resend-marketing.ts";
 
+// Resend limits its internal campaign name to 70 characters. The customer-facing
+// subject remains untouched, even when a long subject or emoji fills this name.
+export function broadcastName(campaignId: string, subject: string) {
+  let name = `Elio ${campaignId.slice(0, 8)} · `;
+  for (const character of subject) {
+    if (name.length + character.length > 70) break;
+    name += character;
+  }
+  return name;
+}
+
 export async function checkBroadcastConfiguration(key: string) {
   const config = await service("newsletter_broadcast_config");
   if (!config?.segment_id || !config?.topic_id) return { configured: false };
@@ -81,7 +92,7 @@ export async function deliverBroadcasts(key: string) {
         const rendered = renderNewsletterEmail({ ...job.payload, broadcast: true });
         job = await action("payload", { provider_payload: {
           segment_id: segment, topic_id: topic, send: false,
-          name: `Elio ${job.campaign_id} — ${job.payload.campaign.subject}`,
+          name: broadcastName(job.campaign_id, job.payload.campaign.subject),
           from: env("NEWSLETTER_EMAIL_FROM") || "Elio Newsletter <news@eliocheesecakes.com>",
           reply_to: "elio.cheesecakes@gmail.com", subject: job.payload.campaign.subject, ...rendered,
         } });

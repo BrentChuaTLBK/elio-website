@@ -40,6 +40,7 @@ globalThis.fetch=async(url,options={})=>{
  if(state.denied)return Response.json({message:'not allowed'},{status:403});
  if(u.pathname==='/broadcasts'&&options.method==='POST'){
   assert.equal(body.send,false);assert.equal(body.segment_id,segment);assert.equal(body.topic_id,topic);
+  assert(body.name.length<=70,'Provider campaign name must fit its 70-character limit');
   assert.equal(body.from,'Elio Newsletter <news@eliocheesecakes.com>');assert.match(body.html,/\{\{\{RESEND_UNSUBSCRIBE_URL\}\}\}/);
   remote={...body,id:'broadcast',status:'draft'};return Response.json({id:remote.id});
  }
@@ -65,6 +66,12 @@ globalThis.fetch=async(url,options={})=>{
 };
 async function check(name,fn){reset();await fn();console.log('PASS '+name);checks++;}
 try{
+ await check('Long subjects and emoji fit the provider campaign-name limit without changing the email subject',async()=>{
+  job.campaign_id='0926e205-7497-47d7-9c7a-59d41ad95888';
+  job.payload.campaign.subject='Your special Elio offer '+ '🍰'.repeat(60);
+  const subject=job.payload.campaign.subject;assert.equal((await deliverBroadcasts('key')).accepted,1);
+  assert.equal(remote.subject,subject);assert(remote.name.length<=70);assert(!/[\uD800-\uDBFF]$/.test(remote.name));
+ });
  await check('Campaigns create a frozen draft, persist its identity and send using only Broadcasts',async()=>{
   const result=await deliverBroadcasts('key');assert.equal(result.accepted,1);assert.equal(state.sends,1);assert.equal(state.status,'sent');assert(state.released);
   assert(calls.findIndex(c=>c.body?.p_action==='newsletter_broadcast_created')<calls.findIndex(c=>c.path.endsWith('/send')));
