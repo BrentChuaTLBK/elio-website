@@ -133,7 +133,7 @@ function schedulePopup(settings) {
     if (document.hidden || anotherModal) return;
     dialog?.remove();
     dialog = document.createElement('dialog');dialog.id = 'elio-newsletter-dialog';dialog.className = 'elio-newsletter-dialog';dialog.setAttribute('aria-labelledby', 'elio-newsletter-title');
-    dialog.innerHTML = `<button class="elio-newsletter-close" type="button" aria-label="Close newsletter signup"><span aria-hidden="true">×</span></button><div class="elio-newsletter-layout"><div class="elio-newsletter-photo"><img src="assets/trio-story-concept.webp" width="1440" height="960" alt="An Elio box of three square Basque cheesecakes"></div><div class="elio-newsletter-copy"><p class="elio-newsletter-eyebrow">Elio Newsletter</p><h2 id="elio-newsletter-title" class="elio-newsletter-offer"><span>Get</span> <strong>${newsletterOffer(activeSettings).discount_percent}% OFF</strong> <span>your next order.</span></h2><p class="elio-newsletter-intro">Join the Elio Newsletter for news, special offers, and exclusive promo codes.</p>${formMarkup('elio-popup', 'home_popup')}<p class="elio-newsletter-terms">${newsletterOfferTerms(activeSettings)}</p></div></div>`;
+    dialog.innerHTML = `<button class="elio-newsletter-close" type="button" aria-label="Close newsletter signup"><span aria-hidden="true">×</span></button><div class="elio-newsletter-layout"><div class="elio-newsletter-photo"><img src="assets/trio-story-concept.webp" width="1440" height="960" alt="An Elio box of three square Basque cheesecakes"></div><div class="elio-newsletter-copy"><p class="elio-newsletter-eyebrow">Elio Newsletter</p><h2 id="elio-newsletter-title" class="elio-newsletter-offer"><span>Get</span> <strong>${newsletterOffer(activeSettings).discount_percent}% OFF</strong> <span>your next order.</span></h2><p class="elio-newsletter-intro">Join the Elio Newsletter for news, special offers, and exclusive promo codes.</p>${formMarkup('elio-popup', 'home_popup')}</div></div>`;
     document.body.append(dialog);bindForm(dialog.querySelector('form'));
     const dismiss = () => { rememberPopup(popupState()?.state === 'submitted' ? 'submitted' : 'dismissed');dialog.close();show(); };
     dialog.querySelector('.elio-newsletter-close').addEventListener('click', dismiss);
@@ -197,3 +197,4 @@ ready.then(() => {
     setTimeout(() => getNewsletterSettings(true), 0);
   });
 });
+
