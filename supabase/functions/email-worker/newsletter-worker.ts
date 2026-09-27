@@ -24,6 +24,11 @@ export async function deliverNewsletters(key: string) {
         let current = await service("newsletter_prepare_email", { id: row.id, lease_token: row.lease_token });
         if (current?.skip) { stats.skipped++; continue; }
         if (!current?.to_email || !current.event_key || !current.payload) throw new Error("Invalid newsletter message.");
+        // Defense in depth: bulk campaigns must never consume transactional quota.
+        if (current.payload.event_type === "newsletter_campaign") {
+          terminal = true;
+          throw new Error("Campaigns require Resend Broadcasts.");
+        }
         if (!current.provider_payload) {
           const rendered = renderNewsletterEmail(current.payload);
           const provider_payload = {

@@ -17,10 +17,11 @@ export function renderNewsletterEmail(payload: any): { html: string; text: strin
   const address = String(settings.newsletter_mailing_address || settings.pickup_address || "").trim();
   if (!address) throw new Error("Newsletter mailing address is required.");
   const unsubscribeToken = token(payload.unsubscribe_token);
+  const isBroadcast = payload.broadcast === true && payload.event_type === "newsletter_campaign";
   const unsubscribe = new URL("newsletter.html", site);
   unsubscribe.hash = new URLSearchParams({ unsubscribe: unsubscribeToken }).toString();
   const isPreview = payload.subscriber?.email === "preview@example.test" || payload.event_type === "newsletter_test_campaign";
-  if (!unsubscribeToken && !isPreview) throw new Error("Newsletter unsubscribe link is missing.");
+  if (!unsubscribeToken && !isPreview && !isBroadcast) throw new Error("Newsletter unsubscribe link is missing.");
   const hero = new URL("assets/home-editorial-hero.webp", site).toString();
   let heading = "", intro = "", body = "", plain = "", subject = "";
 
@@ -83,8 +84,9 @@ export function renderNewsletterEmail(payload: any): { html: string; text: strin
     plain = `${heading}\n\n${campaign.body}${cta ? `\n\n${campaign.cta_label || "Visit Elio"}:\n${cta}` : ""}`;
   } else { throw new Error("Unsupported newsletter email type."); }
 
-  const footer = `<p style="margin:26px 0 0;padding-top:20px;border-top:1px solid #dfd1bd;font-size:12px;line-height:1.8;color:#786858">${payload.event_type === "newsletter_confirmation" ? "You requested an Elio newsletter subscription." : "You’re receiving this because you subscribed to the Elio Newsletter."}<br>Elio Basque Cheesecake · ${e(address).replace(/\n/g, "<br>")}<br>${isPreview ? 'Email preview · unsubscribe links are disabled.' : `<a href="${e(unsubscribe.toString())}" style="color:#63412d;text-decoration:underline">Unsubscribe from Elio newsletters</a>`}</p>`;
-  return { html: emailFrame(subject, intro || heading, body + footer, String(contact)), text: `${plain}\n\nElio Basque Cheesecake\n${address}\n${contact}\n${isPreview ? "Preview only." : `Unsubscribe from Elio newsletters:\n${unsubscribe}`}` };
+  const unsubscribeUrl = isBroadcast ? "{{{RESEND_UNSUBSCRIBE_URL}}}" : unsubscribe.toString();
+  const footer = `<p style="margin:26px 0 0;padding-top:20px;border-top:1px solid #dfd1bd;font-size:12px;line-height:1.8;color:#786858">${payload.event_type === "newsletter_confirmation" ? "You requested an Elio newsletter subscription." : "You’re receiving this because you subscribed to the Elio Newsletter."}<br>Elio Basque Cheesecake · ${e(address).replace(/\n/g, "<br>")}<br>${isPreview && !isBroadcast ? 'Email preview · unsubscribe links are disabled.' : `<a href="${e(unsubscribeUrl)}" style="color:#63412d;text-decoration:underline">Unsubscribe from Elio newsletters</a>`}</p>`;
+  return { html: emailFrame(subject, intro || heading, body + footer, String(contact)), text: `${plain}\n\nElio Basque Cheesecake\n${address}\n${contact}\n${isPreview && !isBroadcast ? "Preview only." : `Unsubscribe from Elio newsletters:\n${unsubscribeUrl}`}` };
 }
 
 export function newsletterHeaders(payload: any, edgeBase: string): Record<string, string> {

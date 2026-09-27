@@ -1,6 +1,7 @@
 import { env, json, rpc, service } from "../_shared/server.ts";
 import { renderEmail } from "../_shared/emails.ts";
 import { deliverNewsletters } from "./newsletter-worker.ts";
+import { deliverBroadcasts, checkBroadcastConfiguration } from "./newsletter-broadcasts.ts";
 
 // This worker accepts only the high-entropy credential held privately in Vault.
 // The verifier RPC can be called only by the service role, not browser sessions.
@@ -15,6 +16,10 @@ export async function handle(request: Request): Promise<Response> {
   const key = env("RESEND_API_KEY"), sender = env("EMAIL_FROM");
   // Check configuration before leasing messages: missing secrets must not use up retries.
   if (!key || !sender) return json({ error: "Configure Elio RESEND_API_KEY and EMAIL_FROM." }, 503);
+  if (new URL(request.url).searchParams.get("action") === "check_broadcasts") {
+    try { return json(await checkBroadcastConfiguration(key)); }
+    catch (error) { return json({ configured: false, error: error instanceof Error ? error.message : "Broadcast configuration unavailable." }, 503); }
+  }
   const stats = { accepted: 0, skipped: 0, failed: 0, acknowledgement_pending: 0, maintenance: null as any };
   try {
     stats.maintenance = await service("maintenance");
@@ -64,6 +69,7 @@ export async function handle(request: Request): Promise<Response> {
       }
     }
     const newsletter = await deliverNewsletters(key);
-    return json({ ...stats, newsletter });
+    const broadcasts = await deliverBroadcasts(key);
+    return json({ ...stats, newsletter, broadcasts });
   } catch { return json({ ...stats, error: "Email maintenance unavailable; existing leases remain retryable." }, 503); }
 }
