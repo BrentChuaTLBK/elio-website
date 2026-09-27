@@ -134,7 +134,7 @@ function closeDialog() { if(catalogOrderController && !catalogOrderController.ca
 modal.addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 $('#dialog-close').addEventListener('click', closeDialog);
 
-const newsletterAdmin = createNewsletterAdmin({connected:()=>state.connected,owner:()=>state.role==='owner',showDialog,closeDialog});
+const newsletterAdmin = createNewsletterAdmin({products:()=>state.products,connected:()=>state.connected,owner:()=>state.role==='owner',showDialog,closeDialog});
 const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,owner:()=>state.role==='owner',showDialog,closeDialog,offersOnly:true});
 
 async function refresh() {
