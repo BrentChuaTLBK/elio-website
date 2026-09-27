@@ -34,6 +34,11 @@ test('real XLSX roundtrip keeps category sheets, formulas, currency, dates and h
  const require=createRequire(import.meta.url);
  const ExcelJS=require(process.env.EXCELJS_TEST_PATH||resolve(import.meta.dirname,'../work/exceljs-4.4.0.min.cjs'));
  const wb=buildAccountingWorkbook(fixture,ExcelJS),bytes=await wb.xlsx.writeBuffer();
+ // A worksheet formula without matching table metadata triggers Excel repair.
+ for(const sheet of wb.worksheets)for(const table of Object.values(sheet.tables)){
+  const amount=table.table.columns.at(-1);assert.equal(amount.totalsRowFunction,'custom');
+  assert.match(amount.totalsRowFormula,/^SUM\(G\d+:G\d+\)$/);
+ }
  assert.equal(String.fromCharCode(...bytes.slice(0,2)),'PK');
  const saved=new ExcelJS.Workbook();await saved.xlsx.load(bytes);
  assert.equal(saved.worksheets.length,fixture.categories.length+2);
@@ -59,4 +64,3 @@ test('a shared category exports two independently filterable tables and one summ
  assert.equal(rows[0].getCell(2).value.result,2500);assert.equal(rows[0].getCell(3).value.result,125.25);assert.equal(rows[0].getCell(4).value.result,2374.75);
  sheet.eachRow(row=>row.eachCell(cell=>assert.notEqual(cell.value,'Net')));
 });
-

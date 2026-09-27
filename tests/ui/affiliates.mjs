@@ -22,8 +22,12 @@ try{
    export async function upload(){throw Error('Unexpected upload')} export async function newsletterRequest(){throw Error('Unexpected newsletter')} export async function websiteVisitorStats(){return {}};${helpers}`});
    if(url.pathname==='/fixture-api'){
     const {action,payload:p}=route.request().postDataJSON();calls.push({action,payload:p});let data;
-    if(action==='admin_bootstrap')data={role,products:[],categories:[],orders:[],inventory:[],zones:[],staff:[],promos:[{id:'affiliate-code',affiliate_managed:true,code:'PRIVATEAFF'},{id:'newsletter-code',newsletter_managed:true,code:'PRIVATENEWS'}],settings:{paused:false}};
-    else if(action==='affiliate_admin')data={affiliates:affiliates.map(a=>({...a,balance_cents:stats().balance_cents,earned_cents:earned,code_count:codes.length}))};
+    if(action==='site_status')data={active:false,uploads_paused:false,announce:false,server_time:new Date().toISOString()};
+    else if(action==='admin_bootstrap')data={role,products:[],categories:[],orders:[],inventory:[],zones:[],staff:[],promos:[{id:'affiliate-code',affiliate_managed:true,code:'PRIVATEAFF'},{id:'newsletter-code',newsletter_managed:true,code:'PRIVATENEWS'}],settings:{paused:false}};
+    else if(action==='affiliate_admin'){
+     const partners=affiliates.map(a=>({...a,...stats(),paid_orders:earned>0?1:0,code_count:codes.length}));
+     data={affiliates:partners,stats:{...stats(),affiliates:partners.length,active_affiliates:partners.filter(a=>a.active).length,payable_cents:Math.max(0,stats().balance_cents),offset_cents:Math.max(0,-stats().balance_cents),paid_orders:earned>0?1:0},top_affiliates:earned>0?partners:[]};
+    }
     else if(action==='affiliate_report'||action==='affiliate_dashboard'){
      if(!assigned)return route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'An affiliate code has not been assigned to your account yet.'})});
      data=report(p);if(holdReport)await new Promise(r=>{releaseReport=r;});
@@ -55,21 +59,27 @@ try{
     // Explicit refresh preserves unsaved form fields and its original revision.
     await page.locator('[data-aff=refresh]').click();assert.equal(await form.locator('[name=commission]').inputValue(),'20');
     await page.locator('[data-view=orders]').click();const dirty=page.getByRole('dialog',{name:'Unsaved affiliate changes',exact:true});await dirty.getByRole('button',{name:'Keep editing',exact:true}).click();assert.equal(await form.locator('[name=commission]').inputValue(),'20');await form.locator('[type=submit]').click();await page.getByText('Current commission:',{exact:false}).waitFor();assert.equal(affiliates[0].commission_bps,2000);
-    earned=9500;await page.locator('[data-aff=refresh]').click();await page.locator('.aff-stats .panel').first().getByText('₱95.00',{exact:true}).waitFor();await page.screenshot({path:join(output,`owner-${width}.png`),fullPage:true});
+    earned=9500;await page.locator('[data-aff=refresh]').click();await page.locator('.aff-detail .aff-stats .panel').first().getByText('₱95.00',{exact:true}).waitFor();await page.screenshot({path:join(output,`owner-${width}.png`),fullPage:true});
     await page.locator('[data-aff=new-payout]').click();await form.locator('[name=amount]').fill('50');await form.locator('[name=reference]').fill('GCASH-123');await form.locator('[name=proof]').setInputFiles({name:'bad.txt',mimeType:'text/plain',buffer:Buffer.from('test')});await form.locator('[type=submit]').click();await page.getByText('Choose a JPG, PNG, or WebP receipt.',{exact:true}).waitFor();assert.equal(payouts.length,0);
-    await form.locator('[name=proof]').setInputFiles(join(root,'assets/elio-favicon.png'));await page.screenshot({path:join(output,`payout-${width}.png`),fullPage:true});await form.locator('[type=submit]').dblclick();await page.getByText('Payment recorded. The balance and Accounting have been updated.',{exact:true}).waitFor();assert.equal(payouts.length,1);assert.equal(payouts[0].amount_cents,5000);await page.locator('.aff-stats .panel').first().getByText('₱45.00',{exact:true}).waitFor();
+    await form.locator('[name=proof]').setInputFiles(join(root,'assets/elio-favicon.png'));await page.screenshot({path:join(output,`payout-${width}.png`),fullPage:true});await form.locator('[type=submit]').dblclick();await page.getByText('Payment recorded. The balance and Accounting have been updated.',{exact:true}).waitFor();assert.equal(payouts.length,1);assert.equal(payouts[0].amount_cents,5000);await page.locator('.aff-detail .aff-stats .panel').first().getByText('₱45.00',{exact:true}).waitFor();
     await page.locator('[data-aff=receipt]').click();await page.getByRole('dialog',{name:'Payment receipt',exact:true}).waitFor();await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
     await page.locator('[data-aff=void-payout]').click();await form.locator('[name=reason]').fill('Wrong payment amount recorded');await form.locator('[type=submit]').click();await page.getByRole('dialog',{name:'Void payment record?',exact:true}).getByRole('button',{name:'Void record',exact:true}).click();await page.getByText('Payment record voided. The balance and Accounting have been updated.',{exact:true}).waitFor();assert.equal(payouts[0].status,'voided');
     // Paid commission later reversed, so the next earnings offset the payment.
     payouts[0].status='paid';earned=0;await page.locator('[data-aff=refresh]').click();await page.getByText('will be offset against future earnings',{exact:false}).waitFor();assert.equal(await page.locator('[data-aff=new-payout]').isDisabled(),true);
-    earned=9500;await page.goto(origin+'/affiliate.html');await page.getByText('Welcome, Elio Partner.',{exact:true}).waitFor();assert.equal(await page.locator('[data-aff=edit-code]').count(),0);assert.equal(await page.locator('[data-aff=new-payout]').count(),0);assert.equal(await page.locator('[data-aff=void-payout]').count(),0);
+    await page.locator('.aff-select').selectOption('');await page.locator('.aff-overview:not([hidden])').waitFor();
+    await page.locator('.aff-overview [data-metric=payable] strong').getByText('₱0.00',{exact:true}).waitFor();assert.match(await page.locator('.aff-overview').textContent(),/₱50.00 in previous payments/);
+    earned=9500;await page.locator('[data-aff=refresh]').click();await page.locator('.aff-overview [data-metric=sales] strong').getByText('₱950.00',{exact:true}).waitFor();
+    assert.equal(await page.locator('.aff-overview [data-metric=payable] strong').textContent(),'₱45.00');assert.equal(await page.locator('.aff-overview [data-metric=paid] strong').textContent(),'₱50.00');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:join(output,`overview-${width}.png`),fullPage:true});
+    await page.locator('.aff-leaderboard [data-aff=open]').click();await page.locator('.aff-detail:not([hidden])').waitFor();assert.equal(await page.locator('.aff-overview').isVisible(),false);
+    await page.goto(origin+'/affiliate.html');await page.getByText('Welcome, Elio Partner.',{exact:true}).waitFor();assert.equal(await page.locator('[data-aff=edit-code]').count(),0);assert.equal(await page.locator('[data-aff=new-payout]').count(),0);assert.equal(await page.locator('[data-aff=void-payout]').count(),0);
     await page.locator('[data-aff=receipt]').click();await page.getByRole('dialog',{name:'Payment receipt'}).getByRole('button',{name:'Close'}).click();await page.screenshot({path:join(output,`affiliate-${width}.png`),fullPage:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'No horizontal page overflow');
     // Sign-out must clear a response still in flight, not redisplay private data.
     holdReport=true;await page.locator('#affiliate-refresh').click();await page.waitForTimeout(50);await page.evaluate(()=>window.__authChange('SIGNED_OUT'));releaseReport();await page.getByText('You have signed out.',{exact:true}).waitFor();await page.waitForTimeout(50);assert.equal(await page.locator('.aff-code').count(),0);
    }
   }else{
-   await page.goto(origin+'/affiliate.html');if(role==='guest'){await page.getByText('Sign in to your Elio account.',{exact:true}).waitFor();assert.equal(calls.length,0);}else await page.getByText('An affiliate code has not been assigned to your account yet.',{exact:true}).waitFor();
+   await page.goto(origin+'/affiliate.html');if(role==='guest'){await page.getByText('Sign in to your Elio account.',{exact:true}).waitFor();assert.equal(calls.filter(c=>c.action!=='site_status').length,0);}else await page.getByText('An affiliate code has not been assigned to your account yet.',{exact:true}).waitFor();
    assert.equal(await page.locator('.aff-code').count(),0);
   }
   assert.deepEqual(errors,[]);await ctx.close();console.log(`PASS ${role} ${width}px affiliate workflows`);

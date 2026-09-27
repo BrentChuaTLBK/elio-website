@@ -137,5 +137,23 @@ export default async function({db,check,state}){
   assert.equal(list.balance_cents,report.stats.balance_cents);assert.equal(list.earned_cents,report.stats.earned_cents);assert.equal(list.code_count,report.codes.length);
   assert.equal((await owner('report',{id:affiliate.id})).affiliate.id,affiliate.id);
  })();
+ await check('overall affiliate analytics rank sales and preserve each partner’s payable and offset independently',async()=>{
+  const existing=await mine();
+  let overview=await owner('admin');assert.equal(overview.stats.affiliates,1);assert.equal(overview.stats.earned_cents,existing.stats.earned_cents);
+  assert.equal(overview.stats.paid_cents,existing.stats.paid_cents);assert.equal(overview.stats.payable_cents,existing.stats.balance_cents);
+  const pending=await approve(await place());overview=await owner('admin');
+  const pendingNet=pending.subtotal_cents-pending.discount_cents;
+  assert.equal(overview.stats.estimated_cents,Math.round(pendingNet/2));assert.equal(overview.stats.net_sales_cents,existing.stats.net_sales_cents+pendingNet);
+  await h.action('set_refund_label',await h.order(pending.id),{enabled:true});
+  overview=await owner('admin');assert.equal(overview.stats.estimated_cents,0);assert.equal(overview.stats.net_sales_cents,existing.stats.net_sales_cents);
+  // A separate partner with an overpayment must never reduce this partner's payable.
+  const other=await owner('save',{id:randomUUID(),revision:0,email:'owner@example.test',name:'Second partner',commission_bps:1000,active:false});
+  await db.query("insert into elio.affiliate_payouts(id,affiliate_id,amount_cents,paid_on,payment_method,proof_path,request_hash,created_by) values($1,$2,2000,$3,'gcash',$4,$5,$6)",[randomUUID(),other.id,today,`${other.id}/test/proof.png`,'a'.repeat(64),ids.owner]);
+  overview=await owner('admin');assert.equal(overview.stats.affiliates,2);assert.equal(overview.stats.active_affiliates,1);
+  assert.equal(overview.stats.payable_cents,existing.stats.balance_cents);assert.equal(overview.stats.offset_cents,2000);assert.equal(overview.stats.paid_cents,existing.stats.paid_cents+2000);
+  assert.equal(overview.top_affiliates.length,1);assert.equal(overview.top_affiliates[0].id,affiliate.id);
+  assert.equal(overview.top_affiliates[0].net_sales_cents,overview.stats.net_sales_cents);
+  for(const role of ['anon','authenticated','service_role'])assert.equal(await scalar("select has_function_privilege($1,'elio.affiliate_admin_overview()','execute')",[role]),false);
+ })();
  state.affiliate={affiliate,code,payout};
 }

@@ -222,5 +222,6 @@
 @media(max-width:1100px){.newsletter-compose-layout{grid-template-columns:minmax(0,1fr)}.newsletter-campaign-list ul{max-height:420px;overflow-y:auto}}
 @media(max-width:560px){.newsletter-metrics{grid-template-columns:minmax(0,1fr);gap:10px}.newsletter-metrics .panel{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px}.newsletter-metrics strong{margin:0;font-size:27px}.newsletter-filters{display:grid;grid-template-columns:minmax(0,1fr)}.newsletter-filters .field{min-width:0}.newsletter-editor .section-heading{align-items:start;flex-direction:column}.newsletter-pagination{align-items:start;flex-direction:column}.newsletter-editor-actions>.button{flex:1 1 calc(50% - 10px)}.newsletter-email-preview{height:490px}}
 .newsletter-offer-metrics strong{font-size:clamp(21px,2.4vw,30px);overflow-wrap:anywhere}
-.newsletter-offers{min-width:850px}
+.newsletter-offers{min-width:560px}
 .newsletter-offers td:first-child{max-width:250px;white-space:normal;overflow-wrap:anywhere}
+.newsletter-conversion-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.newsletter-conversion-note{font-size:12px;line-height:1.7;margin:0 0 22px}.newsletter-code-details>summary{cursor:pointer;font-weight:600}.newsletter-code-details[open]>summary{margin-bottom:20px}@media(max-width:560px){.newsletter-conversion-metrics{grid-template-columns:1fr}.newsletter-conversion-metrics .panel{margin:0}.newsletter-conversion-metrics span{max-width:75%}}

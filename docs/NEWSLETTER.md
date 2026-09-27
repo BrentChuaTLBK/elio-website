@@ -20,7 +20,11 @@ The owner-only library shows an active subscriber count, six template choices an
 
 Available designs are Flavor Spotlight, Subscriber Offer, From the Kitchen, The Elio Edit (photo and story columns), You’re Invited (a framed invitation), and Short & Sweet (numbered updates). Every layout supports optional uploaded/catalog photos and a shopping button. In Short & Sweet, a blank line starts the next update. Changing the layout preserves the draft's content. The preview iframe remains mounted during photo and save operations so concurrent preview requests cannot blank it.
 
-The Welcome offers report under Promo codes shows all-time code issuance, unused/active, reserved, redeemed, expired and inactive counts, together with paid orders, product sales and discounts. Search by subscriber email or code and filter status. Reserved means awaiting payment or review. A paid cancellation or refund does not restore a redeemed code; those orders are excluded from sales and discount totals. Product sales are subtotal minus discount, excluding delivery.
+The newsletter report under Promo codes highlights three all-time totals: Issued, Expired, and Converted to a sale. A conversion needs a paid order that is not cancelled, expired, or refund-labelled. Expired means an unused code past its original expiry; converted codes stay converted after expiry. Search and result filters in the collapsed code details do not change the overall totals.
+
+Refunding or cancelling an order releases its newsletter code for reuse by the same verified subscriber account, without changing the original expiry or issued terms. Historical redemption records remain for audit, but do not consume that code’s effective limit. Another active order still reserves the code. Undoing a refund is blocked if the code has already been reused on another active order. Regular admin and affiliate codes keep their existing usage rules.
+
+Customers can explicitly join or leave through Email preferences on their account page. The server uses the signed-in, verified account identity, never a submitted email address. Rejoining sends the existing welcome-back message, without a new code. Unsubscribing clears the saved signup opt-in so later account activation cannot silently subscribe them again.
 
 ## Email delivery
 

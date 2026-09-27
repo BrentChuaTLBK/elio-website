@@ -1,4 +1,5 @@
 import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=elio-accounting-1';
+import {mountMaintenance} from './maintenance-admin.js';
 import {mountAffiliates} from './affiliates-admin.js';
 import {monthRange} from './accounting.js?v=shared-categories-1';
 import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';
@@ -123,7 +124,7 @@ const empty = (title, description, action = '') => `<div class="empty-state"><di
 function setupNotice() {
   if (state.connected) return '';
   if (new URL(location.href).searchParams.get('preview') === '1') return '<div class="notice"><strong>Read-only dashboard preview.</strong> These are draft catalog items. Changes cannot be saved here. <a href="manage.html">Open the connected dashboard</a></div>';
-  return `<div class="notice"><strong>Draft dashboard · backend setup pending.</strong> You can explore the layout and forms. Saving, accounts, uploads, orders, and email delivery become available after the setup steps are completed. <a href="admin-setup.html" target="_blank" rel="noopener">Open setup guide</a></div>`;
+  return `<div class="notice"><strong>Draft dashboard · backend setup pending.</strong> You can explore the layout and forms. Saving, accounts, uploads, orders, and email delivery become available after the setup steps are completed.</div>`;
 }
 function showDialog(title, content) {
   if (catalogOrderController && !catalogOrderController.canLeave()) return false;
@@ -146,7 +147,7 @@ const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,ow
 async function refresh() {
   if (!configured) return;
   const result = await api('admin_bootstrap');
-  if(!state.connected && ['#accounting','#affiliates'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
+  if(!state.connected && ['#accounting','#affiliates','#maintenance'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
   Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
   state.promos = state.promos.filter(promo => !promo.newsletter_managed && !promo.affiliate_managed);
   state.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
@@ -158,6 +159,8 @@ async function refresh() {
   render();
 }
 function render() {
+  const maintenanceNav=$('[data-view="maintenance"]');if(maintenanceNav)maintenanceNav.hidden=!state.connected||state.role!=='owner';
+  if(state.view==='maintenance' && $('#maintenance-manager') && state.role==='owner')return;
   const affiliatesNav = $('[data-view="affiliates"]');
   if(affiliatesNav)affiliatesNav.hidden=!state.connected||state.role!=='owner';
   if(state.view==='affiliates' && state.connected && state.role==='owner' && $('#affiliates-manager')){affiliatesController?.refresh();return;}
@@ -171,8 +174,9 @@ function render() {
   const newsletterNav = $('[data-view="newsletter"]');
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
-  const views = { affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
+  const views = { maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
+  if(state.view==='maintenance')mountMaintenance($('#maintenance-manager'),{owner:state.connected&&state.role==='owner'});
   if(state.view==='accounting')mountAccounting($('#accounting-manager'),{api,role:state.role,connected:state.connected,money,escapeHtml:esc,today:manilaDate(),filters:state.accountingFilter,openOrder});
   if(state.view==='affiliates')affiliatesController=mountAffiliates($('#affiliates-manager'),{role:state.role,connected:state.connected});
   if(state.view==='faqs')bindFaqView(state,$('#workspace'),render);
@@ -215,8 +219,9 @@ function overviewView() {
 function emailStatusCard() {
   const rows = Array.isArray(state.email_status) ? state.email_status : [];
   const counts = rows.reduce((result, row) => { result[row.status] = (result[row.status] || 0) + 1; return result; }, {});
-  const problems = rows.filter(row => row.last_error && row.status !== 'sent').slice(0, 4);
-  return `<section class="panel" style="margin-top:22px"><div class="section-heading"><h2>Email delivery</h2><a class="button button-quiet" href="admin-setup.html" target="_blank" rel="noopener">Email setup →</a></div>${rows.length ? `<p class="muted">Latest ${rows.length} notifications: ${Object.entries(counts).map(([status, count]) => `${count} ${label(status).toLowerCase()}`).map(esc).join(' · ')}</p>` : '<p class="muted">No order notifications queued yet. Email sending requires the configured email service and scheduler.</p>'}${problems.map(row => `<p class="notice danger"><strong>${esc(label(row.event_type))}</strong> · ${esc(state.orders.find(o => o.id === row.order_id)?.reference || 'Order notification')}<br>${esc(row.last_error)}</p>`).join('')}<p class="help-text no-margin">Queued or pending messages have not been confirmed delivered. A sent status means the email provider accepted the message; check the recipient inbox during acceptance testing.</p></section>`;
+  const problems = rows.filter(row => row.last_error && row.status !== 'sent' && !row.reviewed_at);
+  const reviewed = rows.filter(row => row.last_error && row.status !== 'sent' && row.reviewed_at);
+  return `<section class="panel" style="margin-top:22px"><div class="section-heading"><h2>Email delivery</h2></div>${rows.length ? `<p class="muted">Latest ${rows.length} notifications: ${Object.entries(counts).map(([status, count]) => `${count} ${label(status).toLowerCase()}`).map(esc).join(' · ')}</p>` : '<p class="muted">No order notifications queued yet. Email sending requires the configured email service and scheduler.</p>'}${problems.map(row => `<div class="notice ${row.status === 'skipped' ? '' : 'danger'}"><strong>${esc(label(row.event_type))}</strong> · ${esc(state.orders.find(o => o.id === row.order_id)?.reference || 'Order notification')}<p>${esc(row.last_error)}</p><button class="button button-secondary" data-action="review-email-alert" data-id="${esc(row.id)}">Mark as reviewed</button></div>`).join('')}${reviewed.length ? `<details class="email-reviewed"><summary>Reviewed notifications (${reviewed.length})</summary>${reviewed.map(row => `<p><strong>${esc(label(row.event_type))}</strong> · ${esc(label(row.status))}<br>${esc(row.last_error)}</p>`).join('')}</details>` : ''}<p class="help-text no-margin">Queued or pending messages have not been confirmed delivered. A sent status means the email provider accepted the message; check the recipient inbox during acceptance testing.</p></section>`;
 }
 function filteredOrders() {
   const f = state.filters;
@@ -639,6 +644,12 @@ async function loadTeam() {
   render();
 }
 async function onAction(button) {
+  if(button.dataset.action==='review-email-alert'){
+    const row=state.email_status.find(entry=>entry.id===button.dataset.id);
+    if(!row)throw new Error('Refresh the dashboard and try again.');
+    await api('review_email_alert',{id:row.id,status:row.status,attempts:row.attempts,last_error:row.last_error});
+    await refresh();render();toast('Notification marked as reviewed.');return;
+  }
   if (button.disabled) return;
   const action = button.dataset.action;
   const id = button.dataset.id;
@@ -741,6 +752,7 @@ function exportOrders() {
 
 document.addEventListener('click', async event => {
   const view = event.target.closest('[data-view]');
+  if(view && state.view==='maintenance' && view.dataset.view!==state.view){const manager=$('#maintenance-manager');if(manager?.dataset.busy==='true'){toast('Please wait for maintenance settings to save.');return;}if(manager?.dataset.dirty==='true'&&!await confirmDialog('Discard unsaved maintenance settings?',{title:'Unsaved maintenance settings',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;}
   if(view && state.view==='affiliates' && view.dataset.view!==state.view){
     const manager=$('#affiliates-manager');
     if(manager?.dataset.busy==='true'){toast('Please wait for the affiliate payment or changes to finish saving.','error');return;}
@@ -1123,7 +1135,7 @@ async function init() {
   } catch (error) {
     $('#shop-status').textContent = 'Dashboard unavailable';
     $('#admin-nav').hidden = true;
-    $('#workspace').innerHTML = heading('Dashboard access', 'Your shop information is protected.') + `<section class="panel"><p class="notice danger">${esc(error.message)}</p><p class="muted">Sign in using an authorized team account. For a new installation, follow the first-owner setup steps.</p><div class="row-actions"><a class="button" href="admin-account.html?next=manage.html">Open account</a><a class="button button-secondary" href="admin-setup.html" target="_blank" rel="noopener">Setup guide</a></div></section>`;
+    $('#workspace').innerHTML = heading('Dashboard access', 'Your shop information is protected.') + `<section class="panel"><p class="notice danger">${esc(error.message)}</p><p class="muted">Sign in using an authorized team account.</p><div class="row-actions"><a class="button" href="admin-account.html?next=manage.html">Open account</a></div></section>`;
   }
 }
 init();

@@ -43,6 +43,8 @@ not just the visible page. Workbooks contain a summary, category sheets with
 separate income/expense tables, and delivery comparisons. Customer text is stored
 as literal text; currency and dates remain typed cells.
 
+Amount totals are declared as custom totals in Excel table metadata, with matching formulas and cached results. Previously, writing a formula only into the worksheet left table metadata inconsistent and triggered Excel's table repair warning. New exports preserve both; previously downloaded files must be downloaded again. Verification includes real XLSX roundtrips and opening/recalculating the generated workbook in Microsoft Excel.
+
 ## Validation
 
 `node tests/backend/run.mjs` covers owner-only access, exact totals, safe retries,

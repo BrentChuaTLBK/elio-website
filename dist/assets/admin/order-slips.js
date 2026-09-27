@@ -183,12 +183,18 @@ function waitForPreview(preview) {
     const timer = setInterval(() => {
       try {
         if (preview.closed) { clearInterval(timer); resolve(null); return; }
-        if (preview.location.href === previewUrl && preview.document.readyState === 'complete') {
+        // Static hosting canonicalizes .html URLs to extensionless paths. Check
+        // the same-origin preview document, not an exact pre-redirect URL string.
+        const expected=new URL(previewUrl),actual=new URL(preview.location.href);
+        if (actual.origin===expected.origin && actual.pathname.replace(/\.html$/,'')===expected.pathname.replace(/\.html$/,'') && preview.document.readyState === 'complete') {
           clearInterval(timer); resolve(preview.document);
         } else if (Date.now() - start > 10000) {
           throw new Error('The print preview could not load. Close it and try printing again.');
         }
       } catch (error) {
+        // A redirect can temporarily expose an opaque navigation document.
+        // Never read its contents; wait for the expected same-origin page.
+        if (error.name === 'SecurityError' && Date.now() - start <= 10000) return;
         clearInterval(timer); reject(error);
       }
     }, 50);
@@ -263,4 +269,3 @@ export async function printOrderSlips(source, { products = [], settings = {} } =
     throw error;
   }
 }
-

@@ -115,6 +115,7 @@ function schedulePopup(settings) {
   let dialog, timer, interrupted = false;
   function show() {
     clearTimeout(timer);
+    if(document.body.classList.contains('site-under-maintenance')){if(dialog?.open)dialog.close();return;}
     const saved = popupState();
     const anotherModal = [...document.querySelectorAll('dialog[open]')].some(item => item !== dialog) || document.querySelector('#mobile-nav:not([hidden])');
     if (dialog?.open) {

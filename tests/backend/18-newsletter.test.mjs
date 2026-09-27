@@ -136,16 +136,28 @@ export default async function({db,check,state}) {
   await resetRates();await subscribe('priority@example.test');
   const claims=await h.service('newsletter_claim_emails',{limit:1});assert.equal(claims.length,1);assert.equal(claims[0].payload.event_type,'newsletter_welcome');
  })();
- await check('Newsletter code analytics retain uses but exclude delivery, cancelled orders and refunds from product sales',async()=>{
+ await check('Newsletter conversions exclude refunded and cancelled sales and reuse preserves original terms',async()=>{
+  const before=(await admin()).offer_counts;
   const checkout=h.checkout(box,await h.day(2),{promo_code:offer.code,method:'delivery',address:{locality:'Newsletter QA City',line1:'Local QA address'}});
   await api('save_zone',{zone:{name:'Newsletter QA',localities:['Newsletter QA City'],active:true,fee_cents:3000}},ids.owner);
   order=await api('create_order',checkout,ids.customer);let report=await admin({offer_search:offer.code});assert.equal(report.offers[0].status,'reserved');assert.equal(report.offers[0].sales_cents,0);
   await assert.rejects(()=>api('create_order',{...checkout,idempotency_key:randomUUID()},ids.customer),/use limit/);
   await h.proof(order,{user_id:ids.customer});order=await h.action('approve_payment',await h.order(order.id));
   report=await admin({offer_search:offer.code});assert.equal(report.offers[0].status,'used');assert.equal(report.offers[0].redeemed_count,1);assert.equal(report.offers[0].paid_order_count,1);assert.equal(report.offers[0].sales_cents,47500);assert.equal(report.offers[0].discount_cents,2500);
-  order=await h.action('set_refund_label',order,{enabled:true});report=await admin({offer_search:offer.code});assert.equal(report.offers[0].sales_cents,0);assert.equal(report.offers[0].redeemed_count,1);
+  assert.equal(report.offer_counts.converted,before.converted+1);assert.equal(report.offers[0].conversion_status,'converted');
+  await db.query("update elio.newsletter_subscribers set offer_expires_at=now()-interval '1 second' where promo_id=$1",[offer.id]);
+  report=await admin({offer_search:offer.code});assert.equal(report.offers[0].conversion_status,'converted','A converted code stays converted after expiry');
+  assert.deepEqual((await admin({offer_status:'converted',offer_limit:1})).offer_counts,report.offer_counts,'Filters never change headline totals');
+  order=await h.action('set_refund_label',order,{enabled:true});report=await admin({offer_search:offer.code});assert.equal(report.offers[0].sales_cents,0);assert.equal(report.offers[0].redeemed_count,0);
+  assert.equal(report.offer_counts.converted,before.converted);assert.equal(report.offers[0].conversion_status,'expired');assert.equal(report.offer_counts.expired,before.expired+1);
+  assert.equal(Number(await scalar("select count(*) from elio.promo_usage where promo_id=$1 and state='redeemed'",[offer.id])),1);
+  const replacement=await api('create_order',{...checkout,idempotency_key:randomUUID()},ids.customer);
+  await assert.rejects(()=>api('create_order',{...checkout,idempotency_key:randomUUID()},ids.customer),/use limit/);
+  await assert.rejects(()=>h.action('set_refund_label',order,{enabled:false}),/already been reused/);
+  await h.action('cancel_order',replacement,{reason:'Release reused newsletter reservation'});
   order=await h.action('set_refund_label',order,{enabled:false});order=await h.action('cancel_order',order,{reason:'Local newsletter QA',restore_stock:true});
-  report=await admin({offer_search:offer.code,offer_limit:1});assert.equal(report.offers[0].sales_cents,0);assert.equal(report.offers[0].status,'used');assert.equal(report.offer_total,1);assert(report.offer_counts.issued>=3);
+  assert.equal((await api('quote',checkout,ids.customer)).discount_cents,2500);
+  report=await admin({offer_search:offer.code,offer_limit:1});assert.equal(report.offers[0].sales_cents,0);assert.equal(report.offers[0].conversion_status,'expired');assert.equal(report.offer_total,1);assert(report.offer_counts.issued>=3);
   await db.query("update elio.promos set data=jsonb_set(data,'{expires_at}',to_jsonb((now()-interval '1 second')::text)) where id=$1",[offer.id]);
   await assert.rejects(()=>api('quote',checkout,ids.customer),/expired/);
  })();

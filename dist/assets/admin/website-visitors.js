@@ -61,7 +61,7 @@ export function renderWebsiteVisitors(traffic = { status: 'idle' }, escapeHtml) 
     <div class="traffic-metrics">${card('today', 'Visitors today', traffic.visitorsToday, received && traffic.timeZone ? `Unique visitors today · ${traffic.timeZone}` : 'Unique visitors today · Google Analytics timezone')}${card('realtime', 'Active visitors · last 30 minutes', traffic.activeLast30Minutes, 'Recent activity across the website')}</div>
     <p class="analytics-updated" role="status">${esc(status)}</p>
     <p class="help-text">Today’s total can take longer to process than Realtime. Google Analytics may miss visits blocked by browsers and may count one person on different devices separately.</p>
-    <div class="row-actions"><a class="button button-secondary" href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer">Open Google Analytics ↗</a>${traffic.status === 'not_configured' ? '<a class="button button-quiet" href="admin-setup.html" target="_blank" rel="noopener">Connection guide ↗</a>' : ''}</div>`;
+    <div class="row-actions"><a class="button button-secondary" href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer">Open Google Analytics ↗</a></div>`;
 }
 
 export function createVisitorPoller({ fetchReport, onChange, schedule = setTimeout, cancel = clearTimeout, interval = 60_000 }) {

@@ -22,6 +22,7 @@ let busy = false;
 let googleAvailable = false;
 let resendAfter = 0;
 let retryNewsletter;
+let accountSession=null,ordersRequest=0;
 const oauthNewsletterKey = 'elio-newsletter-oauth-consent-v1';
 
 function newsletterMessage(text, error = false) {
@@ -104,15 +105,47 @@ if (newsletterChoice) newsletterModule.then(module => module.getNewsletterSettin
 async function loadOrders() {
   const section = document.querySelector('#account-orders');
   if (!section) return;
-  section.textContent = 'Loading your orders…';
+  const request=++ordersRequest;
+  const title='<div class="account-orders-heading"><div><h2>Your orders</h2><p>All orders placed while signed in, including those awaiting payment or under review.</p></div><button class="button button-secondary" type="button" data-orders-refresh>Refresh</button></div><p class="account-guest-note">Placed an order as a guest? Open the secure link from your confirmation email.</p>';
+  section.innerHTML = title+'<p>Loading your orders…</p>';
   try {
     const orders = await api('my_orders');
-    section.innerHTML = '<h2>Your orders</h2>' + (orders.length ? orders.map(order => `<a class="account-order" href="order.html#order=${encodeURIComponent(order.id)}"><strong>${esc(order.reference)}</strong><span>${esc(formatDate(order.fulfillment_date))} · ${esc(order.method)}</span><span>${esc(money(order.total_cents))} · ${esc(String(order.payment_status).replaceAll('_', ' '))}</span><span>View order →</span></a>`).join('') : '<p>No orders yet. A little Elio awaits.</p>');
+    if(request!==ordersRequest||!accountSession)return;
+    section.innerHTML = title+(orders.length ? '<div class="account-orders-grid">'+orders.map(order => `<a class="account-order" href="order.html#order=${encodeURIComponent(order.id)}"><strong>${esc(order.reference)}</strong><span>${esc(formatDate(order.fulfillment_date))} · ${esc(order.method)}</span><span>${esc(money(order.total_cents))} · ${esc(String(order.payment_status).replaceAll('_', ' '))}</span><span>View order →</span></a>`).join('')+'</div>' : '<div class="account-orders-empty"><h3>Your next sweet moment starts here</h3><p>Orders you place while signed in will appear here, including those awaiting payment.</p><a class="button" href="order.html">Explore the boxes</a></div>');
   } catch {
-    section.innerHTML = '<p>Your order history could not load.</p><button class="button button-secondary" type="button">Try again</button>';
-    section.querySelector('button').onclick = loadOrders;
+    if(request!==ordersRequest||!accountSession)return;
+    section.innerHTML = title+'<p class="notice danger">Your order history could not load. Please refresh to try again.</p>';
   }
 }
+document.querySelector('#account-orders')?.addEventListener('click',e=>{if(e.target.closest('[data-orders-refresh]'))loadOrders();});
+
+const preferences=document.querySelector('#email-preference-form');
+function showEmailPreference(settings){
+ if(!preferences||!accountSession)return;
+ const suppressed=settings?.own_status==='suppressed',verified=!!accountSession.user.email_confirmed_at;
+ preferences.elements.subscribed.checked=settings?.own_status==='subscribed';
+ preferences.elements.subscribed.disabled=!verified||suppressed;
+ preferences.querySelector('[type=submit]').disabled=!verified||suppressed;
+ document.querySelector('#email-preference-retry').hidden=true;
+ document.querySelector('#email-preference-offer').textContent=`Optional. New subscribers receive ${settings.discount_percent}% OFF by email. Receive Elio news, special offers, and exclusive promo codes. Unsubscribe anytime.`;
+ document.querySelector('#email-preference-status').textContent=!verified?'Verify your account email before changing this preference.':suppressed?'Newsletter delivery is paused for this address. Contact Elio for help.':settings.own_status==='subscribed'?'You’re subscribed to the Elio Newsletter.':'You’re not subscribed to the Elio Newsletter.';
+}
+async function loadEmailPreference(){
+ if(!preferences||!accountSession)return;
+ const id=accountSession.user.id;
+ try{const settings=await (await newsletterModule).getNewsletterSettings(true);if(!settings)throw Error('Unavailable');if(accountSession?.user.id===id)showEmailPreference(settings);}
+ catch{if(accountSession?.user.id!==id)return;document.querySelector('#email-preference-status').textContent='Your email preference could not load. Please try again.';document.querySelector('#email-preference-retry').hidden=false;}
+}
+document.querySelector('#email-preference-retry')?.addEventListener('click',loadEmailPreference);
+preferences?.addEventListener('submit',async e=>{
+ e.preventDefault();const button=preferences.querySelector('[type=submit]');if(button.disabled||!accountSession)return;
+ const id=accountSession.user.id;button.disabled=true;preferences.elements.subscribed.disabled=true;
+ try{
+  const settings=await api('newsletter_account_preference',{subscribed:preferences.elements.subscribed.checked});
+  if(accountSession?.user.id!==id)return;
+  showEmailPreference(settings);(await newsletterModule).rememberNewsletterOptIn();
+ }catch(error){if(accountSession?.user.id===id){document.querySelector('#email-preference-status').textContent=error.message||'Your preference could not be saved. Please try again.';button.disabled=false;preferences.elements.subscribed.disabled=false;}}
+});
 
 function updateControls() {
   document.querySelectorAll('#account-tabs button, #account-recovery button, #account-back').forEach(button => { button.disabled = busy; });
@@ -309,6 +342,7 @@ else if (auth) {
   } else if (authLink.recovery && data.session) setMode('recovery');
   else if (authLink.recovery || authLink.type === 'recovery') message('This password reset link is incomplete or no longer valid. Request a new reset link.', true);
   else if (data.session) {
+    accountSession=data.session;
     heading.textContent = 'Your Elio account.';
     intro.hidden = true;
     form.hidden = true;
@@ -317,8 +351,14 @@ else if (auth) {
     document.querySelector('#account-back').hidden = true;
     document.querySelector('#account-provider').hidden = true;
     document.querySelector('#signed-in').hidden = false;
-    message(`Signed in as ${data.session.user.email}.`);
-    if (customer) { loadOrders();finishOAuthNewsletterConsent(data.session).then(handled => { if (!handled) activateNewsletter(data.session); }); }
+    message(customer?'':`Signed in as ${data.session.user.email}.`);
+    if (customer) {
+      heading.hidden=true;document.querySelector('#main').classList.add('account-dashboard');
+      document.querySelector('#main').append(document.querySelector('.account-policy-links'));
+      document.querySelector('#account-email').textContent=data.session.user.email;
+      document.querySelector('#account-verification').textContent=data.session.user.email_confirmed_at?'Email verified':'Email not verified';
+      loadOrders();finishOAuthNewsletterConsent(data.session).then(async handled=>{if(!handled)await activateNewsletter(data.session);await loadEmailPreference();});
+    }
     const dashboardLink = document.querySelector('#staff-dashboard');
     const affiliateLink = document.querySelector('#affiliate-dashboard');
     if(affiliateLink){
@@ -336,3 +376,4 @@ else if (auth) {
     }
   }
 }
+auth?.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){accountSession=null;ordersRequest++;document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();message('You have signed out. Sign in again to view your account.');}});
