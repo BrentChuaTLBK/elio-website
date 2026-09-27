@@ -4,7 +4,7 @@
 
 Use `supabase/templates/confirmation.html` in Elio's Supabase dashboard → Authentication → Email → Templates → Confirm sign up. Set the subject to **Confirm your Elio account** and save. The `{{ .ConfirmationURL }}` values must remain intact. They support both the customer and staff redirect URLs supplied by the account form.
 
-All email templates share the dark brown ELIO header, gold wordmark, warm ivory background, serif headings, and bronze action buttons. They have no marketing opt-in or promotional offer. The account page newsletter checkbox is disabled; creating an account does not subscribe anyone.
+All email templates share the dark brown ELIO header, gold wordmark, warm ivory background, serif headings, and bronze action buttons. Account emails have no promotional offer. The account page has an optional, unchecked newsletter checkbox; creating an account alone does not subscribe anyone.
 
 Run `node --experimental-transform-types scripts/build-auth-emails.mjs` on Node 24 after changing the shared design. This generates all six authentication templates and seven optional security-notification templates in `supabase/templates/`; `manifest.json` lists their dashboard labels and subjects. Changing a template does not enable a feature or notification. Preserve existing notification settings. Signup, recovery, invite, magic-link and email-change templates retain `{{ .ConfirmationURL }}`; reauthentication retains `{{ .Token }}`.
 
@@ -23,11 +23,13 @@ Required Elio Edge Function secrets:
 
 Order emails set Reply-To to `elio.cheesecakes@gmail.com`. Their main action links to the secure order page for proof uploads and status updates. A separate orders mailbox is not required for outbound sending through a verified Resend domain.
 
+Newsletter welcome codes, campaigns and tests use a separate sender: `Elio Newsletter <news@eliocheesecakes.com>`. Optional `NEWSLETTER_EMAIL_FROM` overrides that address without changing order notifications. It defaults to the news address when unset; it never falls back to `EMAIL_FROM`. Newsletter Reply-To remains `elio.cheesecakes@gmail.com`.
+
 The scheduler credential is generated privately in Supabase Vault by the migration. It is not stored in GitHub, browser code, or the cron command. The worker verifies it through a service-role-only RPC before maintenance, claims, or sending. Gateway JWT verification is disabled because the handler implements this separate private credential check. Browser publishable keys and user sessions cannot authorize it.
 
 Missing Resend configuration returns HTTP 503 **before claiming messages**. Check the pg_net HTTP response and Edge Function logs as well as the cron status: a successful SQL invocation alone does not prove that a message was accepted or delivered. No emails are sent by deployment tests.
 
-The secure order view and payment proof integration use `/order.html`; the worker’s customer links target that route. The newsletter is not handled by this worker.
+The secure order view and payment proof integration use `/order.html`; the worker’s customer links target that route. After order processing, this worker also handles up to three newsletter messages from their separate outbox.
 
 Every order event uses `_shared/email-design.ts`: order received, payment approval/rejection, cancellation, expiry, scheduled-day reminder, ready for pickup, out for delivery, order amendments, and staff payment review. The layout follows the supplied TLB email reference while retaining Elio's dark brown header and gold wordmark. Products and their payment summary occupy the left column; saved payment instructions and pickup/delivery details occupy shaded panels on the right. The main action sits near the top. Columns stack on phones. Missing photos omit the image cell; item names and contents remain visible when an email client blocks remote images.
 

@@ -3,7 +3,9 @@ import { newsletterHeaders, renderNewsletterEmail } from "../_shared/newsletter-
 
 // Called only after the existing worker has verified its private Vault credential.
 // Order and marketing queues are separate; a newsletter error never stops orders.
-export async function deliverNewsletters(key: string, sender: string) {
+export async function deliverNewsletters(key: string) {
+  // Marketing mail has its own identity; never inherit the order sender.
+  const sender = env("NEWSLETTER_EMAIL_FROM") || "Elio Newsletter <news@eliocheesecakes.com>";
   const stats = { accepted: 0, skipped: 0, failed: 0, acknowledgement_pending: 0, unavailable: false };
   try {
     const claimed = await service("newsletter_claim_emails", { limit: 3 });

@@ -19,7 +19,12 @@ globalThis.fetch = async (url, options) => {
   }
   if (String(url).endsWith('/elio_email_worker_authorized')) { calls.push('authorize'); return Response.json(setup.authorized !== false); }
   calls.push(body.p_action);
-  if (body.p_action === 'newsletter_claim_emails') return Response.json([]);
+  const newsletterRow = { ...row, id: 'newsletter-id', event_key: 'newsletter-test/sender-check', subject: 'Newsletter test', payload: { event_type: 'newsletter_test_campaign', settings: { site_url: 'https://eliocheesecakes.com', newsletter_mailing_address: 'Test address' }, subscriber: { email: 'qa@example.test' }, campaign: { subject: 'Newsletter test', title: 'A little Elio', body: 'A subscriber update.', template: 'letter' } } };
+  if (body.p_action === 'newsletter_claim_emails') return Response.json(setup.newsletter ? [newsletterRow] : []);
+  if (body.p_action === 'newsletter_prepare_email') {
+    if (body.p_payload.provider_payload && !setup.newsletterFrozen) setup.newsletterFrozen = structuredClone(body.p_payload.provider_payload);
+    return Response.json({ ...newsletterRow, provider_payload: setup.newsletterFrozen || null });
+  }
   const preparedRow = { ...row, ...setup.row };
   if (body.p_action === 'claim_emails') return Response.json(setup.empty ? [] : [{ ...preparedRow, ...(setup.old ? { first_attempt_at: '2020-01-01' } : {}) }]);
   if (body.p_action === 'prepare_email') {
@@ -54,9 +59,19 @@ try {
     assert.deepEqual(calls, ['authorize', 'maintenance', 'claim_emails', 'prepare_email', 'prepare_email', 'send', 'email_sent', 'newsletter_claim_emails']);
     assert.equal(providerBodies[0].key, 'elio/review/order-id');
     assert.equal(providerBodies[0].body.reply_to, 'elio.cheesecakes@gmail.com');
+    assert.equal(providerBodies[0].body.from, values.EMAIL_FROM);
     assert.ok(providerBodies[0].body.html.includes('&lt;script&gt;'));
     assert.ok(providerBodies[0].body.html.includes('Elio Basque Cheesecake'));
     assert.ok(!providerBodies[0].body.html.includes('The Little Baker'));
+  });
+  await check('one worker run keeps order and newsletter senders separate', async () => {
+    setup.newsletter = true;
+    const result = await (await handle(request())).json();
+    assert.equal(result.accepted, 1); assert.equal(result.newsletter.accepted, 1);
+    assert.equal(providerBodies.length, 2);
+    assert.equal(providerBodies[0].body.from, values.EMAIL_FROM);
+    assert.equal(providerBodies[1].body.from, 'Elio Newsletter <news@eliocheesecakes.com>');
+    assert.equal(providerBodies[1].body.reply_to, 'elio.cheesecakes@gmail.com');
   });
   await check('revoked or stale messages are skipped before delivery', async () => {
     setup.skip = true; assert.equal((await (await handle(request())).json()).skipped, 1); assert.equal(providerBodies.length, 0);

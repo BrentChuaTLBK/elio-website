@@ -63,7 +63,7 @@ export async function handle(request: Request): Promise<Response> {
         catch { /* An expired lease can be reclaimed with the same idempotency key. */ }
       }
     }
-    const newsletter = await deliverNewsletters(key, sender);
+    const newsletter = await deliverNewsletters(key);
     return json({ ...stats, newsletter });
   } catch { return json({ ...stats, error: "Email maintenance unavailable; existing leases remain retryable." }, 503); }
 }
