@@ -38,9 +38,20 @@ export function createNewsletterCampaigns({connected,owner,showDialog,closeDialo
  function paint(){
   if(!root?.isConnected)return;
   if(connected()&&!owner()){root.innerHTML='<h1>Newsletter</h1><p>Only owners can create and send newsletters.</p>';return;}
-  root.innerHTML=`<div class="view-heading newsletter-page-heading"><div><span class="eyebrow">Elio Newsletter</span><h1>${state.editor?(state.draft.status==='draft'?'Create something lovely.':'Your newsletter.'):'Newsletters & offers'}</h1><p data-nl-count>${esc(count())}</p></div>${state.editor?`<button type="button" class="button button-secondary" data-nl-action="library" ${disabled(state.busy)}>← All newsletters</button>`:`<button type="button" class="button" data-nl-action="new" ${disabled(!editable()||state.busy)}>Create newsletter</button>`}</div>
+  const heading=`<div class="view-heading newsletter-page-heading"><div><span class="eyebrow">Elio Newsletter</span><h1>${state.editor?(state.draft.status==='draft'?'Create something lovely.':'Your newsletter.'):'Newsletters & offers'}</h1><p data-nl-count>${esc(count())}</p></div>${state.editor?`<button type="button" class="button button-secondary" data-nl-action="library" ${disabled(state.busy)}>← All newsletters</button>`:`<button type="button" class="button" data-nl-action="new" ${disabled(!editable()||state.busy)}>Create newsletter</button>`}</div>`;
+  const editor=root.querySelector('.newsletter-editor');
+  if(state.editor&&editor){
+   // Keep the preview document mounted while uploads and saves repaint the form.
+   // Repeated srcdoc navigation during a pending preview can blank the iframe.
+   const next=document.createElement('template');next.innerHTML=editorView();
+   editor.replaceWith(next.content.querySelector('.newsletter-editor'));
+   root.querySelector('.newsletter-page-heading').outerHTML=heading;
+   root.querySelector('[data-nl-page-error]').textContent=state.error;
+   previewStatus(state.previewStatus);schedulePreview();return;
+  }
+  root.innerHTML=`${heading}
    ${!connected()?'<p class="notice">Preview only. Sign in as an owner to save drafts and send newsletters.</p>':''}
-   ${state.error?`<p class="form-error" role="alert">${esc(state.error)}</p>`:''}
+   <p class="form-error" role="alert" data-nl-page-error>${esc(state.error)}</p>
    ${state.editor?editorView():libraryView()}`;
   if(state.editor){const frame=root.querySelector('[data-nl-live-frame]');frame.srcdoc=state.previewHtml||placeholder;schedulePreview();}
  }

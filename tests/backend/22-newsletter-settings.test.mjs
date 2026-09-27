@@ -37,7 +37,7 @@ export default async function({db,check,state}) {
  await check('Newsletter layouts persist, escape content and freeze with the reviewed campaign',async()=>{
   const campaign={subject:'A note from Elio',title:'A little Elio <script>alert(1)</script>',body:'Our latest kitchen news.\n\nDiscover something lovely.',image_url:'https://example.test/box.webp',cta_label:'Explore Elio',cta_url:'https://example.test/order.html'};
   const htmls=[];
-  for(const template of ['spotlight','offer','letter']){
+  for(const template of ['spotlight','offer','letter','editorial','invitation','digest']){
    const draft=await api('newsletter_save_campaign',{campaign:{...campaign,template}},ids.owner);assert.equal(draft.template,template);
    const payload=await api('newsletter_preview_campaign',{campaign:draft},ids.owner);const rendered=renderNewsletterEmail(payload);htmls.push(rendered.html);
    assert(!rendered.html.includes('<script>'));assert(rendered.html.includes('&lt;script&gt;'));assert.match(rendered.html,/ELIO/);
@@ -47,7 +47,7 @@ export default async function({db,check,state}) {
     await assert.rejects(()=>api('newsletter_save_campaign',{campaign:{...draft,template:'letter'}},ids.owner),/Only draft/);
    }
   }
-  assert.equal(new Set(htmls).size,3);assert.match(htmls[0],/The Elio collection/);assert.match(htmls[1],/Exclusively for our subscribers/);assert.match(htmls[2],/With care/);
+  assert.equal(new Set(htmls).size,6);assert.match(htmls[0],/The Elio collection/);assert.match(htmls[1],/Exclusively for our subscribers/);assert.match(htmls[2],/With care/);assert.match(htmls[3],/The Elio edit/);assert.match(htmls[4],/An invitation from Elio/);assert.match(htmls[5],/The Elio brief/);
   await assert.rejects(()=>api('newsletter_save_campaign',{campaign:{...campaign,template:'unsafe'}},ids.owner),/valid newsletter template/);
  })();
 }

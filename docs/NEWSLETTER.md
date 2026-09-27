@@ -16,7 +16,9 @@ The popup appears after five seconds on public browsing pages. It waits while an
 
 ## Newsletter dashboard
 
-The owner-only library shows an active subscriber count, three template choices and saved newsletters. A separate editor provides desktop/mobile live previews, catalog photos, direct photo uploads, draft saving, and a test to one explicit address. Owners review a campaign before sending to active subscribers. Draft revision and recipient count are checked again when sending. A campaign can only be queued once. Queued content is immutable, and eligibility is checked again before each delivery.
+The owner-only library shows an active subscriber count, six template choices and saved newsletters. A separate editor provides desktop/mobile live previews, catalog photos, direct photo uploads, draft saving, and a test to one explicit address. Owners review a campaign before sending to active subscribers. Draft revision and recipient count are checked again when sending. A campaign can only be queued once. Queued content is immutable, and eligibility is checked again before each delivery.
+
+Available designs are Flavor Spotlight, Subscriber Offer, From the Kitchen, The Elio Edit (photo and story columns), You’re Invited (a framed invitation), and Short & Sweet (numbered updates). Every layout supports optional uploaded/catalog photos and a shopping button. In Short & Sweet, a blank line starts the next update. Changing the layout preserves the draft's content. The preview iframe remains mounted during photo and save operations so concurrent preview requests cannot blank it.
 
 The Welcome offers report under Promo codes shows all-time code issuance, unused/active, reserved, redeemed, expired and inactive counts, together with paid orders, product sales and discounts. Search by subscriber email or code and filter status. Reserved means awaiting payment or review. A paid cancellation or refund does not restore a redeemed code; those orders are excluded from sales and discount totals. Product sales are subtotal minus discount, excluding delivery.
 
@@ -35,3 +37,5 @@ Public signup is validated, consent checked, rate limited and protected by a hon
 Run `node --experimental-transform-types tests/newsletter-edge.test.mjs` and `node --experimental-transform-types tests/email-worker.test.mjs`. The backend suite includes newsletter consent, immutable offers, redemption binding, analytics, delivery claims, and campaign approval checks. Browser checks cover popup timing/dismissal, account opt-in, token actions, and the owner dashboard without sending customer emails.
 
 Preview the exact newsletter email renderer with `node --experimental-transform-types scripts/preview-newsletter-emails.mjs`. These files contain a sample code and inactive links.
+
+Compare all six campaign layouts with `node --experimental-transform-types scripts/preview-newsletter-designs.mjs <output-directory>`. The interactive gallery has desktop/mobile widths; its links are inactive and it does not send emails. The examples are design copy, not scheduled campaigns or live promotions.

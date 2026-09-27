@@ -58,17 +58,25 @@ export function renderNewsletterEmail(payload: any): { html: string; text: strin
     const campaign = payload.campaign || {};
     heading = String(campaign.title || ""); subject = String(campaign.subject || "");
     if (!heading || !subject || !String(campaign.body || "").trim()) throw new Error("Newsletter content is incomplete.");
-    const paragraphs = String(campaign.body).split(/\n\s*\n/).map(p => `<p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:#665649">${e(p).replace(/\n/g, "<br>")}</p>`).join("");
+    const notes = String(campaign.body).split(/\n\s*\n/);
+    const paragraphs = notes.map(p => `<p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:#665649">${e(p).replace(/\n/g, "<br>")}</p>`).join("");
     const photo = safeHttps(campaign.image_url), cta = safeHttps(campaign.cta_url);
     if (campaign.image_url && !photo || campaign.cta_url && !cta) throw new Error("Newsletter links must use HTTPS.");
     const layout = campaign.template || 'spotlight';
-    if (!['spotlight','offer','letter'].includes(layout)) throw new Error("Choose a valid newsletter template.");
+    if (!['spotlight','offer','letter','editorial','invitation','digest'].includes(layout)) throw new Error("Choose a valid newsletter template.");
     const photoHtml = photo ? `<img src="${e(photo)}" alt="${e(heading)}" width="656" style="display:block;width:100%;height:auto;border:0;margin:0 0 24px">` : "";
     const button = cta && campaign.cta_label ? emailButton(String(campaign.cta_label), cta) : "";
     if (layout === 'offer') {
       body = `<div style="padding:30px 24px 12px;text-align:center;background:#f1e6d6;border:1px solid #d7bea0;margin:0 0 24px">${emailIntro("Exclusively for our subscribers", heading, "")}${paragraphs}${button}</div>` + photoHtml;
     } else if (layout === 'letter') {
       body = emailIntro("From the Elio kitchen", heading, "") + `<div style="border-top:1px solid #dfd1bd;padding-top:25px">${paragraphs}<p style="font:italic 21px/1.5 Georgia,serif;color:#63412d;margin:26px 0">With care,<br>The Elio team</p></div>` + button + photoHtml;
+    } else if (layout === 'editorial') {
+      const story = `<div style="overflow-wrap:anywhere;word-break:break-word">${emailIntro("The Elio edit", heading, "")}${paragraphs}${button}</div>`;
+      body = photo ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed"><tr><td class="email-column" width="48%" valign="top" style="padding:0 28px 0 0"><img src="${e(photo)}" alt="${e(heading)}" width="288" style="display:block;width:100%;height:auto;border:0"><p style="margin:14px 0 0;border-top:1px solid #cdb38f;padding-top:12px;font:italic 18px/1.45 Georgia,serif;color:#8a6033">Burnt beautifully.<br>Soft within.</p></td><td class="email-column" width="52%" valign="top" style="overflow-wrap:anywhere;word-break:break-word">${story}</td></tr></table>` : story;
+    } else if (layout === 'invitation') {
+      body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #b68c58"><tr><td align="center" bgcolor="#f4ecdf" style="background:#f4ecdf;padding:30px 24px 12px;text-align:center;overflow-wrap:anywhere;word-break:break-word"><p style="margin:0 0 20px;font:22px/1 Georgia,serif;color:#91612f" aria-hidden="true">✦</p>${emailIntro("An invitation from Elio", heading, "")}${paragraphs}${button.replace('<table ', '<table align="center" ').replace('margin:22px 0 26px','margin:22px auto 26px')}</td></tr>${photo ? `<tr><td style="padding:12px"><img src="${e(photo)}" alt="${e(heading)}" width="630" style="display:block;width:100%;height:auto;border:0"></td></tr>` : ''}</table>`;
+    } else if (layout === 'digest') {
+      body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;margin:0 0 8px"><tr><td class="email-column" valign="top" style="padding:0 ${photo ? '24px' : '0'} 0 0;overflow-wrap:anywhere;word-break:break-word">${emailIntro("The Elio brief", heading, "")}</td>${photo ? `<td class="email-column" width="144" valign="top"><img src="${e(photo)}" alt="${e(heading)}" width="144" style="display:block;width:144px;max-width:100%;height:auto;border:0"></td>` : ''}</tr></table><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${notes.map((note,index) => `<tr><td width="40" valign="top" style="border-top:1px solid #dfd1bd;padding:20px 12px 20px 0;font:22px/1.4 Georgia,serif;color:#91612f">${String(index + 1).padStart(2,'0')}</td><td valign="top" style="border-top:1px solid #dfd1bd;padding:20px 0;font:15px/1.8 Arial,sans-serif;color:#665649;overflow-wrap:anywhere;word-break:break-word">${e(note).replace(/\n/g,'<br>')}</td></tr>`).join('')}</table>${button}`;
     } else {
       body = photoHtml + emailIntro("The Elio collection", heading, "") + paragraphs + button;
     }
