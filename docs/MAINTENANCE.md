@@ -16,7 +16,7 @@ This feature controls application availability; it cannot guarantee error-free i
 
 ## Email notification review
 
-The Overview email-delivery panel shows unreviewed failures and skipped notifications. Staff or owners can select **Mark as reviewed**. This saves a shared acknowledgement in the database, clears the alert across refreshes/devices, and preserves it in collapsed Reviewed notifications. It does not resend, delete, or mark an email as delivered. A changed error, status, or retry attempt clears the acknowledgement so a new problem appears again. A stale acknowledgement request is rejected.
+The Overview email-delivery panel shows unreviewed failures and skipped notifications. Staff or owners can select **Acknowledge & dismiss**. This saves a shared acknowledgement in the database, clears the alert across refreshes/devices, and preserves it in collapsed Reviewed notifications. It does not resend, delete, or mark an email as delivered. A changed error, status, or retry attempt clears the acknowledgement so a new problem appears again. A stale acknowledgement request is rejected.
 
 ## Verification
 

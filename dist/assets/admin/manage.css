@@ -216,6 +216,7 @@
 .newsletter-campaign-list span,.newsletter-campaign-list small{font-size:10px;line-height:1.8}
 .newsletter-campaign-list small{display:block;color:var(--muted);margin-top:6px}
 .newsletter-preview-dialog{min-width:0}
+.email-alert>p{margin:4px 0 0}.email-alert>.button{margin-top:16px;min-height:36px;padding:8px 12px}.email-alert{margin-bottom:14px}
 .newsletter-email-preview{display:block;width:100%;height:590px;max-height:65vh;border:1px solid var(--line);border-radius:8px;background:#fefaef;margin:18px 0}
 .newsletter-send-summary{line-height:1.7;overflow-wrap:anywhere}
 .newsletter-preview-dialog .check-field{margin:18px 0}

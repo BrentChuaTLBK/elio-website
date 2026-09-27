@@ -34,8 +34,9 @@ try{
    try{return route.fulfill({contentType:mime[extname(file)]||'application/octet-stream',body:await readFile(file)});}catch{return route.fulfill({status:404,body:''});}
   });
   const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/manage.html');
-  await page.getByRole('button',{name:'Mark as reviewed',exact:true}).click();await page.getByText('Reviewed notifications (1)',{exact:true}).waitFor();
-  await page.reload();await page.getByText('Reviewed notifications (1)',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Mark as reviewed',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Acknowledge & dismiss',exact:true}).waitFor();await page.locator('.email-alert').screenshot({path:join(output,`email-alert-${width}.png`)});
+  await page.getByRole('button',{name:'Acknowledge & dismiss',exact:true}).click();await page.getByText('Reviewed notifications (1)',{exact:true}).waitFor();
+  await page.reload();await page.getByText('Reviewed notifications (1)',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Acknowledge & dismiss',exact:true}).count(),0);
   await page.getByText('Reviewed notifications (1)',{exact:true}).click();await page.locator('.email-reviewed p').waitFor();assert.match(await page.locator('.email-reviewed p').textContent(),/Order no longer needs payment review\./);
   await page.locator('[data-view=maintenance]').click();await page.locator('.maintenance-form').waitFor();
   const form=page.locator('.maintenance-form');assert.equal(await form.locator('[name=pause_uploads]').isChecked(),true);
