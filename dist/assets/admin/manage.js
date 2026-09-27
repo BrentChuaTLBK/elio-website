@@ -1,3 +1,6 @@
+import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=elio-accounting-1';
+import {monthRange} from './accounting.js?v=shared-categories-1';
+import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';
 import { PHOTO_ACCEPT, PHOTO_HELP, validatePhoto } from './photo-upload.js';
 import { createNewsletterAdmin } from './newsletter-admin.js';
 import { deliveryTrackingUrl } from '../delivery-tracking.js';
@@ -40,6 +43,7 @@ state.productionRange = {from:manilaDate(),to:manilaDate()};
 state.productionMode = 'range';
 state.productFilters = { search: '', status: '', category: '' };
 state.promoFilter = '';
+state.accountingFilter = monthRange(manilaDate().slice(0,7));
 state.printSelection = new Set();
 let activeOrder = null;
 let productDraft = null;
@@ -140,6 +144,7 @@ const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,ow
 async function refresh() {
   if (!configured) return;
   const result = await api('admin_bootstrap');
+  if(!state.connected && location.hash==='#accounting' && result.role==='owner')state.view='accounting';
   Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
   state.promos = state.promos.filter(promo => !promo.newsletter_managed);
   state.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
@@ -151,11 +156,18 @@ async function refresh() {
   render();
 }
 function render() {
+  const accountingNav = $('[data-view="accounting"]');
+  if(accountingNav)accountingNav.hidden=!state.connected||state.role!=='owner';
+  if(state.view==='accounting' && state.connected && state.role==='owner' && $('#accounting-manager')){
+    $('#accounting-manager').dispatchEvent(new Event('accounting-refresh'));
+    return;
+  }
   const newsletterNav = $('[data-view="newsletter"]');
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
-  const views = { overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
+  const views = { accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
+  if(state.view==='accounting')mountAccounting($('#accounting-manager'),{api,role:state.role,connected:state.connected,money,escapeHtml:esc,today:manilaDate(),filters:state.accountingFilter,openOrder});
   if(state.view==='faqs')bindFaqView(state,$('#workspace'),render);
   if(state.view==='newsletter')newsletterAdmin.mount($('#workspace'));
   if(state.view==='promos' && owner())newsletterOffers.mount($('#workspace'));
@@ -480,6 +492,10 @@ function renderOrderDialog() {
   const address = o.address ? [o.address.line1, o.address.line2, o.address.locality, o.address.postal_code].filter(Boolean).join('\n') : '';
   const notes = o.staff_notes || (o.history || []).filter(event => event.action === 'staff_note').map(event => ({ note: event.reason }));
   showDialog(o.reference, `<div id="print-order"><p class="muted">Placed ${esc(dateTime(o.created_at))} · Revision ${o.revision}</p><div class="order-status-row">${badge(o.payment_status)} ${badge(fulfillmentStatus(o))}</div><div class="order-detail-grid"><section class="detail-section"><h3>Buyer</h3><p><strong>${esc(o.buyer?.name)}</strong>\n${esc(o.buyer?.email)}\n${esc(o.buyer?.phone)}</p>${o.buyer?.social_username ? `<p>${esc(o.buyer.social_platform?.toLowerCase() === 'na' ? 'Social contact' : label(o.buyer.social_platform))}: ${esc(o.buyer.social_username)}</p>` : ''}</section><section class="detail-section"><h3>${esc(label(o.method))} · ${esc(humanDate(o.fulfillment_date))}</h3>${o.method === 'delivery' ? `<p><strong>${esc(o.recipient?.name)}</strong>\n${esc(o.recipient?.phone)}\n${esc(address)}</p>` : `<p>${esc(o.pickup_address || state.settings.pickup_address || '')}</p>`}${o.method === 'delivery' && o.delivery_zone_description ? `<p class="zone-description">${esc(o.delivery_zone_description)}</p>` : ''}${o.instructions ? `<p>Instructions: ${esc(o.instructions)}</p>` : ''}</section></div>${itemTable(o.items)}${totals(o)}${deliveryTrackingForm(o)}${o.payment_status === 'paid' && !o.refund_label ? '<p class="muted">Any difference after an order edit is settled directly with the customer. The original payment record and current fulfillment progress are retained.</p>' : ''}<section class="detail-section proof-block"><h3>Initial payment</h3><p>Reference: ${esc(o.payment_reference || 'Not provided')}</p>${o.proof_path ? '<button class="button button-secondary" data-action="view-proof">View private payment proof ↗</button>' : `<p class="muted">${o.payment_status === 'awaiting_payment' && !CLOSED.has(o.fulfillment_status) ? `Proof deadline: ${esc(dateTime(o.payment_deadline))}` : 'No payment proof on this order.'}</p>`}<div id="proof-viewer"></div></section>${o.refund_label ? '<p class="notice">Fulfillment is Refunded. Remove the Refund label to restore the previous fulfillment status. Refund transfers are handled manually.</p>' : ''}<div class="order-toolbar">${needsPaymentReview(o) ? '<button class="button" data-action="payment-approve">Approve full payment</button><button class="button button-secondary" data-action="payment-reject">Reject payment</button>' : ''}${canProgress ? `<select id="next-fulfillment" aria-label="Fulfillment status">${options(statuses, o.fulfillment_status, null)}</select><button class="button button-secondary" data-action="fulfill-order">Update progress</button>` : ''}${!CLOSED.has(o.fulfillment_status) ? '<button class="button button-secondary" data-action="edit-order">Edit order</button><button class="button button-quiet" data-action="cancel-order">Cancel order</button>' : '<button class="button button-secondary" data-action="edit-contact">Edit contact details</button>'}<button class="button button-quiet" data-action="refund-label">${o.refund_label ? 'Remove' : 'Apply'} Refund label</button><button class="button button-quiet" data-action="print-order">Print summary</button></div><section class="private-staff"><h3>Private staff notes</h3>${notes.map(note => `<p class="muted">${esc(typeof note === 'string' ? note : note.note || note.text || '')}</p>`).join('')}<form data-form="staff-note">${formError}${textarea('note', 'Add a private note', '', 'Visible only to authorized team members.', 'required maxlength="4000"')}<button type="submit" class="button button-secondary">Save note</button></form></section><section class="subsection history-block"><h3>Order history</h3><ol class="history">${(o.history || []).slice().reverse().map(event => `<li><strong>${esc(label(event.action))}</strong>${event.reason ? ` — ${esc(event.reason)}` : ''}<small>${esc(dateTime(event.at || event.created_at))} · ${esc(typeof event.actor === 'object' ? event.actor.email || event.actor.id || 'Team member' : event.actor || 'System')}</small>${event.before || event.after ? `<details><summary>View recorded changes</summary><div class="change-grid"><div><strong>Before</strong>${historySnapshot(event.before)}</div><div><strong>After</strong>${historySnapshot(event.after)}</div></div></details>` : ''}</li>`).join('') || '<li>Order history is recorded as changes are made.</li>'}</ol></section></div>`);
+  if(state.connected && state.role==='owner' && o.method==='delivery'){
+    $('#dialog-body').insertAdjacentHTML('beforeend','<details class="delivery-accounting"><summary>Delivery accounting</summary><div class="delivery-accounting-content"></div></details>');
+    mountDeliveryAccounting($('.delivery-accounting-content'),o,{api,money,escapeHtml:esc,today:manilaDate()});
+  }
 }
 function historySnapshot(value) {
   if (!value) return '<p>—</p>';
@@ -718,6 +734,11 @@ function exportOrders() {
 
 document.addEventListener('click', async event => {
   const view = event.target.closest('[data-view]');
+  if(view && state.view==='accounting' && view.dataset.view!==state.view){
+    const manager=$('#accounting-manager');
+    if(manager?.dataset.busy==='true'){toast('Please wait for accounting to finish saving.','error');return;}
+    if(manager?.dataset.dirty==='true' && !await confirmDialog('Leave accounting and discard these unsaved changes?',{title:'Unsaved accounting entry',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;
+  }
   if(view?.dataset.newsletterTab)newsletterAdmin.selectTab(view.dataset.newsletterTab);
   if (view) { state.view = view.dataset.view; state.productFilters = { search: '', status: '', category: '' }; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
   const button = event.target.closest('[data-action]');
@@ -1094,3 +1115,5 @@ async function init() {
   }
 }
 init();
+
+window.addEventListener('beforeunload',event=>{if($('#accounting-manager')?.dataset.dirty==='true'){event.preventDefault();event.returnValue='';}});
