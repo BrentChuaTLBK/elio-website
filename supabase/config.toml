@@ -53,3 +53,8 @@ verify_jwt = false
 # Every request verifies Auth; the database checks owner or assigned affiliate.
 [functions.affiliate-proof]
 verify_jwt = false
+
+# Validates every caller with Auth and the current database staff role before
+# returning any Google report, including a cached report.
+[functions.website-analytics]
+verify_jwt = false

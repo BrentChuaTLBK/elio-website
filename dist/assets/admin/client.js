@@ -128,7 +128,7 @@ export async function affiliatePayout(file, payload) {
 }
 
 export async function websiteVisitorStats({ signal } = {}) {
-  return { status: 'not_configured' };
+  return edge('website-analytics', {}, { signal });
 }
 
 export async function upload(file, { kind = 'proof', order_id, token, payment_reference } = {}) {
