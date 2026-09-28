@@ -35,6 +35,10 @@ import { renderWebsiteVisitors, createVisitorPoller } from './website-visitors.j
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
 const esc = escapeHtml;
+const dashboardNavigation=$('#dashboard-navigation'),compactNavigation=matchMedia('(max-width:760px)');
+function syncNavigationSize(){if(dashboardNavigation)dashboardNavigation.open=!compactNavigation.matches;}
+syncNavigationSize();compactNavigation.addEventListener('change',syncNavigationSize);
+
 let unmountAnalyticsChart=()=>{};
 const clone = value => JSON.parse(JSON.stringify(value));
 const uid = () => crypto.randomUUID();
@@ -184,6 +188,7 @@ function render() {
   const newsletterNav = $('[data-view="newsletter"]');
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
+  const currentPage=$('#dashboard-current-page');if(currentPage){const active=$('#admin-nav .sidebar-link.active');currentPage.textContent=active?.textContent.trim().replace(/\d+$/, '').trim()||'Overview';}
   const views = { calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   unmountAnalyticsChart();
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
@@ -791,7 +796,7 @@ document.addEventListener('click', async event => {
     if(manager?.dataset.dirty==='true' && !await confirmDialog('Leave accounting and discard these unsaved changes?',{title:'Unsaved accounting entry',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;
   }
   if(view?.dataset.newsletterTab)newsletterAdmin.selectTab(view.dataset.newsletterTab);
-  if (view) { state.view = view.dataset.view; state.productFilters = { search: '', status: '', category: '' }; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
+  if (view) { if(compactNavigation.matches&&dashboardNavigation&&$('#admin-nav').contains(view)){dashboardNavigation.open=false;dashboardNavigation.querySelector('summary')?.focus();} state.view = view.dataset.view; state.productFilters = { search: '', status: '', category: '' }; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
   const button = event.target.closest('[data-action]');
   if (!button) return;
   event.preventDefault();
