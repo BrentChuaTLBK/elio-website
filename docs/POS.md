@@ -23,6 +23,12 @@ The product-first mobile navigation and separate management area use the officia
 
 Flavor imports and stock editors use editable quantities with − / + controls. **Select all**, **Set selected to** and **Apply quantity** stage a quantity across selected rows; individual rows can then be adjusted before saving. Each stock section has **Bulk edit stock** for existing quantities. It saves only changed selected rows, records the adjustment reason, and rejects the entire batch if any affected stock was sold or edited in the meantime. Reopen the editor to get fresh quantities before retrying. Existing imports are skipped and website inventory is unchanged.
 
+### Individual products with flavors
+
+In Event setup, choose **Add product with flavors**, or edit a custom individual product and select **Flavors / options · choose 1**. Set the base event price, then enter **Flavor Name | Stock | Additional Surcharge** for each row. Stock has − / + controls and accepts typed quantities. Add rows, uncheck flavors to pause offering them, or remove them. Total available stock is the sum of the enabled flavors. These product flavors have their own stock, separate from cheesecake flavor pieces, other products and website inventory. Converting an existing plain item leaves its previous unflavored stock separate; enter the prepared quantities for each new flavor.
+
+At the till, tap the product and then a flavor. The button shows the full price and remaining stock. Sold-out choices are disabled, including quantities already in the current cart. One sale deducts one unit of that flavor; the base price plus surcharge flows into the existing in-person sales accounting category. Saved orders retain the flavor, price and allocation even if its surcharge changes or the flavor is removed. Product/stock saves are atomic and reject stale counts after concurrent sales.
+
 Owners can delete events, stock units and sellable items. These are hidden from new sales while past orders, allocations, cash reports and accounting remain intact. Deleting stock makes dependent fixed recipes unavailable and removes that flavor from custom-box choices. **Show deleted events** gives access to historical orders and reports, including finishing cash reconciliation.
 
 Sale unit prices are prominent, with line totals for quantities above one. Direct fulfillment dates, event setup dates and report dates use Elio’s branded calendar picker.
