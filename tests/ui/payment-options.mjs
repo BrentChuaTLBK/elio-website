@@ -90,6 +90,7 @@ try {
   await page.getByRole('button',{name:'Save shop settings',exact:true}).click();
   assert.equal(await page.locator('.payment-option-editor').first().locator('details').evaluate(el=>el.open),true);
   order={...original,payment_options:structuredClone(settings.payment_options)};await page.goto(origin+'/order.html#order=payment-test');await page.getByRole('heading',{name:'Maya',exact:true}).waitFor();assert.equal(await page.locator('.payment-option').count(),4);
+  order={...order,order_source:'direct',payment_deadline:null,payment_seconds_remaining:null};await page.reload();await page.locator('#proof-form').waitFor();assert.match(await page.locator('#app').textContent(),/link stays open/i);assert.doesNotMatch(await page.locator('#app').textContent(),/deadline has passed/i);
   assert.deepEqual(errors,[]);assert.equal(calls.filter(c=>c.action==='mock_upload').length,1);await ctx.close();console.log(`PASS payment copy, fallback, proof upload and closed states; admin adds/saves/removes methods ${width}px`);
  }
 }finally{await browser.close();}

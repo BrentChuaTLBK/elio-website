@@ -15,8 +15,9 @@ const newsletterStatus = document.querySelector('#account-newsletter-status');
 const newsletterRetry = document.querySelector('#account-newsletter-retry');
 const googleButton = document.querySelector('#google-signin');
 const googleLabel = googleButton.innerHTML;
-const destination = document.body.dataset.accountContext === 'customer' ? 'account.html' : 'manage.html';
-const callback = new URL(document.body.dataset.accountContext === 'customer' ? 'account.html' : 'admin-account.html', location.href).href;
+const staffDestination = new URLSearchParams(location.search).get('next') === 'pos.html' ? 'pos.html' : 'manage.html';
+const destination = customer ? 'account.html' : staffDestination;
+const callback = new URL(customer ? 'account.html' : staffDestination==='pos.html' ? 'admin-account.html?next=pos.html' : 'admin-account.html', location.href).href;
 let mode = 'signin';
 let busy = false;
 let googleAvailable = false;
@@ -368,6 +369,7 @@ else if (auth) {
       try {
         const access = await api('account_access');
         dashboardLink.hidden = !['owner', 'staff'].includes(access?.role);
+        if(!customer&&staffDestination==='pos.html'&&!dashboardLink.hidden){dashboardLink.href='pos.html';dashboardLink.textContent='Open POS';}
       } catch {
         // An unavailable role lookup must not expose team navigation or block
         // the customer's account. The dashboard enforces its own permissions.

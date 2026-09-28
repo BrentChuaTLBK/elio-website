@@ -20,6 +20,7 @@ function addOrder(result, order) {
   result.orders++;
   const served=order.fulfillment_status==='completed';
   for (const [index,item] of (order.items || []).entries()) {
+    if(['pos_item','event_item','custom_item'].includes(item.product_kind))continue;
     const count=Number(item.quantity);
     if (!Number.isInteger(count) || count<1) continue;
     const custom=item.product_kind ? item.product_kind==='custom_box' : Object.hasOwn(item.selections || {},'flavors');
@@ -49,7 +50,7 @@ function finish(result) {
 }
 export function buildProduction(orders, from, to) {
   if(!isCalendarDate(from)||!isCalendarDate(to)||from>to)throw new Error('Choose a valid date range, with the start on or before the end.');
-  const selected=orders.filter(o=>o.payment_status==='paid'&&!o.refund_label&&confirmedStatuses.has(o.fulfillment_status)&&o.fulfillment_date>=from&&o.fulfillment_date<=to);
+  const selected=orders.filter(o=>o.order_source!=='in_person'&&o.payment_status==='paid'&&!o.refund_label&&confirmedStatuses.has(o.fulfillment_status)&&o.fulfillment_date>=from&&o.fulfillment_date<=to);
   const totals=total(),daily=new Map();
   for(const order of selected){addOrder(totals,order);const day=daily.get(order.fulfillment_date)||total();addOrder(day,order);daily.set(order.fulfillment_date,day);}
   return {...finish(totals),from,to,days:[...daily.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([date,data])=>({date,...finish(data)}))};

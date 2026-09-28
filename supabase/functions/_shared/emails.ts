@@ -93,6 +93,10 @@ export function renderEmail(payload: any): { html: string; text: string } {
       heading = "Your order has been received";
       message = "Your order is awaiting full initial payment and manual approval. Upload your proof of payment through the secure order link before the deadline. A payment reference is optional. Uploading proof places the payment under review; it does not confirm payment.";
       instructions = `Payment instructions:\n${settings.payment_instructions || "Open your order page for payment instructions."}\n\nPayment-proof deadline: ${date(order.payment_deadline, true)}.`;
+      if (order.order_source === "direct") {
+        message = "Your order details are saved. Please pay the full amount and upload your proof through the private order link below. Our team will review it before confirming payment. This link has no automatic payment deadline; it remains open until you submit proof or our team closes the order.";
+        instructions = `Payment instructions:\n${settings.payment_instructions || "Open your order page for payment instructions."}`;
+      }
       break;
     case "payment_approved":
       heading = "Payment approved · order confirmed";
