@@ -2,6 +2,14 @@
 
 Open `pos.html` from the Kitchen dashboard’s POS link. Authorized staff and owners can sell. Only owners manage event dates, items, prices and stock. The POS requires an internet connection; it never caches private order data or queues sales offline.
 
+## Selling and setup
+
+The cashier screen keeps event management out of checkout. **Setup** contains event creation, imports, prices, stock adjustments and deletion. On mobile, bottom navigation separates New sale, Orders, Event report and Setup. Start with the product grid, tap **View sale** to open the cart/payment screen, and use **Back to items** to continue adding products. Desktop keeps the product grid and sale panel side by side.
+
+Cart − / + controls and product availability account for the current cart and shared event flavor stock. Cash shortcuts offer the exact total and common tender amounts. The server still rechecks stock and prices before saving.
+
+The product-first mobile navigation and separate management area use the official [Cococart mobile POS guide](https://support.cococart.co/en/articles/15549738-how-do-i-view-orders-using-the-pos-mobile-version) and [product-management guide](https://support.cococart.co/en/articles/15549448-how-do-i-add-products-and-categories-to-the-pos-app) as workflow references. Elio retains its own branding and event inventory rules.
+
 ## In-person sales / events
 
 1. Create an event with its name and selling dates.
