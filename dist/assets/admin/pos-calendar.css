@@ -1,0 +1,27 @@
+.pos-calendar-ui .date-calendar{min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;margin:22px 0;background:#fffdfa}
+.date-calendar legend{padding:0 6px;font-weight:700;font-size:12px;line-height:1.5;max-width:100%}
+.date-calendar .calendar-hint{font-size:11px;line-height:1.6;color:var(--muted);margin:0 0 12px}
+.date-calendar textarea[hidden]{display:none}
+.calendar-toolbar{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;gap:8px;text-align:center;margin-bottom:8px}
+.calendar-toolbar strong{font-size:13px}
+.pos-calendar-ui .calendar-nav{border:1px solid var(--line);border-radius:7px;background:#f8f1e6;color:var(--brown);height:38px;font-size:23px;cursor:pointer}
+.calendar-month{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}
+.calendar-month th{font-size:10px;font-weight:400;color:var(--muted);padding:5px 0 7px;text-align:center}
+.calendar-month td{padding:0;text-align:center;height:38px}
+.pos-calendar-ui .calendar-day{position:relative;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--ink);width:100%;min-height:38px;cursor:pointer;padding:6px 1px;font-size:12px}
+.pos-calendar-ui .calendar-day:hover{background:#f1e8db}
+.pos-calendar-ui .calendar-day[aria-current="date"]{border-color:var(--brown);font-weight:700}
+.pos-calendar-ui .calendar-day[aria-pressed="true"]{background:var(--brown);color:#fff;font-weight:700}
+.pos-calendar-ui .calendar-day[aria-pressed="true"]:after{content:'•';position:absolute;bottom:-2px;left:0;right:0;font-size:12px;line-height:12px}
+.date-calendar button:focus-visible,.date-calendar summary:focus-visible{outline:2px solid #764b25;outline-offset:2px}
+.calendar-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:var(--muted);flex-wrap:wrap;margin:11px 0}
+.calendar-selected-key{background:var(--brown);color:#fff;border-radius:3px;padding:1px 3px;margin-right:3px}
+.pos-calendar-ui .calendar-today{border:0;background:transparent;color:var(--brown);text-decoration:underline;cursor:pointer;padding:5px 0;font-size:10px}
+.accounting-filters{overflow:visible}.accounting-date-field{min-width:0}.accounting-date-picker{position:relative;margin-top:7px;font-weight:400}.accounting-date-picker>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;list-style:none;cursor:pointer;border:1px solid #d9c9b8;border-radius:6px;background:#fffefa;padding:12px 13px;min-height:42px;font-size:12px;color:var(--ink)}.accounting-date-picker>summary::-webkit-details-marker{display:none}.accounting-date-picker>summary:focus-visible{outline:2px solid var(--brown);outline-offset:2px}.accounting-date-picker>summary svg{flex-shrink:0;color:var(--brown)}.accounting-date-picker .accounting-calendar{position:absolute;z-index:25;left:0;top:100%;width:330px;max-width:calc(100vw - 60px);margin:8px 0 0;padding:14px;background:#fffdfa;box-shadow:0 14px 35px #2f262426;color:var(--ink)}.accounting-calendar-jump{display:flex;gap:10px;margin:10px 0}.accounting-calendar-jump label{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px;font-size:10px;color:var(--muted)}.accounting-calendar-jump select,.accounting-calendar-jump input{width:100%;min-width:0;padding:7px 8px!important;font-size:12px!important;border:1px solid var(--line);border-radius:6px;background:white;color:var(--ink)}.accounting-month-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.accounting-month-grid .calendar-day{min-height:43px}.accounting-calendar .calendar-footer{margin-bottom:0}.accounting-calendar table{min-width:0}.accounting-date-picker[open]{z-index:26}
+@media(max-width:500px){.accounting-date-picker .accounting-calendar{width:100%;max-width:none;padding:10px}.accounting-date-picker>summary{font-size:12px}}
+.accounting-date-picker{margin-top:0}.accounting-date-picker>summary{height:44px;padding:10px 11px;line-height:20px}
+.accounting-date-picker .accounting-calendar{width:min(330px,calc(100vw - 32px));max-width:calc(100vw - 32px)}
+.accounting-date-picker>summary[aria-invalid="true"]{border-color:#a44b42}
+.accounting-calendar-error{background:#fff0ec;color:#953b2d;border-radius:6px;padding:12px;font-size:12px;line-height:1.6;margin:12px 0}.accounting-calendar-error[hidden]{display:none}
+.accounting-calendar .calendar-day:disabled{opacity:.35;cursor:not-allowed}
+.accounting-date-field{font-size:12px;font-weight:600;margin-bottom:14px}.accounting-date-picker{margin-top:5px}.accounting-calendar th,.accounting-calendar td{background:transparent;border:0}.accounting-calendar-jump label{margin-bottom:0}.accounting-calendar .calendar-nav{padding:0;min-height:38px}.accounting-calendar .calendar-today{min-height:32px}.accounting-date-picker>input[type=hidden]{display:none}dialog:has(.accounting-date-picker[open]){min-height:min(650px,90dvh)}

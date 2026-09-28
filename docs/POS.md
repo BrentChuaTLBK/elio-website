@@ -5,11 +5,15 @@ Open `pos.html` from the Kitchen dashboard’s POS link. Authorized staff and ow
 ## In-person sales / events
 
 1. Create an event with its name and selling dates.
-2. Add the event’s separately prepared stock, such as individual Vanilla, Chocolate and Matcha pieces. No website stock is transferred or deducted.
-3. Create event items with their own prices and recipes. For example, one Trio can use one piece of each flavor; one Vanilla slice uses one Vanilla piece. Both sales consume the same event Vanilla stock.
+2. Use **Import flavors** to choose website flavors and enter the quantities prepared for the event. You can also add custom stock units. No website stock is transferred or deducted.
+3. Use **Import boxes from website** to copy box names, prices and recipes, then edit event prices independently. Missing fixed-box stock starts at zero. Import flavors before importing Build your own box: staff choose exactly three event flavor pieces at each sale using − / + buttons. Event flavor surcharges and remaining pieces are respected. Use **Add custom event item** for other products with their own prices and stock recipes. Boxes and individual items consume the same event flavor stock. Re-importing skips existing imports and does not reset quantities or edited prices.
 4. Open the day’s cash session, including the opening float (zero is allowed).
-5. Add items, choose pickup or delivery, and record full payment: Cash, GCash, BDO or EastWest. Cash received and change are recorded. Paid pickup orders handed over today are completed immediately; scheduled orders stay confirmed.
+5. Add items and tap Cash, GCash, BDO or EastWest. For cash, enter the amount received. **Complete sale** checks stock and price, records full payment, and marks the order completed and handed over today. In-person checkout has no fulfillment method/date fields. Customer details and notes are optional and collapsed. A changed server price requires review; a lost save response uses the same request key when retried. The confirmation shows change clearly and **Next sale** opens an empty cart.
 6. Review the event report for the chosen day, payment totals and remaining event stock. Enter actual cash in/out with a reason, then count and close the session. Closing prevents further sales until an owner reopens it.
+
+Owners can delete events, stock units and sellable items. These are hidden from new sales while past orders, allocations, cash reports and accounting remain intact. Deleting stock makes dependent fixed recipes unavailable and removes that flavor from custom-box choices. **Show deleted events** gives access to historical orders and reports, including finishing cash reconciliation.
+
+Sale unit prices are prominent, with line totals for quantities above one. Direct fulfillment dates, event setup dates and report dates use Elio’s branded calendar picker.
 
 Event price and recipe edits apply to new sales. Existing orders retain their saved prices and recipes. Closed/completed orders retain their history.
 
