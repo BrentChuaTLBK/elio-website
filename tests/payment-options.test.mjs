@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {paymentDetails,renderPaymentOptions} from '../dist/assets/payment-options.js';
+const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const legacy='Accepted Payment Methods:\r\n\r\nGCash\r\nTest Shop\r\n09170000001\r\n\r\nBank\r\nTest Shop\r\n001234567890';
+const parsed=paymentDetails({payment_instructions:legacy});assert.equal(parsed.options.length,2);assert.equal(parsed.options[1].account_number,'001234567890');
+assert.equal(paymentDetails({payment_instructions:'Contact the kitchen.'}).note,'Contact the kitchen.');
+const html=renderPaymentOptions({payment_instructions:legacy},{payment_options:[{label:'New account',account_name:'New',account_number:'123'}]},{esc});assert.match(html,/001234567890/);assert.doesNotMatch(html,/New account/);
+const unsafe=renderPaymentOptions({payment_options:[{label:'<script>x</script>',account_name:'<img src=x>',account_number:'00123',note:'<b>note</b>'}]},{},{esc});assert.doesNotMatch(unsafe,/<script>|<img|<b>/);assert.match(unsafe,/&lt;script&gt;/);
+assert.match(renderPaymentOptions({payment_instructions:'Saved old account'},{payment_options:parsed.options},{esc}),/Saved old account/);
+console.log('PASS legacy payment parsing, leading zeroes, saved order precedence and escaped account details');
