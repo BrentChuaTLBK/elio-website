@@ -103,7 +103,7 @@ export async function api(action, payload = {}, token = null) {
   if (action === 'proof_url') return signedProofUrl(payload.order_id);
   const client = await connection();
   const { data, error } = await client.rpc('shop_api', { p_action: action, p_payload: payload, p_token: token || null });
-  if (error) throw new Error(error.message || 'The request could not be completed. Please try again.');
+  if (error) throw Object.assign(new Error(error.message || 'The request could not be completed. Please try again.'), {code:error.code});
   return data;
 }
 

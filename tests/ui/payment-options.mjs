@@ -90,6 +90,13 @@ try {
   await page.getByRole('button',{name:'Save shop settings',exact:true}).click();
   assert.equal(await page.locator('.payment-option-editor').first().locator('details').evaluate(el=>el.open),true);
   order={...original,payment_options:structuredClone(settings.payment_options)};await page.goto(origin+'/order.html#order=payment-test');await page.getByRole('heading',{name:'Maya',exact:true}).waitFor();assert.equal(await page.locator('.payment-option').count(),4);
+  order={...order,order_source:'direct',payment_deadline:null,payment_seconds_remaining:null};await page.reload();await page.locator('#proof-form').waitFor();assert.match(await page.locator('#app').textContent(),/link stays open/i);assert.doesNotMatch(await page.locator('#app').textContent(),/deadline has passed/i);
+  for(const [charge,expected] of [
+   [{state:'pending',recipient:'elio',fee_cents:null},/To be confirmed.*Pay Elio/],
+   [{state:'courier',recipient:'courier',fee_cents:20000},/200.00.*Pay courier directly/],
+   [{state:'quoted',recipient:'elio',fee_cents:20000},/200.00.*not yet received/],
+   [{state:'paid',recipient:'elio',fee_cents:20000},/Paid to Elio separately/]
+  ]){order={...order,recipient:{},address:{},method:'delivery',payment_status:'paid',paid_amount_cents:original.total_cents,fulfillment_status:'confirmed',delivery_charge:charge};await page.reload();await page.getByRole('heading',{name:'Your treats'}).waitFor();assert.match(await page.locator('#app').textContent(),expected);assert.equal(await page.locator('#proof-form').count(),0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
   assert.deepEqual(errors,[]);assert.equal(calls.filter(c=>c.action==='mock_upload').length,1);await ctx.close();console.log(`PASS payment copy, fallback, proof upload and closed states; admin adds/saves/removes methods ${width}px`);
  }
 }finally{await browser.close();}
