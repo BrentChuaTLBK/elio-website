@@ -35,7 +35,7 @@ export default async function({db,check,state}) {
  })();
  await check('Unsafe and malformed tracking URLs are rejected without side effects',async()=>{
   const before=await order(o.id),count=await scalar('select count(*) from elio.history where order_id=$1',[o.id]);
-  for(const url of [true,7,{},[], 'javascript:alert(1)','data:text/html,x','//example.test/tracking','https://','https:///bad','https://user:secret@example.test/','https://example.test\\evil','https://exa mple.test','https://example.test/\nscript','https://example.test/%0d%0aheader','https://example.test:0','https://example.test:65536','https://bad..test','https://-bad.test','https://999.999.999.999','https://[invalid]/','https://example.test/'+ 'x'.repeat(2048)])await assert.rejects(()=>save(o,url),/tracking|HTTP|username|port/i);
+  for(const url of [true,7,{},[], 'https://grab.com','https://www.grab.com/ph/','https://grab.com/ph/en/?test=1','https://lalamove.com','https://www.lalamove.com/en-ph/', 'javascript:alert(1)','data:text/html,x','//example.test/tracking','https://','https:///bad','https://user:secret@example.test/','https://example.test\\evil','https://exa mple.test','https://example.test/\nscript','https://example.test/%0d%0aheader','https://example.test:0','https://example.test:65536','https://bad..test','https://-bad.test','https://999.999.999.999','https://[invalid]/','https://example.test/'+ 'x'.repeat(2048)])await assert.rejects(()=>save(o,url),/tracking|HTTP|username|port/i);
   await assert.rejects(()=>action('save_delivery_tracking',o),/Provide a tracking link/);
   assert.deepEqual(await order(o.id),before);
   assert.equal(await scalar('select count(*) from elio.history where order_id=$1',[o.id]),count);

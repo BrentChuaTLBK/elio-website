@@ -45,13 +45,50 @@ try {
   await page.locator('[name=proof]').setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2FzQAAAAASUVORK5CYII=','base64')});await page.getByRole('button',{name:'Submit payment proof',exact:true}).click();await page.getByRole('heading',{name:'Your payment is under review',exact:true}).waitFor();assert.equal(await page.locator('.payment-options').count(),0);
   for(const changes of [{payment_status:'paid'},{fulfillment_status:'expired'},{refund_label:true},{uploads_paused:true,payment_seconds_remaining:600}]){order={...original,...changes};await page.reload();await page.locator('.order-title').waitFor();assert.equal(await page.locator('.payment-option').count(),0);assert.equal(await page.locator('#proof-form').count(),0);}
   order={...original};delete order.payment_options;await page.reload();await page.locator('.payment-option').first().waitFor();assert.equal(await page.locator('.payment-option').count(),3);
+  // The same email URL resolves the current courier link on every visit.
+  const trackingPage=origin+'/order.html#order=payment-test&token=fixture-token&section=tracking';
+  for(const [changes,expected] of [
+   [{delivery_tracking_url:null},null],
+   [{delivery_tracking_url:'https://express.grab.com/track/first'},'https://express.grab.com/track/first'],
+   [{delivery_tracking_url:'https://share.lalamove.com/tracking/replaced'},'https://share.lalamove.com/tracking/replaced'],
+   [{delivery_tracking_url:null},null],
+   [{delivery_tracking_url:'https://grab.com'},null],
+   [{delivery_tracking_url:'https://lalamove.com'},null],
+   [{delivery_tracking_url:'https://express.grab.com/track/first',refund_label:true},null],
+   [{delivery_tracking_url:'https://express.grab.com/track/first',fulfillment_status:'cancelled'},null],
+  ]){
+   order={...original,recipient:{name:'Test customer',phone:'09170000003'},address:{line1:'Test address',locality:'Test city'},payment_status:'paid',method:'delivery',fulfillment_status:'out_for_delivery',...changes};
+   await page.goto(trackingPage);await page.reload();try{await page.locator('#delivery-tracking').waitFor({timeout:8000});}catch(error){console.log({changes,errors,body:(await page.locator('body').innerText()).slice(-2200)});throw error;}
+   assert.equal(await page.locator('#delivery-tracking a').count(),expected?1:0);
+   if(expected){assert.equal(await page.locator('#delivery-tracking a').getAttribute('href'),expected);assert(!expected.includes('fixture-token'));}
+   else assert.match(await page.locator('#delivery-tracking').textContent(),/not available yet|order is closed/);
+   assert.equal(await page.locator('#print-order').count(),0);
+   assert.equal(await page.locator('#delivery-tracking').evaluate(el=>document.activeElement===el),true);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  }
+  await page.locator('#delivery-tracking').screenshot({path:join(output,`tracking-${width}.png`)});
   await page.goto(origin+'/manage.html');await page.locator('[data-view=settings]').click();assert.equal(await page.locator('.payment-option-editor').count(),3);
+  assert.equal(await page.locator('.payment-option-editor details[open]').count(),0);
+  const first=page.locator('.payment-option-editor').first();
+  await first.locator('summary').click();await first.locator('[name=note]').fill('Edited before reordering');await first.locator('summary').click();
+  await first.locator('[data-move-payment=down]').click();
+  assert.equal(await page.locator('.payment-option-editor').nth(1).locator('[name=label]').inputValue(),'GCash');
+  assert.equal(await page.locator('.payment-option-editor').nth(1).locator('[name=note]').inputValue(),'Edited before reordering');
+  await page.locator('.payment-option-editor').nth(1).locator('[data-move-payment=up]').click();
+  assert.equal(await page.locator('.payment-option-editor').first().locator('[data-move-payment=up]').isDisabled(),true);
   await page.getByRole('button',{name:'+ Add payment option',exact:true}).click();const fourth=page.locator('.payment-option-editor').nth(3);
   await fourth.locator('[name=label]').fill('Maya');await fourth.locator('[name=account_name]').fill('Test Shop');await fourth.locator('[name=account_number]').fill('09170000004');await fourth.locator('[name=note]').fill('Use your order reference.');
   await page.getByRole('button',{name:'Save shop settings',exact:true}).click();await page.getByText('Shop settings saved.',{exact:true}).waitFor();assert.equal(settings.payment_options.length,4);assert.equal(settings.payment_options[3].account_number,'09170000004');
   await page.reload();await page.locator('[data-view=settings]').click();assert.equal(await page.locator('.payment-option-editor').count(),4);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.locator('.payment-options-editor').screenshot({path:join(output,`admin-${width}.png`)});
-  await page.locator('.payment-option-editor').nth(3).getByRole('button',{name:'Remove option'}).click();assert.equal(await page.locator('.payment-option-editor').count(),3);assert.equal(settings.payment_options.length,4);assert.equal(await page.locator('[name=contact_email]').inputValue(),'shop@example.test');
+  await page.screenshot({path:join(output,`settings-${width}.png`),fullPage:true});
+  await page.locator('.payment-option-editor').nth(3).getByRole('button',{name:'Remove Maya'}).click();assert.equal(await page.locator('.payment-option-editor').count(),3);assert.equal(settings.payment_options.length,4);assert.equal(await page.locator('[name=contact_email]').inputValue(),'shop@example.test');
+  // Native form validation reveals missing fields even when a method is collapsed.
+  await page.locator('.payment-option-editor').first().locator('summary').click();
+  await page.locator('.payment-option-editor').first().locator('[name=account_name]').fill('');
+  await page.locator('.payment-option-editor').first().locator('summary').click();
+  await page.getByRole('button',{name:'Save shop settings',exact:true}).click();
+  assert.equal(await page.locator('.payment-option-editor').first().locator('details').evaluate(el=>el.open),true);
   order={...original,payment_options:structuredClone(settings.payment_options)};await page.goto(origin+'/order.html#order=payment-test');await page.getByRole('heading',{name:'Maya',exact:true}).waitFor();assert.equal(await page.locator('.payment-option').count(),4);
   assert.deepEqual(errors,[]);assert.equal(calls.filter(c=>c.action==='mock_upload').length,1);await ctx.close();console.log(`PASS payment copy, fallback, proof upload and closed states; admin adds/saves/removes methods ${width}px`);
  }

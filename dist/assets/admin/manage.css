@@ -235,4 +235,35 @@
 .newsletter-conversion-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.newsletter-conversion-note{font-size:12px;line-height:1.7;margin:0 0 22px}.newsletter-code-details>summary{cursor:pointer;font-weight:600}.newsletter-code-details[open]>summary{margin-bottom:20px}@media(max-width:560px){.newsletter-conversion-metrics{grid-template-columns:1fr}.newsletter-conversion-metrics .panel{margin:0}.newsletter-conversion-metrics span{max-width:75%}}
 .pickup-reminder>.help-text{margin:12px 0 0}
 .manage-page .pickup-reminder .button-secondary:hover{background:var(--caramel);color:#fff}
-.payment-options-editor{grid-column:1/-1}.payment-option-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:20px 0}.payment-option-editor{min-width:0;margin:0;border:1px solid var(--line);border-radius:10px;padding:18px}.payment-option-editor legend{font-size:12px;font-weight:600;padding:0 6px}.payment-general-note{max-width:760px}.payment-options-editor .section-heading{flex-wrap:wrap;gap:12px}.payment-options-editor .help-text{line-height:1.7}.payment-option-fields:empty{margin:0}@media(max-width:1100px){.payment-option-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.payment-option-fields{grid-template-columns:1fr}.payment-option-editor{padding:14px}}
+
+/* Shop settings share one grid and consistent panel spacing. */
+.shop-settings .settings-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+.shop-settings .panel{min-width:0;margin:0;padding:24px}
+.shop-settings .panel h2{margin-bottom:20px}
+.settings-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;align-items:start}
+.settings-columns>div{min-width:0}
+.shop-settings .help-text{margin:0 0 16px;line-height:1.7}
+.shop-settings .field:last-child,.settings-columns>div>:last-child{margin-bottom:0}
+.shop-settings .date-calendar{margin:0}
+.settings-save{margin-top:24px;padding:20px 0;border-top:1px solid var(--line)}
+.manage-page .settings-zones{margin-top:8px;padding:24px}
+.settings-zones .zone-card:last-child{margin-bottom:0}
+.payment-options-editor{grid-column:1/-1}
+.payment-option-fields{display:grid;gap:12px;margin:20px 0 14px}
+.payment-option-editor{position:relative;min-width:0;border:1px solid #dfcbb5;border-radius:10px;background:#fffdf9}
+.payment-option-editor summary{cursor:pointer;display:flex;align-items:center;gap:10px;min-height:60px;padding:16px 176px 16px 16px;list-style:none;font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.payment-option-editor summary::-webkit-details-marker{display:none}
+.payment-option-editor summary::before{content:'›';font-size:20px;line-height:1;color:var(--caramel);transition:transform .15s}
+.payment-option-editor details[open]>summary::before{transform:rotate(90deg)}
+.payment-option-editor summary:focus-visible{outline:2px solid var(--caramel);outline-offset:3px;border-radius:8px}
+.payment-option-actions{position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:5px}
+.manage-page .payment-option-actions .button{min-height:36px;min-width:32px;padding:7px 9px}
+.payment-option-body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:20px 16px;border-top:1px solid var(--line)}
+.payment-option-body .field{margin:0}
+.payment-option-note{grid-column:1/-1}
+.manage-page .payment-general-note{margin:22px 0 16px}
+.payment-options-editor .payment-editor-status{margin:16px 0 0;color:var(--caramel)}
+.payment-editor-status:empty{display:none}
+@media(max-width:1100px){.shop-settings .settings-grid{grid-template-columns:minmax(0,1fr)}.settings-columns{gap:22px}}
+@media(max-width:850px){.settings-columns,.payment-option-body{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:560px){.shop-settings .panel,.manage-page .settings-zones{padding:18px}.payment-option-editor summary{padding-right:137px;padding-left:12px;font-size:11px}.payment-option-actions{right:8px;gap:3px}.manage-page .payment-option-actions .button{min-width:28px;padding:7px 5px;font-size:10px}.payment-option-body{padding:16px 12px}.settings-save .button{width:100%}}

@@ -5,6 +5,8 @@ export function deliveryTrackingUrl(value) {
   if (!link || link.length > 2048 || /[\s\\\u0000-\u001f\u007f]/.test(link) || /%(?:0[0-9a-f]|1[0-9a-f]|7f)/i.test(link)) return '';
   try {
     const url = new URL(link);
+    const host=url.hostname.toLowerCase().replace(/^www\./,'').replace(/\.$/,'');
+    if(['grab.com','lalamove.com'].includes(host)&&/^\/(?:[a-z]{2}(?:[-/][a-z]{2})?\/?)?$/i.test(url.pathname))return '';
     return /^https?:\/\//i.test(link) && ['https:', 'http:'].includes(url.protocol) && url.hostname && !url.username && !url.password ? link : '';
   } catch { return ''; }
 }

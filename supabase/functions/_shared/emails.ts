@@ -20,6 +20,8 @@ function deliveryTrackingUrl(value: unknown): string {
   if (!raw || raw.length > 2048 || /[\s\\\u0000-\u001f\u007f]/.test(raw) || /%(?:0[0-9a-f]|1[0-9a-f]|7f)/i.test(raw) || !/^https?:\/\//i.test(raw)) return "";
   try {
     const url = new URL(raw);
+    const host=url.hostname.toLowerCase().replace(/^www\./,'').replace(/\.$/,'');
+    if(["grab.com","lalamove.com"].includes(host)&&/^\/(?:[a-z]{2}(?:[-/][a-z]{2})?\/?)?$/i.test(url.pathname))return "";
     return ["https:", "http:"].includes(url.protocol) && url.hostname && !url.username && !url.password ? raw : "";
   } catch { return ""; }
 }
@@ -72,8 +74,15 @@ export function renderEmail(payload: any): { html: string; text: string } {
   const access = new URL("order.html", site);
   access.hash = new URLSearchParams({ order: order.id, token: order.access_token }).toString();
   const link = access.toString();
+  const trackingAccess=new URL(access);
+  trackingAccess.hash=new URLSearchParams({order:order.id,token:order.access_token,section:"tracking"}).toString();
+  const trackingLink=trackingAccess.toString();
   const trackingUpdate = payload.event_type === "delivery_tracking_updated";
   const trackingUrl = order.method === "delivery" && !(trackingUpdate && payload.tracking_change === "removed") ? deliveryTrackingUrl(order.delivery_tracking_url) : "";
+  const showTracking=order.method==="delivery"&&!order.refund_label&&!["cancelled","expired","refunded"].includes(order.fulfillment_status)
+    &&Boolean(trackingUrl||trackingUpdate||["out_for_delivery","fulfillment_reminder"].includes(payload.event_type));
+  const trackingLabel=trackingUrl?"Track your delivery":"Check delivery tracking";
+  const trackingMessage="Open your order page for the latest tracking link and availability.";
   const contact = [settings.contact_email, settings.contact_phone].filter(Boolean).join(" · ");
   const reason = [...(order.history || [])].reverse().find((event: any) => event.reason && !event.private)?.reason || payload.reason || "See your order page for details.";
   let heading: string;
@@ -131,8 +140,8 @@ export function renderEmail(payload: any): { html: string; text: string } {
         const replaced = payload.tracking_change === "replaced" || Boolean(deliveryTrackingUrl(payload.previous_tracking_url));
         heading = replaced ? "Your delivery tracking has been updated" : "Your delivery tracking is ready";
         message = replaced
-          ? "We’ve updated the courier tracking link for your Elio order. Use the new link below to follow your delivery."
-          : "You can now follow your Elio delivery using the courier tracking link below.";
+          ? "We’ve updated the courier tracking link for your Elio order. Open your order page to follow the latest delivery details."
+          : "Your courier tracking link is ready. Open your order page to follow your delivery.";
       } else {
         heading = "Your delivery tracking has been updated";
         message = "Open your secure order page for the latest delivery tracking details, or contact our kitchen if you need a hand.";
@@ -153,14 +162,14 @@ export function renderEmail(payload: any): { html: string; text: string } {
   const items = Array.isArray(order.items) ? order.items : [];
   const itemText = items.map((item: any) => `${item.quantity} × ${item.name}${selections(item) ? ` (${selections(item)})` : ""} — ${money(item.line_total_cents)}`).join("\n");
   const totals = `Product subtotal: ${money(order.subtotal_cents)}\nDiscount: ${money(order.discount_cents)}\nDelivery fee: ${money(order.delivery_cents)}\nCurrent order total: ${money(order.total_cents)}`;
-  const trackingText = trackingUrl ? `Track your delivery:\n${trackingUrl}\n\n` : "";
+  const trackingText = showTracking ? `${trackingLabel}:\n${trackingMessage}\n${trackingLink}\n\n` : "";
   const text = `${settings.shop_name || "Elio Basque Cheesecake"}\n${heading}\nOrder reference: ${order.reference}\n\n${message}\n\n${instructions ? `${instructions}\n\n` : ""}${trackingText}Fulfillment: ${date(order.fulfillment_date)} · ${order.method}\n${fulfillment}\n\n${itemText}\n\n${totals}\n\nView your order securely:\n${link}\n\nKeep this link private; it grants access to this order.\nThis is an automated update. Please use your order page to upload payment proof and check your status.\nFor changes, cancellations, or payment concerns, contact us${contact ? `: ${contact}` : " using the details on your order page"}.`;
   const detailTitle = order.method === "delivery" ? "Delivery details" : "Pickup details";
   const detailsHtml = emailPanel(detailTitle, `<p style="margin:0 0 14px;font-size:15px;font-weight:bold">${escape(date(order.fulfillment_date))}</p><p style="margin:0;font-size:14px;line-height:1.8">${lines(fulfillment || "See your order page for details.")}</p>`, "sand");
   const nextSteps = instructions ? emailPanel(payload.event_type === "order_submitted" ? "Payment instructions" : "What happens next", `<p style="margin:0;font-size:14px;line-height:1.8">${lines(instructions)}</p>`) : "";
-  const trackingPanel = trackingUrl && !trackingUpdate ? emailPanel("Delivery tracking", `<p style="margin:0;font-size:14px;line-height:1.8">Follow your delivery on the courier’s tracking page.</p>${emailButton("Track your delivery", trackingUrl)}`) : "";
-  const action = trackingUpdate && trackingUrl
-    ? emailButton("Track your delivery", trackingUrl) + `<p style="margin:0 0 20px;font-size:14px"><a href="${escape(link)}" style="color:#63412d;text-decoration:underline">View your order details</a></p>`
+  const trackingPanel = showTracking && !trackingUpdate ? emailPanel("Delivery tracking", `<p style="margin:0;font-size:14px;line-height:1.8">${trackingMessage}</p>${emailButton(trackingLabel, trackingLink)}`) : "";
+  const action = trackingUpdate && showTracking
+    ? emailButton(trackingLabel, trackingLink) + `<p style="margin:0 0 20px;font-size:14px"><a href="${escape(link)}" style="color:#63412d;text-decoration:underline">View your order details</a></p>`
     : emailButton(payload.event_type === "order_submitted" ? "View order & upload payment proof" : "View your order", link);
   const body = emailIntro("Your Elio order", heading, message, order.reference)
     + action

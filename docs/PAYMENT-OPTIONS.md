@@ -1,6 +1,6 @@
 # Customer payment options
 
-In **Shop settings → Payment options**, the owner can add, edit or remove up to 20 payment methods. Each has a method name, account name, account number and optional instructions. General instructions can be entered below the list. Save shop settings to publish changes. At least one method is required while orders are open.
+In **Shop settings → Payment options**, click a method to open its fields. The owner can add, edit, reorder or remove up to 20 payment methods. New methods open automatically. Each has a method name, account name, account number and optional instructions. General instructions can be entered below the list. Save shop settings to publish changes. At least one method is required while orders are open. Missing required fields open their row when saving.
 
 Customers awaiting payment see every saved option as a separate card, with copy buttons for account name and number. Leading zeroes are preserved. If clipboard access is blocked, the value is selected for manual copying. The existing full-payment deadline and receipt-upload flow apply. Paid, closed, refunded and maintenance-paused orders do not show payment cards.
 

@@ -26,10 +26,12 @@ assert(!renderEmail({event_type:'payment_approved',order,settings}).html.include
 checks++;
 const trackingUrl='https://tracking.example.test/order/ELIO-TEST?courier=grab&view=live';
 const deliveryOrder={...order,method:'delivery',delivery_tracking_url:trackingUrl};
+const statusLink='https://eliocheesecakes.com/order.html#order=order-id&token=private-order-token&section=tracking';
 for(const event_type of ['order_submitted','payment_approved','out_for_delivery','fulfillment_reminder','order_updated']){
  const tracked=renderEmail({event_type,order:deliveryOrder,settings});
- assert(tracked.html.includes('href="https://tracking.example.test/order/ELIO-TEST?courier=grab&amp;view=live"'));
- assert(tracked.html.includes('Track your delivery')&&tracked.text.includes('Track your delivery:\n'+trackingUrl));
+ assert(tracked.html.includes('href="'+statusLink.replaceAll('&','&amp;')+'"'));
+ assert(tracked.html.includes('Track your delivery')&&tracked.text.includes(statusLink));
+ assert(!tracked.html.includes('tracking.example.test')&&!tracked.text.includes(trackingUrl));
  const noTracking=renderEmail({event_type,order:{...deliveryOrder,delivery_tracking_url:null},settings});
  assert(!noTracking.html.includes('Track your delivery')&&!noTracking.text.includes(trackingUrl));
  const pickup=renderEmail({event_type,order:{...deliveryOrder,method:'pickup'},settings});
@@ -53,7 +55,15 @@ for(const bad of ['javascript:alert(1)','data:text/html,unsafe','//tracking.exam
  checks++;
 }
 const httpTracking=renderEmail({event_type:'out_for_delivery',order:{...deliveryOrder,delivery_tracking_url:'http://tracking.example.test/order'},settings});
-assert(httpTracking.html.includes('href="http://tracking.example.test/order"'));checks++;
+assert(httpTracking.html.includes('href="'+statusLink.replaceAll('&','&amp;')+'"')&&!httpTracking.html.includes('http://tracking.example.test/order'));checks++;
+for(const bad of ['https://grab.com','https://www.grab.com/ph/','https://grab.com/ph/en/?test=1','https://lalamove.com','https://www.lalamove.com/en-ph/']){
+ const rendered=renderEmail({event_type:'out_for_delivery',order:{...deliveryOrder,delivery_tracking_url:bad},settings});
+ assert(rendered.html.includes('Check delivery tracking')&&rendered.text.includes(statusLink));assert(!rendered.html.includes(bad));checks++;
+}
+for(const closed of [{refund_label:true},{fulfillment_status:'cancelled'},{fulfillment_status:'expired'}]){
+ const rendered=renderEmail({event_type:'out_for_delivery',order:{...deliveryOrder,...closed},settings});
+ assert(!rendered.html.includes('section=tracking')&&!rendered.text.includes(trackingUrl));checks++;
+}
 const staleRemoval=renderEmail({event_type:'delivery_tracking_updated',tracking_change:'removed',order:deliveryOrder,settings});
 assert(!staleRemoval.html.includes('Track your delivery')&&!staleRemoval.text.includes(trackingUrl));checks++;
 const manifest=JSON.parse(await readFile(new URL('../supabase/templates/manifest.json',import.meta.url),'utf8'));

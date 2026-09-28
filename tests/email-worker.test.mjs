@@ -115,7 +115,7 @@ try {
     assert.ok(email.text.includes('Vanilla × 2, Matcha × 1'));
     assert.ok(email.text.includes('Please use your order page to upload payment proof'));
   });
-  await check('tracking follow-up retains branded order details and the new courier link', async () => {
+  await check('tracking follow-up retains branded details and links to current order tracking', async () => {
     setup.row = { event_key: 'delivery-tracking/order-id/version-2', subject: 'Your Elio delivery tracking has been updated', payload: {
       ...row.payload, event_type: 'delivery_tracking_updated', tracking_change: 'replaced',
       tracking_url: 'https://tracking.example.test/new', previous_tracking_url: 'https://tracking.example.test/old',
@@ -126,8 +126,9 @@ try {
     const sent = providerBodies[0];
     assert.equal(sent.key, 'elio/delivery-tracking/order-id/version-2');
     assert.ok(sent.body.html.includes('Your delivery tracking has been updated'));
-    assert.ok(sent.body.html.includes('href="https://tracking.example.test/new"'));
-    assert.ok(sent.body.text.includes('https://tracking.example.test/new'));
+    assert.ok(sent.body.html.includes('&amp;section=tracking'));
+    assert.ok(sent.body.text.includes('&section=tracking'));
+    assert.ok(!sent.body.html.includes('https://tracking.example.test/new'));
     assert.ok(!sent.body.html.includes('https://tracking.example.test/old'));
     assert.ok(sent.body.html.includes('src="https://eliocheesecakes.com/assets/trio-story-concept.webp"'));
     assert.ok(sent.body.html.includes('Signature trio'));

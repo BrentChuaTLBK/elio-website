@@ -17,6 +17,21 @@ async function excelLibrary() {
 const currency = '"₱"#,##0.00;[Red]("₱"#,##0.00);"₱"0.00';
 const date = value => new Date(value + 'T00:00:00Z');
 const quoted = name => "'" + name.replaceAll("'", "''") + "'";
+const gridBorder = {style:'thin',color:{argb:'FFDCCDBB'}};
+function tableStyle(sheet,first,last,count,{amounts=[],dates=[],totals=false}={}) {
+  for(let number=first;number<=last;number++) {
+    const row=sheet.getRow(number),isHeader=number===first,isTotal=totals&&number===last;
+    row.height=Math.max(row.height||24,isHeader||isTotal?30:26);
+    for(let col=1;col<=count;col++) {
+      const cell=row.getCell(col);
+      cell.font={name:'Calibri',size:11,bold:isHeader||isTotal,color:{argb:isHeader?'FFFFFFFF':'FF302820'}};
+      cell.alignment={vertical:'middle',horizontal:isHeader?'center':amounts.includes(col)?'right':!isTotal&&dates.includes(col)?'center':'left',wrapText:true};
+      if(typeof cell.value==='string')row.height=Math.min(409,Math.max(row.height,8+18*cell.value.split('\n').reduce((lines,line)=>lines+Math.max(1,Math.ceil(line.length/(sheet.getColumn(col).width-3))),0)));
+      cell.border={top:gridBorder,bottom:isTotal?{style:'double',color:{argb:'FFB49A7A'}}:gridBorder,left:gridBorder,right:gridBorder};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:isHeader?'FF764B25':isTotal?'FFF1E6D6':number%2?'FFFFFFFF':'FFFCF9F3'}};
+    }
+  }
+}
 
 // Workbook construction is separate from downloading so its numeric values,
 // formulas, literal text and sheet names can be tested without an external service.
@@ -49,7 +64,7 @@ export function buildAccountingWorkbook(report, ExcelJS) {
   for (const [index, group] of groups.entries()) {
     const name = accountingSheetName(group.name, used), sheet = wb.addWorksheet(name);
     const columns=['Date','Source','Order ID','Client name','Payment method','Description','Amount'];
-    header(sheet, group.name, columns, [17,19,22,28,23,60,24]);
+    header(sheet, group.name, columns, [18,21,30,28,23,60,24]);
     sheet.views = [{state:'frozen',ySplit:6,showGridLines:false}];
     sheet.pageSetup.printTitlesRow='1:3';
     const subtotal = {};
@@ -74,10 +89,10 @@ export function buildAccountingWorkbook(report, ExcelJS) {
       sheet.getRow(titleRow+1).eachCell(cell=>{cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF764B25'}};cell.font={bold:true,color:{argb:'FFFFFFFF'}};});
       for(let row=first;row<=last;row++) {
         const r=sheet.getRow(row);r.getCell(1).numFmt='mmm d, yyyy';
-        for(const col of [2,4,6])r.getCell(col).alignment={wrapText:true,vertical:'top'};
-        r.height=Math.min(210,21*Math.max(1,...[2,4,6].map(col=>String(r.getCell(col).value||'').split('\n').reduce((n,line)=>n+Math.max(1,Math.ceil(line.length/(col===6?58:26))),0))));
+        r.height=Math.min(409,8+18*Math.max(1,...[2,3,4,5,6].map(col=>String(r.getCell(col).value||'').split('\n').reduce((n,line)=>n+Math.max(1,Math.ceil(line.length/(sheet.getColumn(col).width-3))),0))));
       }
       totalStyle(sheet.getRow(totalRow));sheet.getRow(totalRow).height=27;
+      tableStyle(sheet,titleRow+1,totalRow,7,{amounts:[7],dates:[1],totals:true});
       subtotal[kind]=totalRow;titleRow=totalRow+3;
     }
     sheet.getColumn(7).numFmt=currency;
@@ -89,19 +104,21 @@ export function buildAccountingWorkbook(report, ExcelJS) {
   const end = summary.lastRow.number, totals = accountingTotals(report), total = summary.addRow(['Overall total']);
   for (const [col,key] of [['B','sales'],['C','expenses'],['D','net']]) summary.getCell(`${col}${total.number}`).value = {formula:end>=6?`SUM(${col}6:${col}${end})`:'0',result:totals[key]/100};
   totalStyle(total); for (const c of [2,3,4]) summary.getColumn(c).numFmt = currency;
+  tableStyle(summary,5,total.number,4,{amounts:[2,3,4],totals:true});
   summary.addRow([]);
   summary.addRow(['Delivery costs not recorded', totals.missingCosts]).getCell(2).numFmt='0';
   summary.addRow(['Net = recorded income less recorded expenses. Missing costs are not treated as free delivery.']);
   summary.mergeCells(summary.lastRow.number,1,summary.lastRow.number,4);
   summary.lastRow.getCell(1).alignment = {wrapText:true}; summary.lastRow.height=32;
   const delivery = wb.addWorksheet('Delivery comparison');
-  header(delivery, 'Delivery fee comparison', ['Approval date','Order ID','Order status','Fee collected','Actual cost','Difference','Cost date'], [17,20,24,22,22,22,17]);
+  header(delivery, 'Delivery fee comparison', ['Approval date','Order ID','Order status','Fee collected','Actual cost','Difference','Cost date'], [18,30,24,22,22,22,18]);
   for (const d of report.deliveries) {
     const row = delivery.addRow([date(d.approval_date),d.reference,d.refund_label ? 'Refunded' : d.status.replaceAll('_',' '),d.fee_cents/100,d.cost_cents === null ? 'Not recorded' : d.cost_cents/100,null,d.cost_date ? date(d.cost_date) : null]);
     row.getCell(1).numFmt = row.getCell(7).numFmt = 'mmm d, yyyy';
     if (d.cost_cents !== null) row.getCell(6).value = {formula:`D${row.number}-E${row.number}`,result:(d.fee_cents-d.cost_cents)/100};
   }
   for (const c of [4,5,6]) delivery.getColumn(c).numFmt = currency;
+  tableStyle(delivery,5,delivery.lastRow.number,7,{amounts:[4,5,6],dates:[1,7]});
   if (report.deliveries.length) delivery.autoFilter = {from: 'A5',to:`G${delivery.lastRow.number}`};
   return wb;
 }
