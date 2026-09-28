@@ -26,11 +26,13 @@ import { quantitySelection, quantitySaveRows, quantityStatus, bulkQuantityDrafts
 import { analyticsDateRange, buildAnalytics } from './analytics.js';
 import { renderFlavorMenus, flavorMenuFields, menuMonths, menuFor, monthLabel, lineupChanged } from './flavor-menus.js';
 import { renderAnalytics } from './analytics-view.js';
+import { mountAnalyticsChart } from './analytics-chart.js';
 import { renderWebsiteVisitors, createVisitorPoller } from './website-visitors.js';
 
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
 const esc = escapeHtml;
+let unmountAnalyticsChart=()=>{};
 const clone = value => JSON.parse(JSON.stringify(value));
 const uid = () => crypto.randomUUID();
 const CLOSED = new Set(['cancelled', 'expired', 'completed']);
@@ -175,7 +177,9 @@ function render() {
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
   const views = { maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
+  unmountAnalyticsChart();
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
+  unmountAnalyticsChart=state.view==='analytics'?mountAnalyticsChart($('#workspace')):()=>{};
   if(state.view==='maintenance')mountMaintenance($('#maintenance-manager'),{owner:state.connected&&state.role==='owner'});
   if(state.view==='accounting')mountAccounting($('#accounting-manager'),{api,role:state.role,connected:state.connected,money,escapeHtml:esc,today:manilaDate(),filters:state.accountingFilter,openOrder});
   if(state.view==='affiliates')affiliatesController=mountAffiliates($('#affiliates-manager'),{role:state.role,connected:state.connected});
