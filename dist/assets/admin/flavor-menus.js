@@ -27,7 +27,7 @@ function renderHeadings(state, months, esc, disabled) {
 }
 
 export function renderFlavorMenus(state, { today, esc, disabled }) {
-  const months = menuMonths(state, today), flavors = sortProducts(state.products.filter(p => p.kind === 'flavor'));
+  const months = menuMonths(state, today), flavors = sortProducts(state.products.filter(p => p.kind === 'flavor' && !p.deleted_at));
   const panels = months.map((month, i) => {
     const menu = menuFor(state, month), draft=state.lineupDrafts?.[month], selection=draft||menu;
     const baseline={flavor_ids:draft?.expected_flavor_ids||menu.flavor_ids,published:draft?.expected_published??menu.published};

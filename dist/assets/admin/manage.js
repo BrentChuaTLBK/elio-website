@@ -1,4 +1,5 @@
-import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=elio-accounting-1';
+import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-clean-2';
+import {mountCalendar} from './calendar-manager.js';
 import {mountMaintenance} from './maintenance-admin.js';
 import {mountAffiliates} from './affiliates-admin.js';
 import {monthRange} from './accounting.js?v=shared-categories-1';
@@ -12,7 +13,7 @@ import { productCategoryIds, sortProducts, categoryFields } from './catalog-orde
 import { mountCatalogOrder } from './catalog-order.js';
 import { buildProduction, renderProduction } from './production.js';
 import { productionCalendar, bindProductionCalendar } from './production-calendar.js';
-import { api, auth, ready, configured, money, escapeHtml, manilaDate, formatDate, toast, upload, websiteVisitorStats } from './client.js';
+import { api, auth, ready, configured, money, escapeHtml, manilaDate, formatDate, toast, upload, websiteVisitorStats, calendarConnection } from './client.js';
 import { prepareOrderSave, normalizeOrderEditReason } from './order-edit-save.js';
 import { confirmOrderTotalChange } from './order-edit-confirmation.js';
 import { confirmFlavorRemoval } from './flavor-confirmation.js';
@@ -55,6 +56,8 @@ let productDraft = null;
 let clearPhotoDrag = () => {};
 let catalogOrderController = null;
 let affiliatesController = null;
+let calendarController = null;
+state.calendarFilters = {};
 const catalogScope = () => ['menus','flavors'].includes(state.view) ? 'flavors' : 'boxes';
 const areaCategories = () => state.categories.filter(c => c.scope === catalogScope());
 let editDraft = null;
@@ -88,7 +91,7 @@ const cents = value => Math.round(Number(value || 0) * 100);
 const safeImage = value => typeof value === 'string' && (/^https?:\/\//.test(value) || /^assets\//.test(value)) ? value : '';
 const list = value => String(value || '').split(/\r?\n/).map(v => v.trim()).filter(Boolean);
 const stockProducts = () => state.products.filter(p => p.kind === 'flavor' && !p.collection_hidden && menuFor(state,state.inventoryMonth+'-01').flavor_ids.includes(p.id));
-const areaProducts = () => state.products.filter(p => state.view === 'flavors' ? p.kind === 'flavor' : p.kind !== 'flavor');
+const areaProducts = () => state.products.filter(p => !p.deleted_at && (state.view === 'flavors' ? p.kind === 'flavor' : p.kind !== 'flavor'));
 const productNoun = (plural = false) => state.view === 'flavors' ? (plural ? 'flavors' : 'flavor') : (plural ? 'boxes' : 'box');
 const owner = () => !state.connected || state.role === 'owner';
 const readonly = () => state.connected && state.role !== 'owner' ? '<p class="notice">Only an owner can change this section. Your staff role can manage orders and daily quantities.</p>' : '';
@@ -151,6 +154,7 @@ async function refresh() {
   if (!configured) return;
   const result = await api('admin_bootstrap');
   if(!state.connected && ['#accounting','#affiliates','#maintenance'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
+  if(!state.connected && /^#calendar(?:\?|$)/.test(location.hash))state.view='calendar';
   Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
   state.promos = state.promos.filter(promo => !promo.newsletter_managed && !promo.affiliate_managed);
   state.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
@@ -162,6 +166,8 @@ async function refresh() {
   render();
 }
 function render() {
+  if(state.view==='calendar' && $('#order-calendar-manager') && calendarController){calendarController.refresh();return;}
+  calendarController?.destroy();calendarController=null;
   const maintenanceNav=$('[data-view="maintenance"]');if(maintenanceNav)maintenanceNav.hidden=!state.connected||state.role!=='owner';
   if(state.view==='maintenance' && $('#maintenance-manager') && state.role==='owner')return;
   const affiliatesNav = $('[data-view="affiliates"]');
@@ -177,10 +183,11 @@ function render() {
   const newsletterNav = $('[data-view="newsletter"]');
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
-  const views = { maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
+  const views = { calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   unmountAnalyticsChart();
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
   unmountAnalyticsChart=state.view==='analytics'?mountAnalyticsChart($('#workspace')):()=>{};
+  if(state.view==='calendar')calendarController=mountCalendar($('#order-calendar-manager'),{api,calendarConnection,role:state.role,connected:state.connected,openOrder,toast,esc,filters:state.calendarFilters});
   if(state.view==='maintenance')mountMaintenance($('#maintenance-manager'),{owner:state.connected&&state.role==='owner'});
   if(state.view==='accounting')mountAccounting($('#accounting-manager'),{api,role:state.role,connected:state.connected,money,escapeHtml:esc,today:manilaDate(),filters:state.accountingFilter,openOrder});
   if(state.view==='affiliates')affiliatesController=mountAffiliates($('#affiliates-manager'),{role:state.role,connected:state.connected});
@@ -196,7 +203,7 @@ function flavorMenusView() {
 }
 function editFlavorMenu(id) {
   const flavor = state.products.find(p => p.id === id);
-  showDialog(flavor ? 'Edit ' + flavor.name : 'Add a flavor', `<form data-form="flavor-menu-editor">${formError}${flavorMenuFields(state,id,{ today: manilaDate(),esc,input,textarea,select,option,check,disabled:ownerLocked() })}${actions(flavor ? 'Save flavor' : 'Add to collection')}</form>`);
+  showDialog(flavor ? 'Edit ' + flavor.name : 'Add a flavor', `<form data-form="flavor-menu-editor">${formError}${flavorMenuFields(state,id,{ today: manilaDate(),esc,input,textarea,select,option,check,disabled:ownerLocked() })}${actions(flavor ? 'Save flavor' : 'Add to collection')}${flavor && owner() ? `<div class="subsection"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(flavor.id)}">Delete flavor</button></div>` : ''}</form>`);
 }
 function productionView() {
   const report=buildProduction(state.orders,state.productionRange.from,state.productionRange.to);
@@ -284,7 +291,7 @@ function productFiltersActive() {
 }
 function productResults(products) {
   if (!areaProducts().length) return `<section class="panel">${empty('Room for something delicious', 'Your ordering catalog starts empty. Add your own products, photos, and prices when you’re ready.', `<button class="button" data-action="new-product" ${owner() ? '' : 'disabled'}>+ Add your first ${productNoun()}</button>`)}</section>`;
-  return products.length ? `<div class="product-grid">${products.map(product => `<article class="panel product-card"><div class="product-photo">${safeImage(product.photos?.[0]) ? `<img src="${esc(safeImage(product.photos[0]))}" alt="${esc(product.name)}" loading="lazy">` : '<span aria-hidden="true">♧</span>'}</div><div class="product-card-body"><h3>${esc(product.name)}</h3><p class="muted">${esc(state.categories.filter(c=>productCategoryIds(product,state.categories).includes(c.id)).map(c=>c.name).join(' · ') || 'Uncategorized')}</p><div class="product-card-meta"><span>${product.kind === 'flavor' ? (product.collection_hidden ? 'Hidden from collection' : menuMonths(state,manilaDate()).filter(month=>menuFor(state,month).flavor_ids.includes(product.id)).map(month=>monthLabel(month)+' lineup').join(' · ') || 'Full collection only') : product.kind === 'custom_box' ? 'Uses flavor-piece inventory' : 'Uses included flavors’ inventory'}</span><span>${product.allow_same_day === true ? '<span class="badge">Same-day eligible</span> ' : ''}${product.pickup_only ? '<span class="badge">Pickup only</span> ' : ''}${product.kind==='flavor' ? '' : badge(product.active ? 'shown_in_shop' : 'hidden_from_shop')}</span></div><div class="product-card-bottom"><strong>${money(product.price_cents)}${product.kind === 'flavor' ? ' / piece extra' : ''}</strong><button class="button button-quiet" data-action="edit-product" data-id="${esc(product.id)}">${owner() ? (product.kind === 'flavor' ? 'Edit flavor' : 'Edit box') : 'View item'} →</button></div></div></article>`).join('')}</div>` : `<section class="panel">${empty('No matching products', 'Try another product name, status, or category, or clear the filters.')}</section>`;
+  return products.length ? `<div class="product-grid">${products.map(product => `<article class="panel product-card"><div class="product-photo">${safeImage(product.photos?.[0]) ? `<img src="${esc(safeImage(product.photos[0]))}" alt="${esc(product.name)}" loading="lazy">` : '<span aria-hidden="true">♧</span>'}</div><div class="product-card-body"><h3>${esc(product.name)}</h3><p class="muted">${esc(state.categories.filter(c=>productCategoryIds(product,state.categories).includes(c.id)).map(c=>c.name).join(' · ') || 'Uncategorized')}</p><div class="product-card-meta"><span>${product.kind === 'flavor' ? (product.collection_hidden ? 'Hidden from collection' : menuMonths(state,manilaDate()).filter(month=>menuFor(state,month).flavor_ids.includes(product.id)).map(month=>monthLabel(month)+' lineup').join(' · ') || 'Full collection only') : product.kind === 'custom_box' ? 'Uses flavor-piece inventory' : 'Uses included flavors’ inventory'}</span><span>${product.allow_same_day === true ? '<span class="badge">Same-day eligible</span> ' : ''}${product.pickup_only ? '<span class="badge">Pickup only</span> ' : ''}${product.kind==='flavor' ? '' : badge(product.active ? 'shown_in_shop' : 'hidden_from_shop')}</span></div>${product.kind !== 'flavor' ? `<p class="help-text product-production-days">${Number(product.lead_days) || 0} production day${Number(product.lead_days) === 1 ? '' : 's'}</p>` : ''}${product.kind === 'set' && product.box_flavors?.some(id=>state.products.some(f=>f.id===id&&f.deleted_at)) ? '<p class="notice danger">Unavailable · contains a deleted flavor</p>' : ''}<div class="product-card-bottom"><strong>${money(product.price_cents)}${product.kind === 'flavor' ? ' / piece extra' : ''}</strong><button class="button button-quiet" data-action="edit-product" data-id="${esc(product.id)}">${owner() ? (product.kind === 'flavor' ? 'Edit flavor' : 'Edit box') : 'View item'} →</button></div></div></article>`).join('')}</div>` : `<section class="panel">${empty('No matching products', 'Try another product name, status, or category, or clear the filters.')}</section>`;
 }
 function updateProductResults() {
   const products = filteredProducts();
@@ -432,7 +439,7 @@ function renderProductDialog() {
   const kind = p.kind || 'set';
   const flavor = kind === 'flavor';
   const names = { flavor: 'flavor', set: 'fixed box', custom_box: 'custom box' };
-  const boxChoices = state.products.filter(item => item.kind === 'flavor');
+  const boxChoices = state.products.filter(item => item.kind === 'flavor' && !item.deleted_at);
   const savedFlavor = value => boxChoices.find(item => item.id === value || item.slug === value)?.id || '';
   showDialog(p.id ? 'Edit ' + p.name : 'Add ' + names[kind], `<form data-form="product">${formError}
     ${flavor ? '<input type="hidden" name="kind" value="flavor">' : select('kind', 'Box type', option('set', 'Fixed box / set', kind) + option('custom_box', 'Custom box of three', kind), p.id ? 'disabled' : '')}
@@ -448,7 +455,7 @@ function renderProductDialog() {
     ${categoryFields(p,areaCategories(),esc,ownerLocked())}
     ${productLabelEditor(p.label)}
     <section class="subsection"><h3>Photos</h3><p class="muted">${PHOTO_HELP} Product photos are public. The first photo is the cover.</p><p class="help-text" id="photo-order-help">Drag photos to rearrange them, or focus a photo and use the arrow keys. Save the item to publish changes.</p><div id="product-photo-order">${renderProductPhotos(p.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) })}</div><p id="photo-order-status" class="sr-only" role="status" aria-live="polite"></p>${input('photos', 'Upload photos', '', 'file', `accept="${PHOTO_ACCEPT}" multiple id="product-photos" ` + ownerLocked())}</section>
-    ${actions(p.id ? 'Save changes' : 'Create ' + names[kind])}
+    ${actions(p.id ? 'Save changes' : 'Create ' + names[kind])}${p.id && owner() ? `<div class="subsection"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(p.id)}">Delete ${names[kind]}</button><p class="help-text">Existing orders and records are preserved.</p></div>` : ''}
   </form>`);
   bindPhotoOrder();
   updateProductLabelPreview();
@@ -458,7 +465,7 @@ function renderProductDialog() {
 
 function categoriesDialog() { catalogOrderDialog('categories'); }
 function catalogOrderDialog(kind) {
- const scope=catalogScope(),items=kind==='categories'?areaCategories():state.products.filter(p=>(p.kind==='flavor')===(scope==='flavors'));
+ const scope=catalogScope(),items=kind==='categories'?areaCategories():state.products.filter(p=>!p.deleted_at&&(p.kind==='flavor')===(scope==='flavors'));
  if(showDialog(kind==='categories'?'Arrange '+scope+' categories':'Arrange '+scope,'<div id="catalog-order-root"></div>')===false)return;
  catalogOrderController=mountCatalogOrder($('#catalog-order-root'),{kind,scope,items,categories:areaCategories(),editable:!ownerLocked(),api,escapeHtml:esc,safeImage,onSaved:items=>{const ids=new Set(items.map(p=>p.id));const field=kind==='categories'?'categories':'products';state[field]=[...state[field].filter(p=>!ids.has(p.id)),...items];state.categories.sort((a,b)=>a.sort_order-b.sort_order||a.name.localeCompare(b.name));render();}});
 }
@@ -577,7 +584,7 @@ function editItemMarkup(item, index) {
   const configuration = item.preserve_configuration
     ? `<p class="muted"><strong>Saved configuration</strong><br>${esc(selectionText(original || item) || 'No additional options')}</p>${product && (groups.length || Object.keys(item.selections).length) ? `<button type="button" class="button button-quiet" data-action="change-edit-options" data-index="${index}">Choose a different configuration</button>` : ''}`
     : groups.map((group, gi) => `<div><h3>${esc(group.label)} · ${group.required_count} selection${group.required_count === 1 ? '' : 's'} per unit</h3>${group.required_count === 1 ? select(`selection_${index}_${gi}`, 'Selected choice', group.choices.map(choice => option(choice.id, `${choice.label} (+${money(choice.surcharge_cents)})${choice.active === false ? ' · unavailable' : ''}`, Object.keys(item.selections[group.id] || {}).find(key => item.selections[group.id][key] > 0))).join(''), 'data-edit-value') : `<div class="mix-fields">${group.choices.map((choice, ci) => input(`mix_${index}_${gi}_${ci}`, `${choice.label} · +${money(choice.surcharge_cents)}`, item.selections[group.id]?.[choice.id] || 0, 'number', `required min="0" max="${group.required_count}" step="1" data-edit-value`)).join('')}</div>`}</div>`).join('');
-  return `<div class="edit-item"><div class="edit-item-top">${select(`product_${index}`, 'Product', `${product ? '' : option(item.product_id, original?.name || 'Archived product', item.product_id)}${state.products.filter(p => p.kind !== 'flavor').map(p => option(p.id, p.name + (p.active ? '' : ' (hidden)'), item.product_id)).join('')}`, `data-edit-product="${index}" required`)}${input(`qty_${index}`, 'Units', item.quantity, 'number', 'required min="1" max="9999" step="1" data-edit-value')}<button type="button" class="icon-button" data-action="remove-edit-item" data-index="${index}" aria-label="Remove item">×</button></div>${configuration}<p class="line-price" id="edit-price-${index}">${money(editItemPrice(item))} per unit · ${money(editItemPrice(item) * item.quantity)}</p></div>`;
+  return `<div class="edit-item"><div class="edit-item-top">${select(`product_${index}`, 'Product', `${product ? '' : option(item.product_id, original?.name || 'Archived product', item.product_id)}${state.products.filter(p => p.kind !== 'flavor' && (!p.deleted_at || p.id === item.product_id)).map(p => option(p.id, p.name + (p.active ? '' : ' (hidden)'), item.product_id)).join('')}`, `data-edit-product="${index}" required`)}${input(`qty_${index}`, 'Units', item.quantity, 'number', 'required min="1" max="9999" step="1" data-edit-value')}<button type="button" class="icon-button" data-action="remove-edit-item" data-index="${index}" aria-label="Remove item">×</button></div>${configuration}<p class="line-price" id="edit-price-${index}">${money(editItemPrice(item))} per unit · ${money(editItemPrice(item) * item.quantity)}</p></div>`;
 }
 function renderEditOrder() {
   const d = editDraft;
@@ -693,6 +700,14 @@ async function onAction(button) {
     case 'edit-flavor-menu': editFlavorMenu(id); break;
     case 'new-product': openProduct(); break;
     case 'edit-product': openProduct(id); break;
+    case 'delete-product': {
+      if(!owner())return;
+      const product=state.products.find(p=>p.id===id);if(!product)return;
+      const affected=state.products.filter(p=>!p.deleted_at&&p.kind==='set'&&p.box_flavors?.includes(id));
+      const detail=product.kind==='flavor' ? ' Boxes containing this flavor will become unavailable to order.'+(affected.length?' Affected boxes: '+affected.map(p=>p.name).join(', ')+'.':'') : ' This product will no longer be offered for new orders.';
+      if(!await confirmDialog('Delete '+product.name+'?'+detail+' Existing orders and saved records will be preserved.',{title:'Delete '+(product.kind==='flavor'?'flavor':'product'),confirmLabel:'Delete',cancelLabel:'Keep item'}))return;
+      await api('delete_product',{id});closeDialog();await refresh();toast('Item deleted. Existing orders and records are preserved.');break;
+    }
     case 'categories': categoriesDialog(); break;
     case 'reorder-products': catalogOrderDialog('products'); break;
     case 'new-category': categoryDialog(); break;

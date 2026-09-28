@@ -58,3 +58,8 @@ verify_jwt = false
 # returning any Google report, including a cached report.
 [functions.website-analytics]
 verify_jwt = false
+
+# Owner setup verifies Auth and database role. Background runs verify a
+# separate high-entropy Vault credential through a service-only RPC.
+[functions.calendar-sync]
+verify_jwt = false

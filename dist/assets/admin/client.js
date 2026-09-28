@@ -131,6 +131,10 @@ export async function websiteVisitorStats({ signal } = {}) {
   return edge('website-analytics', {}, { signal });
 }
 
+export async function calendarConnection(action, payload = {}) {
+  return edge('calendar-sync', { ...payload, action });
+}
+
 export async function upload(file, { kind = 'proof', order_id, token, payment_reference } = {}) {
   if (!(file instanceof File) || !file.size) throw new Error('Choose a photo to upload.');
   if (kind === 'product') {

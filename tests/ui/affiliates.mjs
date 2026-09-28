@@ -19,7 +19,7 @@ try{
    export async function api(action,payload={}){const r=await fetch('/fixture-api',{method:'POST',body:JSON.stringify({action,payload})});const d=await r.json();if(!r.ok)throw Error(d.error);return d;}
    export async function affiliatePayout(file,payload){if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('Choose a JPG, PNG, or WebP receipt.');return api('upload_payout',{...payload,proof_name:file.name});}
    export async function affiliateReceipt(id){await api('receipt',{id});return {url:'${origin}/receipt.png',expires_in:300};}
-   export async function upload(){throw Error('Unexpected upload')} export async function newsletterRequest(){throw Error('Unexpected newsletter')} export async function websiteVisitorStats(){return {}};${helpers}`});
+   export async function upload(){throw Error('Unexpected upload')} export async function newsletterRequest(){throw Error('Unexpected newsletter')} export async function calendarConnection(){return {}} export async function websiteVisitorStats(){return {}};${helpers}`});
    if(url.pathname==='/fixture-api'){
     const {action,payload:p}=route.request().postDataJSON();calls.push({action,payload:p});let data;
     if(action==='site_status')data={active:false,uploads_paused:false,announce:false,server_time:new Date().toISOString()};

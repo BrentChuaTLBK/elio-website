@@ -20,7 +20,7 @@ try{
     const guest=location.search.includes('guest');export const configured=true,ready=Promise.resolve(),initializationError=null,authLink={};
     export const auth={getSession:async()=>({data:{session:guest?null:{user:{id:'owner',email:'elio@example.test',email_confirmed_at:'2026-09-01',user_metadata:{}}}}}),onAuthStateChange:fn=>{window.__authChange=fn;},signOut:async()=>({})};
     export async function api(action,payload={}){const r=await fetch('/fixture-api',{method:'POST',body:JSON.stringify({action,payload})});const d=await r.json();if(!r.ok)throw Error(d.error);return d;}
-    export async function newsletterRequest(){return {status:'not_subscribed'}};export async function upload(){throw Error('Unexpected upload')};export async function affiliatePayout(){throw Error('Unexpected payout')};export async function affiliateReceipt(){throw Error('Unexpected receipt')};export async function websiteVisitorStats(){return {}};${helpers}`});
+    export async function newsletterRequest(){return {status:'not_subscribed'}};export async function upload(){throw Error('Unexpected upload')};export async function affiliatePayout(){throw Error('Unexpected payout')};export async function affiliateReceipt(){throw Error('Unexpected receipt')};export async function calendarConnection(){return {}} export async function websiteVisitorStats(){return {}};${helpers}`});
    if(u.pathname==='/fixture-api'){
     const {action,payload}=route.request().postDataJSON();calls.push({action,payload});let data;
     if(action==='site_status')data={active:false,uploads_paused:false,announce:false,server_time:new Date().toISOString()};

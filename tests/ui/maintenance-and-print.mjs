@@ -17,7 +17,7 @@ try{
   const ctx=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'});
   await ctx.route('**/*',async route=>{
    const u=new URL(route.request().url());if(u.origin!==origin)return route.abort();
-   if(u.pathname==='/assets/admin/client.js')return route.fulfill({contentType:'text/javascript',body:`export const configured=true,ready=Promise.resolve(),auth={getSession:async()=>({data:{session:{user:{id:'owner'}}}}),onAuthStateChange:()=>{}};export async function api(action,payload={}){const r=await fetch('/api',{method:'POST',body:JSON.stringify({action,payload})});const d=await r.json();if(!r.ok)throw Error(d.error);return d;};export async function affiliateReceipt(){};export async function affiliatePayout(){};export async function newsletterRequest(){};export async function upload(){};export async function websiteVisitorStats(){};${helpers}`});
+   if(u.pathname==='/assets/admin/client.js')return route.fulfill({contentType:'text/javascript',body:`export const configured=true,ready=Promise.resolve(),auth={getSession:async()=>({data:{session:{user:{id:'owner'}}}}),onAuthStateChange:()=>{}};export async function api(action,payload={}){const r=await fetch('/api',{method:'POST',body:JSON.stringify({action,payload})});const d=await r.json();if(!r.ok)throw Error(d.error);return d;};export async function affiliateReceipt(){};export async function affiliatePayout(){};export async function newsletterRequest(){};export async function upload(){};export async function calendarConnection(){return {}} export async function websiteVisitorStats(){};${helpers}`});
    if(u.pathname==='/api'){
     const {action,payload}=route.request().postDataJSON();calls.push({action,payload});let data;
     if(action==='site_status')data=state();
