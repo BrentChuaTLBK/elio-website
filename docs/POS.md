@@ -43,7 +43,7 @@ Paid orders use the existing payment records, order history and accounting ledge
 - `In-person POS sales`: product income from events.
 - `Delivery`: customer delivery fees as income and actual courier costs as expenses.
 
-Unpaid orders contribute no income. Existing cancellation/refund exclusions apply to sales, discounts and delivery expenses. Cash drawer reconciliation creates no second income entry. Website-linked direct orders participate in production; event items and inventory-free custom items are excluded from the website box production count. Paid scheduled orders enter the existing calendar sync; immediate handed-over sales do not.
+Unpaid orders contribute no income. Existing cancellation/refund exclusions apply to sales, discounts and delivery expenses. Cash drawer reconciliation creates no second income entry. Website-linked direct orders participate in production; event items and inventory-free custom items are excluded from the website box production count. Paid, confirmed Direct pickup and delivery orders enter both the admin calendar and Google Calendar sync. Rescheduling updates the same event; cancellation or refund removes it. Event/In-person sales never appear on either calendar, including scheduled event orders. Unpaid direct orders stay off the calendar until payment is approved.
 
 ## Safeguards and validation
 
