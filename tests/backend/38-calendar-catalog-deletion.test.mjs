@@ -14,6 +14,9 @@ export default async function({db,check,state}) {
   order=await h.action('approve_payment',await h.proof(order));
   const data=await h.api('calendar_list',{from:date,to:date},h.ids.staff),entry=data.orders.find(o=>o.id===order.id);
   assert.equal(entry.reference,order.reference);assert.equal(entry.buyer.phone,'09171234567');
+  assert.equal(entry.total_cents,order.total_cents);
+  assert.deepEqual(entry.items[0].flavor_contents,order.items[0].flavor_contents||[]);
+  assert.deepEqual(entry.items[0].selection_labels,order.items[0].selection_labels||[]);
   assert.equal(entry.access_token,undefined);assert.equal(entry.staff_notes,undefined);assert.equal(entry.payment_proof,undefined);
   await assert.rejects(h.service('calendar_connect',{user_id:h.ids.staff,calendar_id:'fixture@example.test'}));
   await h.service('calendar_connect',{user_id:h.ids.owner,calendar_id:'fixture@example.test'});

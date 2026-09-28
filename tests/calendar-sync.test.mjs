@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {generateKeyPairSync} from 'node:crypto';
-import {createGoogleCalendar,calendarId,eventBody,CalendarError} from '../supabase/functions/calendar-sync/google.ts';
+import {createGoogleCalendar,calendarId,eventBody,calendarDescription,CalendarError} from '../supabase/functions/calendar-sync/google.ts';
 import {syncCalendar} from '../supabase/functions/calendar-sync/handler.ts';
-import {calendarCopy,calendarMonth,filteredCalendarOrders} from '../dist/assets/admin/order-calendar.js';
+import {calendarCopy,calendarMonth,filteredCalendarOrders,calendarSummary} from '../dist/assets/admin/order-calendar.js';
 const order={id:'00000000-0000-4000-8000-000000000001',reference:'ELIO-FIXTURE',date:'2026-09-30',method:'delivery',status:'confirmed',buyer:{name:'Buyer',email:'fixture@example.test',phone:'09170000000'},recipient:{name:'<Recipient>',phone:'09171111111'},address:{line1:'12 Test St',locality:'Makati'},items:[{name:'Box',quantity:2}],window:'9 AM – 6 PM'};
 const job={order_id:order.id,event_id:'elio00000000000040008000000000000001g0',desired:order};
 const {privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});
@@ -22,8 +22,27 @@ for(const method of ['pickup','delivery']){
  assert.match(completed.summary,method==='pickup'?/Pickup/:/Delivery · Makati/);
  assert.equal(completed.status,'confirmed');assert.equal(completed.start.date,order.date);assert.equal(completed.id,job.event_id);
 }
-assert.match(calendarCopy(order),/Address: 12 Test St, Makati/);assert.equal(calendarMonth('2024-02').days,29);
+assert.match(calendarCopy(order),/Delivery address: 12 Test St, Makati/);assert.equal(calendarMonth('2024-02').days,29);
 assert.equal(filteredCalendarOrders([order],{search:'makati'}).length,1);
+{
+ const sample={...order,total_cents:93000,buyer:{...order.buyer,social_platform:'Instagram',social_username:'@mia.santos'},
+  pickup_address:'Private kitchen address',window:'10am – 8pm',instructions:'Call at the gate',
+  items:[{name:'Build your own box',quantity:1,selection_labels:[{label:'Vanilla',quantity:2},{label:'Matcha',quantity:1}],flavor_contents:[{name:'Do not repeat',quantity:3}]}]};
+ for(const method of ['pickup','delivery']){
+  const value={...sample,method},summary=calendarDescription(value),event=eventBody(value,job.event_id);
+  assert.equal(calendarSummary(value),summary);assert.equal(calendarCopy(value),summary);
+  assert.match(summary,/Social media: Instagram · @mia.santos/);assert.match(summary,/Amount: ₱930.00/);
+  assert.match(summary,/2 × Vanilla, 1 × Matcha/);assert.doesNotMatch(summary,/Do not repeat|Email:|Window:|Pickup location:|Reschedule|Buyer phone:/);
+  if(method==='pickup'){
+   assert.equal(event.location,'');assert.doesNotMatch(summary,/Private kitchen|Call at the gate|Recipient:|Delivery address:/);
+   assert.deepEqual(summary.split('\n').filter(s=>s.includes(':')).map(s=>s.split(':')[0]),['Customer name','Phone number','Social media','Order ID','Order details','Amount']);
+  }else{assert.equal(event.location,'12 Test St, Makati');assert.match(summary,/Recipient: <Recipient>/);assert.match(summary,/Delivery instructions: Call at the gate/);}
+ }
+ const sameRecipient={...sample,recipient:{name:sample.buyer.name,phone:sample.buyer.phone}};
+ assert.doesNotMatch(calendarDescription(sameRecipient),/Recipient:|Recipient phone:/);
+ assert.match(calendarDescription({...sample,buyer:{...sample.buyer,social_platform:'na',social_username:'N/A'},total_cents:0}),/Social media: Not provided/);
+ assert.match(calendarDescription({...sample,total_cents:0}),/Amount: ₱0.00/);
+}
 {
  const f=fixture([{method:'GET',data:owned},{method:'PUT',data:{etag:'completed'}}]);
  await f.client.sync('elio@example.test',{...job,desired:{...order,status:'completed'}});

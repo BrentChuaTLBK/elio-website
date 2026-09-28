@@ -10,6 +10,7 @@ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila'}).format(new
 const connection={connected:true,calendar_id:'elio@example.test',pending:0,last_success_at:new Date().toISOString()};
 const base={date:today,status:'confirmed',buyer:{name:'Buyer',email:'buyer@example.test',phone:'09170000000'},recipient:{name:'Recipient <safe>',phone:'09171111111'},address:{line1:'12 Test Street',locality:'Makati'},items:[{name:'Signature Trio',quantity:1}],window:'9 AM – 6 PM',sync_state:'synced'};
 const orders=[{...base,id:'pickup',reference:'ELIO-PICKUP',method:'pickup',pickup_address:'Elio kitchen'},{...base,id:'z',reference:'ELIO-Z',method:'delivery',address:{...base.address,locality:'Quezon City'}},{...base,id:'a',reference:'ELIO-A',method:'delivery'}];
+for(const order of orders){order.total_cents=90000;order.buyer={...order.buyer,social_platform:'Instagram',social_username:'@mia.santos'};}
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 try{for(const width of [1440,390,320]){
  for(const order of orders)order.status='confirmed';
@@ -33,6 +34,13 @@ try{for(const width of [1440,390,320]){
  const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));await page.clock.install();await page.goto(origin+'/manage.html#calendar');
  await page.locator('[data-calendar-order=a]').waitFor();assert.equal(await page.locator('.calendar-order.pickup').count(),1);assert.equal(await page.locator('.calendar-order.delivery').count(),2);
  assert.deepEqual(await page.locator('.calendar-group-heading.delivery').allTextContents(),['Makati · 1 delivery','Quezon City · 1 delivery']);
+ const pickupCard=page.locator('[data-calendar-order=pickup]');
+ assert.doesNotMatch(await pickupCard.textContent(),/Elio kitchen|Buyer email|Pickup location|9 AM|buyer@example/);
+ assert.equal(await pickupCard.locator('.calendar-amount strong').textContent(),'₱900.00');
+ await pickupCard.locator('[data-calendar-copy=social]').click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'Instagram · @mia.santos');
+ await pickupCard.locator('[data-calendar-copy=all]').click();const copied=await page.evaluate(()=>navigator.clipboard.readText());
+ assert.match(copied,/Order ID: ELIO-PICKUP/);assert.match(copied,/Amount: ₱900.00/);assert.doesNotMatch(copied,/Elio kitchen|Window:|Email:/);
+ assert.doesNotMatch(await page.locator('[data-calendar-order=a]').textContent(),/Buyer email|9 AM|buyer@example/);
  orders[0].status='completed';orders[2].status='completed';await page.locator('[data-calendar-action=refresh]').click();
  await page.locator('[data-calendar-order=a].is-completed').waitFor();
  assert.equal(await page.locator('.calendar-order').count(),3,'Completed orders remain visible');
