@@ -12,6 +12,7 @@ const base={date:today,status:'confirmed',buyer:{name:'Buyer',email:'buyer@examp
 const orders=[{...base,id:'pickup',reference:'ELIO-PICKUP',method:'pickup',pickup_address:'Elio kitchen'},{...base,id:'z',reference:'ELIO-Z',method:'delivery',address:{...base.address,locality:'Quezon City'}},{...base,id:'a',reference:'ELIO-A',method:'delivery'}];
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 try{for(const width of [1440,390,320]){
+ for(const order of orders)order.status='confirmed';
  const ctx=await browser.newContext({viewport:{width,height:1000},hasTouch:width<500,permissions:['clipboard-read','clipboard-write'],serviceWorkers:'block'}),errors=[],calls=[];
  const products=[{id:'flavor',name:'Vanilla fixture',kind:'flavor',price_cents:0,photos:[],active:true},{id:'box',name:'Box fixture',kind:'set',price_cents:90000,photos:[],active:true,lead_days:2,box_flavors:['flavor','flavor','flavor']}];
  await ctx.route('**/*',async route=>{const url=new URL(route.request().url());if(url.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:sdk});if(url.origin!==origin)return route.abort();
@@ -32,6 +33,18 @@ try{for(const width of [1440,390,320]){
  const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));await page.clock.install();await page.goto(origin+'/manage.html#calendar');
  await page.locator('[data-calendar-order=a]').waitFor();assert.equal(await page.locator('.calendar-order.pickup').count(),1);assert.equal(await page.locator('.calendar-order.delivery').count(),2);
  assert.deepEqual(await page.locator('.calendar-group-heading.delivery').allTextContents(),['Makati · 1 delivery','Quezon City · 1 delivery']);
+ orders[0].status='completed';orders[2].status='completed';await page.locator('[data-calendar-action=refresh]').click();
+ await page.locator('[data-calendar-order=a].is-completed').waitFor();
+ assert.equal(await page.locator('.calendar-order').count(),3,'Completed orders remain visible');
+ assert.equal(await page.locator('.calendar-completed-badge').count(),2);
+ assert.equal(await page.locator('[data-calendar-order=a] .calendar-completed-badge').textContent(),'✓ Completed');
+ const day=page.locator(`[data-calendar-day="${today}"]`);
+ assert.match(await day.getAttribute('aria-label'),/0 pending pickups; 1 pending deliveries; 2 completed orders/);
+ assert.equal(await day.locator('.completed').textContent(),'✓ 2');
+ assert.equal(await day.locator('.pickup').count(),0,'Completed pickups do not count as pending');
+ assert.equal(await page.locator('[data-calendar-order=a]').evaluate(el=>getComputedStyle(el).borderLeftColor),'rgb(138, 132, 124)');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Completed calendar has no page overflow');
+ await page.locator('#order-calendar-manager').screenshot({path:join(output,`calendar-completed-${width}.png`)});
  await page.locator('[data-calendar-order=a] [data-calendar-copy=address]').click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'12 Test Street, Makati');
  await page.locator('[data-calendar-filter=method]').selectOption('delivery');assert.equal(await page.locator('.calendar-order.pickup').count(),0);
  await page.locator('[data-calendar-filter=area]').selectOption('Makati');assert.equal(await page.locator('.calendar-order').count(),1);

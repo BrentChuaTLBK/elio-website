@@ -16,8 +16,21 @@ assert.equal(calendarId('https://calendar.google.com/calendar/embed?src=elio.che
 assert.throws(()=>calendarId('https://evil.test/'),CalendarError);
 const body=eventBody(order,job.event_id);assert.equal(body.end.date,'2026-10-01');assert.equal(body.colorId,'9');assert.match(body.description,/&lt;Recipient&gt;/);assert.deepEqual(body.attendees,[]);assert.equal(body.visibility,'private');
 assert.equal(eventBody({...order,method:'pickup'},job.event_id).colorId,'2');
+for(const method of ['pickup','delivery']){
+ const completed=eventBody({...order,method,status:'completed'},job.event_id);
+ assert.equal(completed.colorId,'8');assert.match(completed.summary,/^✓ Completed · /);
+ assert.match(completed.summary,method==='pickup'?/Pickup/:/Delivery · Makati/);
+ assert.equal(completed.status,'confirmed');assert.equal(completed.start.date,order.date);assert.equal(completed.id,job.event_id);
+}
 assert.match(calendarCopy(order),/Address: 12 Test St, Makati/);assert.equal(calendarMonth('2024-02').days,29);
 assert.equal(filteredCalendarOrders([order],{search:'makati'}).length,1);
+{
+ const f=fixture([{method:'GET',data:owned},{method:'PUT',data:{etag:'completed'}}]);
+ await f.client.sync('elio@example.test',{...job,desired:{...order,status:'completed'}});
+ const update=JSON.parse(f.calls.at(-1).body);
+ assert.equal(update.id,job.event_id);assert.equal(update.colorId,'8');assert.match(update.summary,/^✓ Completed/);
+ assert(!f.calls.some(c=>c.method==='DELETE'),'Completing an order keeps the same event');
+}
 {
  const f=fixture([{method:'GET',data:{nextSyncToken:'cursor'}},{method:'GET',status:410}]);
  assert.deepEqual((await f.client.changes('elio@example.test',null,null)).changes,[]);

@@ -28,7 +28,7 @@ export function eventBody(order:any,eventId:string) {
   const start=new Date(`${order.date}T00:00:00Z`);
   if(!Number.isFinite(start.getTime())||start.toISOString().slice(0,10)!==order.date)throw new CalendarError('configuration');
   const end=new Date(start.getTime()+86400000).toISOString().slice(0,10);
-  const delivery=order.method==='delivery',area=clean(order.address?.locality,100)||'Area not recorded';
+  const completed=order.status==='completed',delivery=order.method==='delivery',area=clean(order.address?.locality,100)||'Area not recorded';
   const address=delivery?[order.address?.line1,order.address?.line2,order.address?.locality,order.address?.postal_code].filter(Boolean).map(v=>clean(v)).join(', '):clean(order.pickup_address);
   const detail=[`${delivery?'Delivery':'Pickup'} · ${clean(order.reference,80)}`,`Status: ${clean(order.status,80).replaceAll('_',' ')}`,
     `${delivery?'Recipient':'Customer'}: ${name(order)}`,`Phone: ${phone(order)}`,`Buyer: ${clean(order.buyer?.name,200)}`,
@@ -37,8 +37,8 @@ export function eventBody(order:any,eventId:string) {
     '', 'Items:',...(Array.isArray(order.items)?order.items.map((item:any)=>`${Number(item.quantity)||0} × ${clean(item.name,200)}`):[]),
     '',`Instructions: ${clean(order.instructions)||'None'}`,'','Reschedule and update this order in Elio. Google changes to this order event are replaced by the saved Elio order.'];
   const url=`https://eliocheesecakes.com/manage.html#calendar?date=${order.date}&order=${encodeURIComponent(order.id)}`;
-  return {id:eventId,summary:`${delivery?`Delivery · ${area}`:'Pickup'} · ${clean(order.reference,80)} · ${name(order)}`.slice(0,500),
-    description:detail.map(html).join('\n'),location:address,colorId:delivery?'9':'2',
+  return {id:eventId,summary:`${completed?'✓ Completed · ':''}${delivery?`Delivery · ${area}`:'Pickup'} · ${clean(order.reference,80)} · ${name(order)}`.slice(0,500),
+    description:detail.map(html).join('\n'),location:address,colorId:completed?'8':delivery?'9':'2',
     start:{date:order.date},end:{date:end},visibility:'private',transparency:'transparent',status:'confirmed',
     reminders:{useDefault:false},attendees:[],source:{title:'Open in Elio',url},
     extendedProperties:{private:{elio_source:'elio-orders',elio_order_id:order.id}}};
