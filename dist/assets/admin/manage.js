@@ -1,8 +1,8 @@
 import {deliveryFeeSummary,separateDeliveryPaid} from '../delivery-fee.js';
-import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-clean-2';
+import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-mobile-audit-1';
 import {mountCalendar} from './calendar-manager.js';
 import {mountMaintenance} from './maintenance-admin.js';
-import {mountAffiliates} from './affiliates-admin.js';
+import {mountAffiliates} from './affiliates-admin.js?v=mobile-audit-1';
 import {monthRange} from './accounting.js?v=shared-categories-1';
 import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';
 import { PHOTO_ACCEPT, PHOTO_HELP, validatePhoto } from './photo-upload.js';

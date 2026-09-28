@@ -29,7 +29,7 @@ async function pickDate(form,name,value) {
 }
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH||undefined,headless:true});
 try{
- for(const [width,role] of [[1440,'owner'],[390,'owner'],[390,'staff']]){
+ for(const [width,role] of [[1440,'owner'],[390,'owner'],[320,'owner'],[390,'staff']]){
   const categories=structuredClone(cats),entries=structuredClone(initial),calls=[];let cost=null,excludeOrder=false;
   const ctx=await browser.newContext({viewport:{width,height:1000},hasTouch:width<500,acceptDownloads:true,serviceWorkers:'block'});
   await ctx.route('**/*',async route=>{
@@ -64,6 +64,7 @@ try{
   }else{
    await pickDate(page.locator('.accounting-filters'),'start','2026-09-01');await pickDate(page.locator('.accounting-filters'),'end','2026-09-30');await page.locator('.accounting-filters [type=submit]').click();
    await page.locator('.accounting-net').getByText('₱3,600.00',{exact:true}).waitFor();
+   if(width<600)assert(await page.locator('.accounting-report .table-wrap').evaluateAll(wrappers=>wrappers.every(w=>w.scrollWidth<=w.clientWidth+1)),'All accounting amounts fit without horizontal scrolling');
    await page.screenshot({path:join(output,`overview-${width}.png`),fullPage:true});
    assert.equal(await page.locator('#accounting-manager input[type=date],#accounting-manager input[type=month]').count(),0);
    const startPicker=page.locator('.accounting-date-picker:has([name=start])');

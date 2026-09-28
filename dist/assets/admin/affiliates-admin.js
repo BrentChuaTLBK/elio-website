@@ -1,5 +1,5 @@
 import {api,money,escapeHtml as esc,manilaDate,affiliatePayout} from './client.js';
-import {percent,decimalHundredths,manilaInput,manilaTimestamp,paymentMethods,renderAffiliateReport,renderPayoutDetails,openAffiliateReceipt,liveAffiliateRefresh,dateTime} from '../affiliates.js';
+import {percent,decimalHundredths,manilaInput,manilaTimestamp,paymentMethods,renderAffiliateReport,renderPayoutDetails,openAffiliateReceipt,liveAffiliateRefresh,dateTime} from '../affiliates.js?v=mobile-audit-1';
 import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';
 import {PHOTO_ACCEPT,RECEIPT_HELP} from './photo-upload.js';
 

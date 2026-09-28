@@ -1,5 +1,5 @@
 import {api,auth,ready,initializationError,escapeHtml as esc} from './admin/client.js';
-import {renderAffiliateReport,renderPayoutDetails,renderPayoutDetailsForm,openAffiliateReceipt,liveAffiliateRefresh} from './affiliates.js';
+import {renderAffiliateReport,renderPayoutDetails,renderPayoutDetailsForm,openAffiliateReceipt,liveAffiliateRefresh} from './affiliates.js?v=mobile-audit-1';
 import {confirmDialog} from './admin/site-dialog.js?v=branded-dialogs-1';
 const root=document.querySelector('#affiliate-content'),message=document.querySelector('#affiliate-message'),refresh=document.querySelector('#affiliate-refresh');
 let report=null,loading=false,orderOffset=0,payoutOffset=0,stop=()=>{},authorized=false,generation=0,editing=false,dirty=false,saving=false;

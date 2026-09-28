@@ -8,7 +8,7 @@ const client=await readFile(join(root,'assets/admin/client.js'),'utf8'),helpers=
 const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2'};
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 try{
- for(const [width,role] of [[1440,'owner'],[390,'owner'],[390,'staff'],[390,'unassigned'],[390,'guest']]){
+ for(const [width,role] of [[1440,'owner'],[390,'owner'],[320,'owner'],[390,'staff'],[390,'unassigned'],[390,'guest']]){
   const calls=[],affiliates=[],codes=[],payouts=[],errors=[];let earned=0,assigned=role!=='unassigned',holdReport=false,releaseReport,payoutDetails=null,holdSave=false,releaseSave;
   const stats=()=>({earned_cents:earned,net_sales_cents:earned*10,estimated_cents:9500,completed_orders:earned>0?1:0,paid_cents:payouts.filter(p=>p.status==='paid').reduce((n,p)=>n+p.amount_cents,0),balance_cents:earned-payouts.filter(p=>p.status==='paid').reduce((n,p)=>n+p.amount_cents,0)});
   const report=p=>({affiliate:affiliates[0],payout_details:payoutDetails,stats:stats(),codes,orders:[{order_id:'test-order',reference:'ELIO-DEMO',code:codes[0]?.code||'ELIOLOVE',created_at:'2026-09-27T02:00:00Z',commission_bps:1000,net_sales_cents:95000,estimated_cents:9500,earned_cents:9500,status:'earned'}],order_total:1,order_offset:p.order_offset||0,payouts,payout_total:payouts.length,payout_offset:p.payout_offset||0,generated_at:new Date().toISOString()});
@@ -95,6 +95,7 @@ try{
     await page.goto(origin+'/affiliate.html');await page.getByText('Welcome, Elio Partner.',{exact:true}).waitFor();
     await page.locator('[data-aff=receipt]').click();await page.getByRole('dialog',{name:'Payment receipt'}).getByRole('button',{name:'Close'}).click();await page.screenshot({path:join(output,`affiliate-${width}.png`),fullPage:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'No horizontal page overflow');
+    if(width<600)assert(await page.locator('.aff-responsive').evaluateAll(tables=>tables.every(t=>t.scrollWidth<=t.clientWidth+1)),'Affiliate commission, status and receipt controls fit on mobile');
     // Sign-out must clear a response still in flight, not redisplay private data.
     holdReport=true;await page.locator('#affiliate-refresh').click();await page.waitForTimeout(50);await page.evaluate(()=>window.__authChange('SIGNED_OUT'));releaseReport();await page.getByText('You have signed out.',{exact:true}).waitFor();await page.waitForTimeout(50);assert.equal(await page.locator('.aff-code').count(),0);
     holdReport=false;await page.goto(origin+'/affiliate.html');await page.locator('[data-aff=edit-payout-details]').click();await page.locator('[name=account_name]').fill('Changed name');holdSave=true;

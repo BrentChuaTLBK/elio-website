@@ -45,3 +45,19 @@
 .accounting-note{line-height:1.6;margin-top:6px}
 .accounting-categories{padding-block:18px!important}
 @media(max-width:700px){#accounting-manager .panel{padding:18px}.accounting-filters{gap:14px}.accounting-summary{gap:16px}.accounting-report>.panel,.accounting-categories{margin-top:16px}.accounting-net{gap:14px}.accounting-scope{margin-bottom:20px}.accounting-report .data-table{min-width:700px}}
+@media(max-width:600px){
+ #accounting-manager .view-heading{flex-direction:column;align-items:stretch;gap:16px}
+ #accounting-manager .view-heading .row-actions{display:grid;grid-template-columns:auto 1fr auto}
+ #accounting-manager .view-heading .row-actions .button{padding-inline:10px}
+ .accounting-report .data-table{display:block;min-width:0;table-layout:auto}
+ .accounting-report .data-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .accounting-report .data-table tbody{display:block}
+ .accounting-report .data-table tbody tr{display:block;padding:10px 12px;border-bottom:1px solid var(--line)}
+ .accounting-report .data-table tbody tr:last-child{border-bottom:0}
+ .accounting-report .data-table td[data-label]{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:12px;width:auto;padding:8px 0;border:0!important;text-align:right;white-space:normal}
+ .accounting-report .data-table td[data-label]::before{content:attr(data-label);text-align:left;color:var(--muted);font-size:11px;line-height:1.6}
+ .accounting-cell-value{min-width:0;overflow-wrap:anywhere}
+ .accounting-records td:nth-child(4) .accounting-cell-value,.accounting-records td:nth-child(5) .accounting-cell-value,.accounting-deliveries td:nth-child(n+2) .accounting-cell-value{font-weight:600;font-size:14px}
+ .accounting-report .data-table td[colspan]{display:block;padding:12px 0}
+ .accounting-report .data-table .button{min-height:40px}
+}

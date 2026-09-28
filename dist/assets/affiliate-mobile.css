@@ -1,0 +1,16 @@
+/* Keep affiliate commissions, payout status and receipt actions visible on phones. */
+.affiliate-main #affiliate-content>.panel,.aff-detail>.panel{margin-top:20px}
+@media(max-width:600px){
+ table.aff-table.aff-responsive{display:block;min-width:0;width:100%;border:1px solid var(--line);border-radius:7px;border-collapse:separate;border-spacing:0;overflow:hidden}
+ .aff-responsive thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .aff-responsive tbody{display:block}
+ .aff-responsive tbody tr{display:block;padding:10px 12px;border-bottom:1px solid var(--line)}
+ .aff-responsive tbody tr:last-child{border-bottom:0}
+ .aff-responsive td[data-label]{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:12px;padding:8px 0;border:0;width:auto;text-align:right;white-space:normal}
+ .aff-responsive td[data-label]::before{content:attr(data-label);text-align:left;font-size:11px;line-height:1.6;color:var(--muted)}
+ .aff-cell-value{min-width:0;overflow-wrap:anywhere}
+ .aff-responsive td:is([data-label="Commission"],[data-label="Amount"]) .aff-cell-value{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
+ .aff-responsive .row-actions{justify-content:flex-end;flex-wrap:wrap}
+ .aff-responsive .button{min-height:40px;white-space:normal}
+ .aff-responsive td[colspan]{display:block;padding:12px 0;border:0;white-space:normal}
+}

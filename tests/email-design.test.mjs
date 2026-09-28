@@ -5,6 +5,10 @@ import {productPhoto} from '../supabase/functions/_shared/email-design.ts';
 const order={id:'order-id',reference:'ELIO-TEST',access_token:'private-order-token',buyer_name:'Test buyer',fulfillment_date:'2026-09-28',method:'pickup',payment_deadline:'2026-09-27T04:00:00Z',items:[{product_id:'box-id',name:'Box <test>',quantity:2,unit_price_cents:90000,line_total_cents:180000,flavor_contents:[{name:'Vanilla',quantity:2},{name:'Matcha',quantity:1}]}],subtotal_cents:180000,discount_cents:10000,delivery_cents:0,total_cents:170000};
 const settings={site_url:'https://eliocheesecakes.com',pickup_address:'Saved pickup address',pickup_hours:'10am–8pm',contact_email:'elio.cheesecakes@gmail.com',payment_instructions:'Saved payment instructions'};
 const site=new URL(settings.site_url+'/');
+// Direct orders can contain singles and custom items, not only cheesecake boxes.
+const direct=renderEmail({event_type:'order_submitted',order:{...order,order_source:'direct',items:[{name:'Single cookie',quantity:2,unit_price_cents:12000,line_total_cents:24000}]},settings});
+assert(direct.html.includes('₱120.00 each'));
+assert(!direct.html.includes('per box'));
 let checks=0;
 for(const event_type of ['order_submitted','payment_approved','payment_rejected','order_cancelled','order_expired','fulfillment_reminder','ready_for_pickup','pickup_reminder','out_for_delivery','order_updated','delivery_tracking_updated','order_review_required']){
  const {html,text}=renderEmail({event_type,order,settings,product_photos:{'box-id':'assets/box.webp'}});
