@@ -1,5 +1,5 @@
 import { HttpError } from "./server.ts";
-import { emailFrame, emailIntro, emailButton, emailSection, emailColumns, emailProducts, emailTotals, emailPanel } from "./email-design.ts";
+import { emailFrame, emailIntro, emailButton, emailSection, emailColumns, emailProducts, emailTotals, emailPanel, deliveryFeeSummary } from "./email-design.ts";
 
 const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const money = (value: unknown) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format(Number(value || 0) / 100);
@@ -39,7 +39,7 @@ function renderReviewEmail(order: any, settings: any, site: URL, photos: any): {
   const discountLabel = `Discount${order.promo_code ? ` (${order.promo_code})` : ""}`;
   const discount = `${Number(order.discount_cents) > 0 ? "−" : ""}${money(order.discount_cents)}`;
   const itemText = items.map((item: any) => `${item.quantity} × ${item.name}${selections(item) ? `\n  ${selections(item)}` : ""}\n  ${money(item.unit_price_cents)} each · Line total: ${money(item.line_total_cents)}`).join("\n\n");
-  const breakdown = detailed ? `\n\nProducts ordered\n${itemText || "See the product details in the dashboard."}\n\nPayment breakdown\nSubtotal: ${money(order.subtotal_cents)}\n${discountLabel}: ${discount}\nDelivery fee: ${money(order.delivery_cents)}\nOrder total: ${money(order.total_cents)}` : "";
+  const breakdown = detailed ? `\n\nProducts ordered\n${itemText || "See the product details in the dashboard."}\n\nPayment breakdown\nSubtotal: ${money(order.subtotal_cents)}\n${discountLabel}: ${discount}\nDelivery fee: ${deliveryFeeSummary(order,money)}\nOrder total: ${money(order.total_cents)}` : "";
   const footer = "You received this notification because your account is assigned a Staff or Owner role. The dashboard shows the current order status.";
   const text = `${shop}\n${heading}\n\n${message}\n\n${details}${breakdown}\n\nOpen the admin dashboard:\n${link}\n\n${footer}`;
   const reviewDetails = emailPanel("Order details", `<p style="margin:0;font-size:14px;line-height:1.8">${lines(details)}</p>`, "sand");
@@ -165,7 +165,7 @@ export function renderEmail(payload: any): { html: string; text: string } {
     : [settings.pickup_address, settings.pickup_hours && `Opening hours: ${settings.pickup_hours}`, settings.pickup_instructions].filter(Boolean).join("\n");
   const items = Array.isArray(order.items) ? order.items : [];
   const itemText = items.map((item: any) => `${item.quantity} × ${item.name}${selections(item) ? ` (${selections(item)})` : ""} — ${money(item.line_total_cents)}`).join("\n");
-  const totals = `Product subtotal: ${money(order.subtotal_cents)}\nDiscount: ${money(order.discount_cents)}\nDelivery fee: ${money(order.delivery_cents)}\nCurrent order total: ${money(order.total_cents)}`;
+  const totals = `Product subtotal: ${money(order.subtotal_cents)}\nDiscount: ${money(order.discount_cents)}\nDelivery fee: ${deliveryFeeSummary(order,money)}\nCurrent order total: ${money(order.total_cents)}`;
   const trackingText = showTracking ? `${trackingLabel}:\n${trackingMessage}\n${trackingLink}\n\n` : "";
   const text = `${settings.shop_name || "Elio Basque Cheesecake"}\n${heading}\nOrder reference: ${order.reference}\n\n${message}\n\n${instructions ? `${instructions}\n\n` : ""}${trackingText}Fulfillment: ${date(order.fulfillment_date)} · ${order.method}\n${fulfillment}\n\n${itemText}\n\n${totals}\n\nView your order securely:\n${link}\n\nKeep this link private; it grants access to this order.\nThis is an automated update. Please use your order page to upload payment proof and check your status.\nFor changes, cancellations, or payment concerns, contact us${contact ? `: ${contact}` : " using the details on your order page"}.`;
   const detailTitle = order.method === "delivery" ? "Delivery details" : "Pickup details";

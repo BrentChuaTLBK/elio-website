@@ -25,6 +25,16 @@ Cash reconciliation uses actual original cash payments plus opening float and re
 - Email details and future updates are optional, initially off. Choosing email requires an email address. Direct-order email templates explain the absence of an automatic deadline.
 - Existing order edits use optimistic revisions and preserve website prices for unchanged configurations. Changes and cash movements retain an audit history. Paid-order amount changes still require staff to settle any difference directly.
 
+## Delivery fees confirmed later
+
+Direct delivery orders can use **Pay Elio** or **Pay courier directly**. Choose an exact fee or **Confirm after booking** when creating the order. An unconfirmed fee is shown as “To be confirmed,” and is excluded from the current amount owed to Elio.
+
+In POS → Direct orders → Orders, use **Edit delivery fee** to change the amount or recipient. Before the initial payment, an Elio fee joins the full payment due through the existing link. After product payment, a newly confirmed Elio fee remains unpaid until staff uses **Record delivery payment** and confirms the full amount received. There is no second customer receipt upload. The order link always displays the latest payment instructions.
+
+You can switch between Elio and courier while the fee is uncollected, including while its amount is still unknown. Payment-proof review must finish before changing the fee. Once a separate Elio payment is recorded, an owner can use **Correct delivery payment** after returning the money or confirming the receipt was recorded in error; this reverses delivery income and preserves the original receipt and correction history. The recipient can then be changed. This action does not send money or issue a refund. A delivery fee included in an already approved initial payment uses the existing whole-order refund/correction process; it cannot be silently reassigned.
+
+Only delivery fees received by Elio become Delivery income. Fees paid straight to a courier do not. Actual courier costs paid by Elio are entered through Delivery accounting. Product payment, inventory, and event cash counts stay separate from later direct-order delivery payments.
+
 ## Accounting and other records
 
 Paid orders use the existing payment records, order history and accounting ledger:

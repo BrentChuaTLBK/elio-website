@@ -62,6 +62,19 @@ export default async function({db,check,state}) {
   await h.action('set_refund_label',await h.order(order.id),{enabled:true,reason:'Test refund'});
   report=await staff('pos_event_report',{date:today});assert.equal(report.sales[0].total_cents,175000);assert.equal(report.cash.expected_cents,420000);
  })();
+ await check('event GCash, BDO and EastWest payments record full sales without changing the cash drawer',async()=>{
+  const closed=await staff('pos_event_report',{date:today});
+  await owner('pos_reopen_cash',{date:today,revision:closed.cash.revision,reason:'Additional isolated payment checks'});
+  const current=await owner('pos_event_data');
+  for(const s of current.stock)await owner('pos_save_event_stock',{...s,available:5,expected_available:s.remaining,reason:'Test payment methods'});
+  for(const method of ['GCash','BDO','EastWest']){
+   const p={...payload,items:[{source:'event',product_id:item.id,quantity:1}],payment:{method,reference:'Isolated payment'}};
+   const o=await staff('pos_create_order',{...p,idempotency_key:randomUUID(),expected_quote:await staff('pos_quote',p)});
+   assert.equal(o.payment_status,'paid');assert.equal(o.pos_payment.label,method);assert.equal(o.pos_payment.change_cents,0);
+  }
+  const report=await staff('pos_event_report',{date:today});assert.equal(report.cash.expected_cents,420000);
+  for(const method of ['GCash','BDO','EastWest'])assert.equal(report.sales.find(s=>s.method===method).total_cents,80000);
+ })();
  await check('direct payment links keep optional contact/social details and accept proof without automatic expiry',async()=>{
   const f=await accountingFixture(h),p={order_source:'direct',fulfillment_date:f.date,method:'pickup',paid:false,items:[h.item(f.product)],buyer:{social_platform:'Instagram',social_username:'@test'}};
   const q=await api('pos_quote',p,ids.staff);const o=await api('pos_create_order',{...p,expected_quote:q,idempotency_key:randomUUID()},ids.staff);

@@ -47,5 +47,17 @@ export function emailProducts(items: any[], photos: any, site: URL, labels: (ite
 
 export function emailTotals(order: any, money: (value: unknown) => string): string {
  const discount = `${Number(order.discount_cents) > 0 ? "−" : ""}${money(order.discount_cents)}`;
- return emailPanel("Payment summary", `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13px;line-height:1.65"><tr><td style="padding:3px 8px 3px 0">Products</td><td align="right">${e(money(order.subtotal_cents))}</td></tr><tr><td style="padding:3px 8px 3px 0">Discount${order.promo_code ? ` (${e(order.promo_code)})` : ""}</td><td align="right">${e(discount)}</td></tr><tr><td style="padding:3px 8px 10px 0">${order.method === "pickup" ? "Pickup" : "Delivery"}</td><td align="right" style="padding-bottom:10px">${e(money(order.delivery_cents))}</td></tr><tr><td style="padding-top:12px;border-top:1px solid #dfd1bd;font-weight:bold">Order total</td><td align="right" style="padding-top:12px;border-top:1px solid #dfd1bd;font-weight:bold;font-size:18px;color:#63412d;white-space:nowrap">${e(money(order.total_cents))}</td></tr></table>`);
+ return emailPanel("Payment summary", `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13px;line-height:1.65"><tr><td style="padding:3px 8px 3px 0">Products</td><td align="right">${e(money(order.subtotal_cents))}</td></tr><tr><td style="padding:3px 8px 3px 0">Discount${order.promo_code ? ` (${e(order.promo_code)})` : ""}</td><td align="right">${e(discount)}</td></tr><tr><td style="padding:3px 8px 10px 0">${order.method === "pickup" ? "Pickup" : "Delivery"}</td><td align="right" style="padding-bottom:10px">${e(deliveryFeeSummary(order,money))}</td></tr><tr><td style="padding-top:12px;border-top:1px solid #dfd1bd;font-weight:bold">Order total</td><td align="right" style="padding-top:12px;border-top:1px solid #dfd1bd;font-weight:bold;font-size:18px;color:#63412d;white-space:nowrap">${e(money(order.total_cents))}</td></tr></table>`);
+}
+
+export function deliveryFeeSummary(order: any,money: (value: unknown) => string): string{
+ const c=order.delivery_charge;
+ if(order.method!=='delivery')return money(0);
+ if(!c)return money(order.delivery_cents);
+ const recipient=c.recipient==='courier'?'Pay courier directly':'Pay Elio';
+ if(c.state==='pending')return 'To be confirmed · '+recipient;
+ if(c.state==='courier')return money(c.fee_cents)+' · Pay courier directly';
+ if(c.state==='quoted')return money(c.fee_cents)+' · Pay Elio · not yet received';
+ if(c.state==='paid')return money(c.fee_cents)+' · Paid to Elio separately';
+ return money(c.fee_cents)+' · '+recipient;
 }

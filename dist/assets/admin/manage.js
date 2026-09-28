@@ -1,3 +1,4 @@
+import {deliveryFeeSummary,separateDeliveryPaid} from '../delivery-fee.js';
 import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-clean-2';
 import {mountCalendar} from './calendar-manager.js';
 import {mountMaintenance} from './maintenance-admin.js';
@@ -498,7 +499,7 @@ function itemTable(items) {
 }
 
 function totals(order) {
-  return `<div class="order-total"><div><span>Product subtotal</span><span>${money(order.subtotal_cents)}</span></div><div><span>Discount${order.promo_snapshot?.code ? ` · ${esc(order.promo_snapshot.code)}` : ''}</span><span>− ${money(order.discount_cents)}</span></div><div><span>Delivery fee</span><span>${money(order.delivery_cents)}</span></div><div class="grand-total"><span>Current total</span><span>${money(order.total_cents)}</span></div>${order.payment_status === 'paid' ? `<div><span>Original approved payment</span><span>${money(order.paid_amount_cents)}</span></div>` : ''}</div>`;
+  return `<div class="order-total"><div><span>Product subtotal</span><span>${money(order.subtotal_cents)}</span></div><div><span>Discount${order.promo_snapshot?.code ? ` · ${esc(order.promo_snapshot.code)}` : ''}</span><span>− ${money(order.discount_cents)}</span></div><div><span>Delivery fee</span><span>${esc(deliveryFeeSummary(order,money))}</span></div><div class="grand-total"><span>Current total</span><span>${money(order.total_cents)}</span></div>${separateDeliveryPaid(order)?`<div><span>Separate delivery payment received</span><span>${money(separateDeliveryPaid(order))}</span></div>`:''}${order.payment_status === 'paid' ? `<div><span>Original approved payment</span><span>${money(order.paid_amount_cents)}</span></div>` : ''}</div>`;
 }
 function deliveryTrackingForm(order) {
   if (order.method !== 'delivery') return '';
