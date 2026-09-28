@@ -49,7 +49,7 @@ export function renderWebsiteVisitors(traffic = { status: 'idle' }, escapeHtml) 
   };
   let status = 'Open Analytics while signed in to load website visitors.';
   if (traffic.status === 'loading') status = 'Loading website visitors…';
-  if (traffic.status === 'not_configured') status = 'Connect Google Analytics reporting to display visitor counts here. Website visitor tracking is not connected for Elio yet.';
+  if (traffic.status === 'not_configured') status = 'Elio’s storefront is connected to Google Analytics. Open Google Analytics to view traffic; these visitor cards still need reporting access.';
   if (traffic.status === 'error') status = 'Visitor counts are temporarily unavailable. Try Refresh analytics, or open Google Analytics below. This does not affect ordering.';
   if (received) {
     const updated = new Intl.DateTimeFormat('en-PH', { ...(traffic.timeZone ? { timeZone: traffic.timeZone } : {}), dateStyle: 'medium', timeStyle: 'short' }).format(new Date(traffic.updatedAt));

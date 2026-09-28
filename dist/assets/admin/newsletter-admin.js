@@ -1,11 +1,18 @@
-import {newsletterOfferSummary} from '../shop/newsletter-offer.js';
-import {api,escapeHtml as esc,toast} from './client.js';
+import {api,escapeHtml as esc,money,toast} from './client.js';
 import {createNewsletterCampaigns} from './newsletter-campaigns.js';
 const label = value => ({converted:'Converted to a sale',not_converted:'Not converted',expired:'Expired'}[value]||String(value || '').replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase()));
 const badge = status => `<span class="badge ${esc(status)}">${esc(label(status))}</span>`;
 const field = (name, title, value, extra = '', help = '') => `<label class="field">${title}<input name="${name}" value="${esc(value || '')}" ${extra}>${help ? `<small>${help}</small>` : ''}</label>`;
 const safeHttps = value => { try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; } };
 const date = value => { const parsed = new Date(value); return value && Number.isFinite(parsed.getTime()) ? new Intl.DateTimeFormat('en-PH',{timeZone:'Asia/Manila',dateStyle:'medium',timeStyle:'short'}).format(parsed)+' PHT' : '—'; };
+function issuedTerms(terms) {
+ const validAmount=value=>typeof value==='number'&&Number.isFinite(value)&&value>=0;
+ if(!terms||!['percent','fixed'].includes(terms.kind)||!validAmount(terms.value)||!validAmount(terms.min_subtotal_cents)||!(terms.cap_cents===null||validAmount(terms.cap_cents)))return '<span class="muted">Terms unavailable</span>';
+ const discount=terms.kind==='percent'?`${terms.value}%`:money(terms.value);
+ const minimum=terms.min_subtotal_cents>0?`Min. spend ${money(terms.min_subtotal_cents)}`:'No minimum spend';
+ const cap=terms.kind==='percent'?`<small>${esc(terms.cap_cents===null?'No discount cap':`Max. discount ${money(terms.cap_cents)}`)}</small>`:'';
+ return `<strong>${esc(discount)} off</strong><small>${esc(minimum)}</small>${cap}`;
+}
 
 export function createNewsletterAdmin(options) {
  if(!options.offersOnly)return createNewsletterCampaigns(options);
@@ -20,9 +27,9 @@ export function createNewsletterAdmin(options) {
   function offersView(report) {
     const counts=report?.offer_counts||{},rows=report?.offers||[],total=Number(report?.offer_total)||0;
     const metrics=[['Issued',counts.issued],['Expired',counts.expired],['Converted to a sale',counts.converted]];
-    return `<div class="newsletter-metrics newsletter-offer-metrics newsletter-conversion-metrics">${metrics.map(([name,value])=>`<div class="panel"><span>${name}</span><strong>${esc(value??'—')}</strong></div>`).join('')}</div><p class="muted newsletter-conversion-note">All-time totals. A conversion is a code with a paid order, excluding refunded, cancelled or expired orders. Expired means the code passed its expiry without a valid sale. Unpaid orders do not count as conversions.</p><details class="panel newsletter-code-details"><summary>View issued codes</summary><p class="muted">${esc(newsletterOfferSummary(report?.settings))} Existing codes keep their issued terms.</p>
+    return `<div class="newsletter-metrics newsletter-offer-metrics newsletter-conversion-metrics">${metrics.map(([name,value])=>`<div class="panel"><span>${name}</span><strong>${esc(value??'—')}</strong></div>`).join('')}</div><p class="muted newsletter-conversion-note">All-time totals. A conversion is a code with a paid order, excluding refunded, cancelled or expired orders. Expired means the code passed its expiry without a valid sale. Unpaid orders do not count as conversions.</p><details class="panel newsletter-code-details"><summary>View issued codes</summary><p class="muted">Each code shows its original offer. Changes to welcome offer settings apply only to newly issued codes.</p>
       <form class="newsletter-filters" data-nl-offer-filter>${field('offer_search','Search email or code',state.offerSearch,'type="search" maxlength="254"')}<label class="field">Result<select name="offer_status">${[['','All codes'],['converted','Converted to a sale'],['expired','Expired'],['not_converted','Not converted']].map(([value,text])=>`<option value="${value}" ${state.offerStatus===value?'selected':''}>${text}</option>`).join('')}</select></label><button type="submit" class="button button-secondary" ${disabled(!editable()||state.loading)}>Apply filters</button></form>
-      ${rows.length?`<div class="table-wrap"><table class="data-table newsletter-offers"><thead><tr><th>Subscriber / code</th><th>Issued / expires · Manila</th><th>Result</th></tr></thead><tbody>${rows.map(offer=>`<tr><td><strong>${esc(offer.email)}</strong><small class="newsletter-code">${esc(offer.code)}</small></td><td>${esc(date(offer.issued_at))}<small>Expires ${esc(date(offer.expires_at))}</small></td><td>${badge(offer.conversion_status||'not_converted')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="newsletter-empty">No welcome codes match these filters.</p>'}
+      ${rows.length?`<div class="table-wrap" tabindex="0" role="region" aria-label="Issued newsletter codes"><table class="data-table newsletter-offers"><thead><tr><th scope="col">Subscriber / code</th><th scope="col">Offer details</th><th scope="col">Issued / expires · Manila</th><th scope="col">Result</th></tr></thead><tbody>${rows.map(offer=>`<tr><td><strong>${esc(offer.email)}</strong><small class="newsletter-code">${esc(offer.code)}</small></td><td class="newsletter-issued-terms">${issuedTerms(offer.offer_terms)}</td><td>${esc(date(offer.issued_at))}<small>Expires ${esc(date(offer.expires_at))}</small></td><td>${badge(offer.conversion_status||'not_converted')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="newsletter-empty">No welcome codes match these filters.</p>'}
       <div class="newsletter-pagination"><span>${total?`${state.offerOffset+1}–${Math.min(state.offerOffset+rows.length,total)} of ${total.toLocaleString()} codes`:'0 codes'}</span><div class="row-actions"><button type="button" class="button button-secondary" data-nl-action="offer-previous" ${disabled(!editable()||state.loading||state.offerOffset===0)}>Previous</button><button type="button" class="button button-secondary" data-nl-action="offer-next" ${disabled(!editable()||state.loading||state.offerOffset+state.offerLimit>=total)}>Next</button></div></div></details>`;
   }
   function offerSettingsView(report) {

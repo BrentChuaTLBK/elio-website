@@ -21,7 +21,8 @@ for(const event_type of ['order_submitted','payment_approved','payment_rejected'
 for(const bad of ['javascript:alert(1)','data:image/png;base64,x','http://example.test/photo.jpg','https://user:pass@example.test/photo.jpg','//example.test/photo.jpg'])assert.equal(productPhoto(order.items[0],{'box-id':bad},site),'');
 assert.equal(productPhoto(order.items[0],{},site),'');
 assert.equal(productPhoto(order.items[0],{'box-id':'https://cdn.example.test/photo.webp'},site),'https://cdn.example.test/photo.webp');
-assert(!renderEmail({event_type:'payment_approved',order,settings}).html.includes('<img'));
+// The branded header always has its logo; absent product photos must stay absent.
+assert(!renderEmail({event_type:'payment_approved',order,settings}).html.includes('alt="Box &lt;test&gt;"'));
 checks++;
 const trackingUrl='https://tracking.example.test/order/ELIO-TEST?courier=grab&view=live';
 const deliveryOrder={...order,method:'delivery',delivery_tracking_url:trackingUrl};

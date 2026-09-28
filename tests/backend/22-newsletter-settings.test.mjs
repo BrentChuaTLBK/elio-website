@@ -27,6 +27,13 @@ export default async function({db,check,state}) {
   await subscribe('policy-new@example.test');const fresh=await row('policy-new@example.test');
   assert.equal(fresh.offer.value,10);assert.equal(fresh.offer.min_subtotal_cents,75000);assert.equal(fresh.offer.cap_cents,15000);
   assert.equal(await scalar('select extract(epoch from offer_expires_at-subscribed_at)::integer from elio.newsletter_subscribers where id=$1',[fresh.id]),7*86400);
+  for(const issued of [oldRow,fresh]){
+   const report=await api('newsletter_admin',{offer_search:issued.email},ids.owner);
+   assert.equal(report.offers.length,1);
+   assert.deepEqual(report.offers[0].offer_terms,{kind:issued.offer.kind,value:issued.offer.value,min_subtotal_cents:issued.offer.min_subtotal_cents,cap_cents:issued.offer.cap_cents});
+   assert.equal(new Date(report.offers[0].expires_at).getTime(),new Date(issued.offer_expires_at).getTime());
+  }
+  for(const user of [null,ids.customer,ids.staff])await assert.rejects(()=>api('newsletter_admin',{offer_search:oldRow.email},user),/owner/i);
   const mail=await emailPayload(fresh.email),render=renderNewsletterEmail(mail);assert.match(render.html,/10%/);assert.match(render.text,/₱750.00/);assert.match(render.text,/₱150.00/);assert.match(render.text,/exclusive promo codes/);
   assert.match(await scalar("select subject from elio.newsletter_outbox where subscriber_id=$1 and event_type='newsletter_welcome'",[fresh.id]),/10%/);
   await subscribe(oldRow.email);assert.deepEqual((await row(oldRow.email)).offer,oldRow.offer);

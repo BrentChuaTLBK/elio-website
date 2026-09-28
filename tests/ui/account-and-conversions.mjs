@@ -9,7 +9,7 @@ const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png'
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 try{
  for(const width of [1440,390,320]){
-  let subscribed=false,failSave=false,showOrder=false,converted=1;const calls=[],errors=[];
+  let subscribed=false,failSave=false,showOrder=false,converted=1,missingTerms=false;const calls=[],errors=[];
   const settings=()=>({enabled:true,discount_percent:5,min_subtotal_cents:50000,cap_cents:10000,expiry_days:14,revision:1,own_status:subscribed?'subscribed':'unsubscribed',known_subscriber:true});
   const ctx=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'});
   await ctx.route('**/*',async route=>{
@@ -30,7 +30,7 @@ try{
     else if(action==='affiliate_status')data={assigned:true};
     else if(action==='my_orders')data=showOrder?[{id:'order-1',reference:'ELIO-TEST01',fulfillment_date:'2026-09-30',method:'pickup',payment_status:'awaiting_payment',total_cents:95000}]:[];
     else if(action==='admin_bootstrap')data={role:'owner',products:[],categories:[],orders:[],inventory:[],zones:[],staff:[],promos:[],settings:{paused:false}};
-    else if(action==='newsletter_admin')data={settings:settings(),offer_counts:{issued:4,expired:1,converted},offer_total:1,offers:[{id:'code',email:'elio@example.test',code:'AB3D4F',issued_at:'2026-09-01',expires_at:'2026-09-15',conversion_status:converted?'converted':'expired'}]};
+    else if(action==='newsletter_admin')data={settings:settings(),offer_counts:{issued:4,expired:1,converted},offer_total:1,offers:[{id:'code',email:'elio@example.test',code:'AB3D4F',issued_at:'2026-09-01',expires_at:'2026-09-08',offer_terms:missingTerms?undefined:{kind:'percent',value:10,min_subtotal_cents:75000,cap_cents:15000},conversion_status:converted?'converted':'expired'}]};
     else throw Error('Unexpected API '+action);
     return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
    }
@@ -52,9 +52,15 @@ try{
   await page.goto(origin+'/manage.html');await page.locator('[data-view=promos]').click();await page.waitForFunction(()=>document.querySelector('.newsletter-conversion-metrics strong')?.textContent==='4');
   assert.equal(await page.locator('.newsletter-conversion-metrics .panel').count(),3);assert.deepEqual(await page.locator('.newsletter-conversion-metrics span').allTextContents(),['Issued','Expired','Converted to a sale']);
   assert.equal(await page.locator('.newsletter-code-details').evaluate(el=>el.open),false);await page.locator('.newsletter-code-details summary').click();
+  assert.equal(await page.locator('[name=discount_percent]').inputValue(),'5');
+  const terms=page.locator('.newsletter-issued-terms');assert.equal(await terms.locator('strong').textContent(),'10% off');assert.deepEqual(await terms.locator('small').allTextContents(),['Min. spend ₱750.00','Max. discount ₱150.00']);
+  assert.match(await page.locator('.newsletter-offers tbody tr').textContent(),/Expires Sep 8, 2026/);
   await page.locator('[name=offer_status]').selectOption('converted');await page.getByRole('button',{name:'Apply filters',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('[data-nl-action=refresh]').disabled);assert.equal(await page.locator('.newsletter-code-details').evaluate(el=>el.open),true);
   converted=0;await page.locator('[data-nl-action=refresh]').click();await page.waitForFunction(()=>[...document.querySelectorAll('.newsletter-conversion-metrics strong')].at(-1)?.textContent==='0');
   assert.equal(await page.locator('.newsletter-offers [data-action=edit-promo]').count(),0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  await page.screenshot({path:join(output,`conversions-${width}.png`),fullPage:true});assert.deepEqual(errors,[]);await ctx.close();console.log(`PASS account, preferences, recovery and conversions ${width}px`);
+  await page.screenshot({path:join(output,`conversions-${width}.png`),fullPage:true});
+  if(width<740){await page.locator('.newsletter-offers').evaluate(el=>{el.parentElement.scrollLeft=el.querySelector('.newsletter-issued-terms').offsetLeft;});await page.screenshot({path:join(output,`issued-terms-${width}.png`),fullPage:true});}
+  missingTerms=true;await page.locator('[data-nl-action=refresh]').click();await terms.getByText('Terms unavailable',{exact:true}).waitFor();assert.equal(await terms.locator('strong').count(),0);
+  assert.deepEqual(errors,[]);await ctx.close();console.log(`PASS account, preferences, recovery, conversions and issued terms ${width}px`);
  }
 }finally{await browser.close();}

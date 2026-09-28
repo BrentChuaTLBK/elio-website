@@ -12,6 +12,7 @@ try{
  for(const width of [1440,390]){
   let settings={mode:'off',announce:false,pause_uploads:true,message:'A few improvements for your next Elio order.',starts_at:null,ends_at:null},revision=1,active=false,errors=[],calls=[];
   const emailAlert={id:'email-test',event_type:'order_review_required',status:'skipped',attempts:1,last_error:'Order no longer needs payment review.',reviewed_at:null};
+  let pickupOrder={...order,id:'pickup-test',revision:1,fulfillment_date:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila'}).format(new Date()),fulfillment_status:'ready_for_pickup',buyer:{...order.buyer,email:'pickup@example.test'}};
   const state=()=>({active,uploads_paused:active&&settings.pause_uploads,announce:settings.announce,message:settings.message,starts_at:settings.starts_at,ends_at:settings.ends_at,server_time:new Date().toISOString()});
   const ctx=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'});
   await ctx.route('**/*',async route=>{
@@ -20,7 +21,9 @@ try{
    if(u.pathname==='/api'){
     const {action,payload}=route.request().postDataJSON();calls.push({action,payload});let data;
     if(action==='site_status')data=state();
-    else if(action==='admin_bootstrap')data={role:'owner',products:[],categories:[],orders:[],inventory:[],zones:[],staff:[],promos:[],email_status:[emailAlert],settings:{paused:false}};
+    else if(action==='admin_bootstrap')data={role:'owner',products:[],categories:[],orders:[pickupOrder],inventory:[],zones:[],staff:[],promos:[],email_status:[emailAlert],settings:{paused:false}};
+    else if(action==='get_order')data=pickupOrder;
+    else if(action==='send_pickup_reminder'){assert.equal(payload.order_id,pickupOrder.id);assert.equal(payload.revision,pickupOrder.revision);assert(payload.idempotency_key);pickupOrder={...pickupOrder,revision:2,pickup_reminder_count:1,pickup_reminder_requested_at:new Date().toISOString()};data=pickupOrder;}
     else if(action==='review_email_alert'){assert.equal(payload.id,emailAlert.id);assert.equal(payload.attempts,1);emailAlert.reviewed_at=new Date().toISOString();data={reviewed:true};}
     else if(action==='maintenance_admin')data={settings,revision,status:state()};
     else if(action==='save_maintenance'){assert.equal(payload.revision,revision);settings=payload.settings;revision++;active=settings.mode==='manual';data={settings,revision,status:state()};}
@@ -38,6 +41,10 @@ try{
   await page.getByRole('button',{name:'Acknowledge & dismiss',exact:true}).click();await page.getByText('Reviewed notifications (1)',{exact:true}).waitFor();
   await page.reload();await page.getByText('Reviewed notifications (1)',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Acknowledge & dismiss',exact:true}).count(),0);
   await page.getByText('Reviewed notifications (1)',{exact:true}).click();await page.locator('.email-reviewed p').waitFor();assert.match(await page.locator('.email-reviewed p').textContent(),/Order no longer needs payment review\./);
+  await page.locator('[data-view=orders]').click();await page.locator('[data-action=open-order]').first().click();
+  await page.getByRole('button',{name:'Send pickup reminder',exact:true}).click();await page.getByText('Pickup reminder queued. Check Email delivery for its status.',{exact:true}).waitFor();
+  assert.equal(calls.filter(call=>call.action==='send_pickup_reminder').length,1);assert.match(await page.locator('.pickup-reminder').textContent(),/pickup@example.test.*Last requested/s);
+  await page.locator('.pickup-reminder').screenshot({path:join(output,`pickup-reminder-${width}.png`)});await page.keyboard.press('Escape');
   await page.locator('[data-view=maintenance]').click();await page.locator('.maintenance-form').waitFor();
   const form=page.locator('.maintenance-form');assert.equal(await form.locator('[name=pause_uploads]').isChecked(),true);
   await form.locator('[name=mode]').selectOption('scheduled');await form.locator('[name=starts]').fill('2026-10-01T23:00');await form.locator('[name=ends]').fill('2026-10-02T00:00');await form.locator('[name=announce]').check();await form.locator('[type=submit]').click();await page.getByText('Maintenance settings saved.',{exact:true}).waitFor();
