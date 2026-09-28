@@ -228,3 +228,5 @@
 .newsletter-offers td:first-child{max-width:250px;white-space:normal;overflow-wrap:anywhere}
 .newsletter-conversion-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.newsletter-conversion-note{font-size:12px;line-height:1.7;margin:0 0 22px}.newsletter-code-details>summary{cursor:pointer;font-weight:600}.newsletter-code-details[open]>summary{margin-bottom:20px}@media(max-width:560px){.newsletter-conversion-metrics{grid-template-columns:1fr}.newsletter-conversion-metrics .panel{margin:0}.newsletter-conversion-metrics span{max-width:75%}}
 .pickup-reminder>.help-text{margin:12px 0 0}
+.manage-page .pickup-reminder .button-secondary:hover{background:var(--caramel);color:#fff}
+
