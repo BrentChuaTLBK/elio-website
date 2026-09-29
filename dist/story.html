@@ -18,6 +18,8 @@
   <link rel="stylesheet" href="assets/site-analytics.css">
   <script type="module" src="assets/site-analytics.js?v=story-1"></script>
   <noscript><style>@media(max-width:1000px){.story-page .menu-toggle{display:none}.story-page .mobile-nav[hidden]{display:flex}}</style></noscript>
+  <link rel="stylesheet" href="assets/storefront-footer.css?v=1">
+  <script type="module" src="assets/website-photos.js?v=1"></script>
 </head>
 <body class="story-page">
   <a class="skip-link" href="#main">Skip to content</a>
@@ -46,7 +48,7 @@
   </header>
   <main id="main">
     <div class="story-hero">
-      <img src="assets/home-editorial-story.webp" width="1536" height="1024" alt="A square Basque cheesecake being carefully placed on a ceramic plate" fetchpriority="high">
+      <img data-website-photo="story_hero" src="assets/home-editorial-story.webp" width="1536" height="1024" alt="A square Basque cheesecake being carefully placed on a ceramic plate" fetchpriority="high">
     </div>
     <div class="story-editorial">
       <div class="story-identity">
@@ -60,7 +62,7 @@
           </div>
         </div>
         <div class="story-plated">
-          <img src="assets/home-editorial-hero.webp" width="1916" height="821" alt="Elio's individual square cheesecake with a caramelized top and a soft vanilla center" loading="lazy">
+          <img data-website-photo="story_plated" src="assets/home-editorial-hero.webp" width="1916" height="821" alt="Elio's individual square cheesecake with a caramelized top and a soft vanilla center" loading="lazy">
         </div>
       </div>
       <div class="story-copy">
@@ -77,7 +79,7 @@
           <p>Something sweet for the everyday. Something thoughtful to share.</p>
           <div class="story-founder-details">
             <figure class="story-kitchen-photo">
-              <img src="assets/unboxing-moment-concept.webp" width="1200" height="800" alt="An Elio box being opened to reveal three individual cheesecakes" loading="lazy">
+              <img data-website-photo="story_kitchen" src="assets/unboxing-moment-concept.webp" width="1200" height="800" alt="An Elio box being opened to reveal three individual cheesecakes" loading="lazy">
             </figure>
             <div class="story-motto">
               <span class="story-rule" aria-hidden="true"></span>
@@ -93,17 +95,16 @@
         <span class="eyebrow">Find your favorite</span>
         <h2>Explore<br>the flavors <span aria-hidden="true">→</span></h2>
       </div>
-      <img src="assets/trio-story-concept.webp" width="1440" height="960" alt="An open brown Elio box with vanilla, chocolate and matcha cheesecakes" loading="lazy">
+      <img data-website-photo="story_explore" src="assets/trio-story-concept.webp" width="1440" height="960" alt="An open brown Elio box with vanilla, chocolate and matcha cheesecakes" loading="lazy">
     </a>
   </main>
-  <footer class="site-footer"><div class="footer-inner">
-    <a class="wordmark footer-wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home">
-      <span class="wordmark-name">ELIO</span>
-      <span class="wordmark-description">Basque Cheesecake</span>
-      <span class="wordmark-byline">by TLB Kitchen</span>
-    </a>
-    <div><p>Burnt beautifully. Soft within.</p><a href="https://www.instagram.com/elio.cheesecakes/" target="_blank" rel="noopener noreferrer">@elio.cheesecakes<span class="sr-only"> (opens in a new tab)</span></a></div>
-    <div><a href="privacy.html">Privacy</a> · <a href="terms.html">Website terms</a></div>
-  </div></footer>
+  <footer class="elio-footer">
+    <div class="elio-footer-main">
+      <div class="elio-footer-brand"><a class="wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home"><span class="wordmark-name">ELIO</span><span class="wordmark-description">Basque Cheesecake</span><span class="wordmark-byline">by TLB Kitchen</span></a><p>Burnt beautifully. Soft within.</p></div>
+      <nav class="elio-footer-links" aria-label="Explore Elio"><h2>Explore Elio</h2><a href="order.html">Shop our boxes</a><a href="flavors.html">Our flavors</a><a href="story.html">Our story</a></nav>
+      <div class="elio-footer-links"><h2>Keep in touch</h2><a href="https://www.instagram.com/elio.cheesecakes/" target="_blank" rel="noopener noreferrer">@elio.cheesecakes <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:elio.cheesecakes@gmail.com">Email us</a></div>
+    </div>
+    <div class="elio-footer-bottom"><p>© 2026 Elio · by TLB Kitchen</p><nav aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Website terms</a></nav></div>
+  </footer>
 </body>
 </html>

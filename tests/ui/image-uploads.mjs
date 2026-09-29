@@ -25,16 +25,16 @@ try{
   window.uploads=[];window.capture=async(endpoint,file)=>{const bmp=await createImageBitmap(file),bytes=await file.arrayBuffer();uploads.push({endpoint,name:file.name,type:file.type,size:file.size,width:bmp.width,height:bmp.height,header:[...new Uint8Array(bytes.slice(0,12))],hash:[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].join(',')});bmp.close();window.lastFile=file;};
   window.client=await import('/assets/admin/client.js');await client.ready;
   window.makeFile=async(type,width=300,height=200)=>{const c=document.createElement('canvas');c.width=width;c.height=height;const x=c.getContext('2d');x.fillStyle='white';x.fillRect(0,0,width,height);x.fillStyle='black';x.font='28px Arial';x.fillText('TEST PHP 100.00',12,55);const b=await new Promise(r=>c.toBlob(r,type,.96));return new File([b],'receipt.'+type.split('/')[1],{type});};
-  window.send=async(flow,file)=>flow==='affiliate'?client.affiliatePayout(file,{id:'test-payout',affiliate_id:'test-affiliate',amount_cents:10000,reference:'TEST'}):client.upload(file,flow==='product'?{kind:'product'}:{kind:'proof',order_id:'test-order',token:'test-token',payment_reference:'TEST'});
+  window.send=async(flow,file)=>flow==='affiliate'?client.affiliatePayout(file,{id:'test-payout',affiliate_id:'test-affiliate',amount_cents:10000,reference:'TEST'}):client.upload(file,['product','website'].includes(flow)?{kind:flow}:{kind:'proof',order_id:'test-order',token:'test-token',payment_reference:'TEST'});
  });
  const webp=result=>{assert.equal(result.type,'image/webp');assert.match(result.name,/\.webp$/);assert.equal(String.fromCharCode(...result.header.slice(8)),'WEBP');assert(result.size<5*1024*1024);};
- for(const flow of ['product','proof','affiliate']){
+ for(const flow of ['product','website','proof','affiliate']){
   for(const type of ['image/jpeg','image/png','image/webp']){const result=await page.evaluate(async({flow,type})=>{await send(flow,await makeFile(type));return uploads.at(-1);},{flow,type});webp(result);}
   for(const [name,type] of [['camera.HEIC','image/heic'],['camera.heif','application/octet-stream'],['camera.HEIC','']]){
    const result=await page.evaluate(async({flow,bytes,name,type})=>{await send(flow,new File([new Uint8Array(bytes)],name,{type}));return uploads.at(-1);},{flow,bytes:[...heic],name,type});webp(result);
   }
   checks.push(`${flow}: real JPEG, PNG, WebP, HEIC and HEIF uploads produce WebP, including missing/generic MIME`);
-  const resized=await page.evaluate(async flow=>{await send(flow,await makeFile('image/jpeg',6000,2000));return uploads.at(-1);},flow);assert.equal(resized.width,flow==='product'?2400:3200);
+  const resized=await page.evaluate(async flow=>{await send(flow,await makeFile('image/jpeg',6000,2000));return uploads.at(-1);},flow);assert.equal(resized.width,['product','website'].includes(flow)?2400:3200);
   for(const bad of [{name:'bad.jpg',type:'image/jpeg',bytes:[37,80,68,70]},{name:'bad.heic',type:'image/heic',bytes:[37,80,68,70]},{name:'empty.png',type:'image/png',bytes:[]},{name:'document.pdf',type:'application/pdf',bytes:[37,80,68,70]}]){
    const result=await page.evaluate(async({flow,bad})=>{const before=uploads.length;try{await send(flow,new File([new Uint8Array(bad.bytes)],bad.name,{type:bad.type}));return {accepted:true};}catch(e){return {message:e.message,newUploads:uploads.length-before};}},{flow,bad});assert(result.message);assert.equal(result.newUploads,0);
   }

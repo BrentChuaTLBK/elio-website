@@ -28,6 +28,8 @@
 <script type="module" src="assets/shop/newsletter.js"></script>
 <link rel="stylesheet" href="assets/site-maintenance.css"><script type="module" src="assets/site-maintenance.js"></script>
 <link rel="stylesheet" href="assets/site-analytics.css"><script type="module" src="assets/site-analytics.js"></script>
+  <link rel="stylesheet" href="assets/storefront-footer.css?v=1">
+  <script type="module" src="assets/website-photos.js?v=1"></script>
 </head>
 <body class="shop-page" data-newsletter-popup>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -38,7 +40,7 @@
   </header>
   <main id="main">
     <section class="shop-hero" aria-labelledby="shop-title">
-      <img src="assets/shop-hero-concept.webp" width="1920" height="640" alt="Three individual square Basque cheesecakes in vanilla, chocolate, and matcha on warm stone — concept photograph" fetchpriority="high">
+      <img data-website-photo="shop_hero" src="assets/shop-hero-concept.webp" width="1920" height="640" alt="Three individual square Basque cheesecakes in vanilla, chocolate, and matcha on warm stone — concept photograph" fetchpriority="high">
       <div class="shop-hero-copy"><p class="eyebrow">A little Elio, just for you</p><h1 id="shop-title">Good things<br>come in threes.</h1><p>Three little cheesecakes.<br>A kinder day awaits.</p><div class="shop-hero-actions"><a class="button" href="#cheesecake-boxes">Explore our boxes <span aria-hidden="true">→</span></a><a class="button button-outline" href="order.html?product=your-own">Make your own <span aria-hidden="true">→</span></a></div></div>
     </section>
     <div class="shop-shell">
@@ -49,7 +51,7 @@
         <div class="shop-flavor-strip" id="order-products"></div>
       </section>
       <section class="shop-gifting" id="shop-gifting" aria-labelledby="shop-gift-title">
-        <picture><source media="(max-width:600px)" srcset="assets/thoughtful-gift-concept.webp"><img src="assets/thoughtful-gift-wide-concept.webp" width="1920" height="640" alt="Elio's bronze-lettered brown paper bag and closed cheesecake box — concept photograph" loading="lazy"></picture>
+        <picture><source data-website-photo="shop_gift_mobile" media="(max-width:600px)" srcset="assets/thoughtful-gift-concept.webp"><img data-website-photo="shop_gift" src="assets/thoughtful-gift-wide-concept.webp" width="1920" height="640" alt="Elio's bronze-lettered brown paper bag and closed cheesecake box — concept photograph" loading="lazy"></picture>
         <div class="shop-gift-copy"><p class="eyebrow">A little box. A lovely gesture.</p><h2 id="shop-gift-title">A sweeter way<br>to show you care.</h2><p>Thoughtful treats for birthdays,<br>thank yous, and everyday moments.</p><a class="button button-outline" href="index.html#box">Explore gifting <span aria-hidden="true">→</span></a></div>
       </section>
       <section class="shop-faq" data-shop-faqs aria-labelledby="faq-title" hidden>
@@ -58,7 +60,14 @@
       </section>
     </div>
   </main>
-  <footer class="shop-footer"><div class="shop-footer-inner"><a class="wordmark footer-wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home"><span class="wordmark-name">ELIO</span><span class="wordmark-description">Basque Cheesecake</span><span class="wordmark-byline">by TLB Kitchen</span></a><p>Burnt beautifully. Soft within.</p><div class="shop-footer-links"><nav aria-label="Footer"><a href="order.html">Shop</a><a href="story.html">Our story</a><a href="#shop-gifting">Gifting</a><a href="mailto:elio.cheesecakes@gmail.com">Contact</a></nav><a href="https://www.instagram.com/elio.cheesecakes/" target="_blank" rel="noopener noreferrer">@elio.cheesecakes<span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:elio.cheesecakes@gmail.com">elio.cheesecakes@gmail.com</a></div></div></footer>
+  <footer class="elio-footer">
+    <div class="elio-footer-main">
+      <div class="elio-footer-brand"><a class="wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home"><span class="wordmark-name">ELIO</span><span class="wordmark-description">Basque Cheesecake</span><span class="wordmark-byline">by TLB Kitchen</span></a><p>Burnt beautifully. Soft within.</p></div>
+      <nav class="elio-footer-links" aria-label="Explore Elio"><h2>Explore Elio</h2><a href="order.html">Shop our boxes</a><a href="flavors.html">Our flavors</a><a href="story.html">Our story</a></nav>
+      <div class="elio-footer-links"><h2>Keep in touch</h2><a href="https://www.instagram.com/elio.cheesecakes/" target="_blank" rel="noopener noreferrer">@elio.cheesecakes <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:elio.cheesecakes@gmail.com">Email us</a></div>
+    </div>
+    <div class="elio-footer-bottom"><p>© 2026 Elio · by TLB Kitchen</p><nav aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Website terms</a></nav></div>
+  </footer>
   <dialog id="order-flavor-dialog" aria-labelledby="dialog-title"><button class="dialog-close icon-button" type="button" aria-label="Close details"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19"/></svg></button><div id="order-flavor-content"></div></dialog>
 <dialog id="product-dialog" class="elio-commerce" aria-labelledby="product-title"></dialog><dialog id="checkout-dialog" class="elio-commerce" aria-labelledby="checkout-title"></dialog>
 </body>

@@ -18,6 +18,8 @@
   <script src="flavors.js" defer></script>
 <link rel="stylesheet" href="assets/site-maintenance.css"><script type="module" src="assets/site-maintenance.js"></script>
 <link rel="stylesheet" href="assets/site-analytics.css"><script type="module" src="assets/site-analytics.js"></script>
+  <link rel="stylesheet" href="assets/storefront-footer.css?v=1">
+  <script type="module" src="assets/website-photos.js?v=1"></script>
 </head>
 <body class="flavors-page" data-newsletter-popup>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -28,7 +30,7 @@
   </header>
   <main id="main">
     <section class="flavors-hero" aria-labelledby="flavors-title">
-      <img src="assets/home-editorial-hero.webp" width="1916" height="821" alt="A golden square Basque cheesecake with a beautifully burnt top" fetchpriority="high">
+      <img data-website-photo="flavors_hero" src="assets/home-editorial-hero.webp" width="1916" height="821" alt="A golden square Basque cheesecake with a beautifully burnt top" fetchpriority="high">
       <div class="flavors-hero-copy"><p class="eyebrow">The Elio collection</p><h1 id="flavors-title">Find your favorite.</h1><p>Burnt beautifully. Soft within.</p><p class="flavors-hero-note">A little discovery in every square.</p></div>
     </section>
     <div class="flavors-shell">
@@ -63,13 +65,20 @@
       </div>
       <section class="flavors-box" aria-labelledby="flavors-box-title">
         <div class="flavors-box-copy"><p class="eyebrow">A little box. A lovely moment.</p><h2 id="flavors-box-title">Find your perfect box.</h2><p>Your favorite flavors, beautifully boxed.<br>Choose a signature set or make it your own.</p><div class="flavors-box-actions"><a class="button" href="order.html#cheesecake-boxes">Shop our boxes <span aria-hidden="true">→</span></a><a class="button button-outline" href="order.html#cheesecake-boxes">Build your own <span aria-hidden="true">→</span></a></div></div>
-        <img src="assets/home-editorial-gift.webp" width="1860" height="846" loading="lazy" alt="An Elio cheesecake gift box in warm brown with gold lettering">
+        <img data-website-photo="flavors_box" src="assets/home-editorial-gift.webp" width="1860" height="846" loading="lazy" alt="An Elio cheesecake gift box in warm brown with gold lettering">
       </section>
       <p class="flavors-footnote">Our selections change throughout the year. Visit the shop for ordering availability on your chosen date.</p>
       <noscript><p>Enable JavaScript to explore the flavor collection and descriptions.</p></noscript>
     </div>
   </main>
-  <footer class="site-footer"><div class="footer-inner"><a class="wordmark footer-wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home"><span class="wordmark-name">ELIO</span><span class="wordmark-description">Basque Cheesecake</span><span class="wordmark-byline">by TLB Kitchen</span></a><div><p>Burnt beautifully. Soft within.</p><a href="https://www.instagram.com/elio.cheesecakes/" target="_blank" rel="noopener noreferrer">@elio.cheesecakes<span class="sr-only"> (opens in a new tab)</span></a></div></div></footer>
+  <footer class="elio-footer">
+    <div class="elio-footer-main">
+      <div class="elio-footer-brand"><a class="wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home"><span class="wordmark-name">ELIO</span><span class="wordmark-description">Basque Cheesecake</span><span class="wordmark-byline">by TLB Kitchen</span></a><p>Burnt beautifully. Soft within.</p></div>
+      <nav class="elio-footer-links" aria-label="Explore Elio"><h2>Explore Elio</h2><a href="order.html">Shop our boxes</a><a href="flavors.html">Our flavors</a><a href="story.html">Our story</a></nav>
+      <div class="elio-footer-links"><h2>Keep in touch</h2><a href="https://www.instagram.com/elio.cheesecakes/" target="_blank" rel="noopener noreferrer">@elio.cheesecakes <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:elio.cheesecakes@gmail.com">Email us</a></div>
+    </div>
+    <div class="elio-footer-bottom"><p>© 2026 Elio · by TLB Kitchen</p><nav aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Website terms</a></nav></div>
+  </footer>
   <dialog id="flavor-dialog" aria-labelledby="dialog-title"><button class="dialog-close icon-button" type="button" aria-label="Close details"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19"/></svg></button><div id="flavor-dialog-content"></div></dialog>
 </body>
 </html>

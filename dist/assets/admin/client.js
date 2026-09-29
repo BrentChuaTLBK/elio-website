@@ -137,16 +137,17 @@ export async function calendarConnection(action, payload = {}) {
 
 export async function upload(file, { kind = 'proof', order_id, token, payment_reference } = {}) {
   if (!(file instanceof File) || !file.size) throw new Error('Choose a photo to upload.');
-  if (kind === 'product') {
+  if (kind === 'product' || kind === 'website') {
     const client = await connection();
     const { data: identity, error: identityError } = await client.auth.getUser();
-    if (identityError || !identity.user) throw new Error('Sign in as an owner to upload product photos.');
+    if (identityError || !identity.user) throw new Error('Sign in as an owner to upload photos.');
     file = await preparePhoto(file);
     const path = `${identity.user.id}/${crypto.randomUUID()}.webp`;
     // Storage RLS independently requires the current database-assigned owner role.
-    const { error } = await client.storage.from('product-images').upload(path, file, { contentType: file.type, upsert: false, cacheControl: '3600' });
+    const bucket = kind === 'website' ? 'website-images' : 'product-images';
+    const { error } = await client.storage.from(bucket).upload(path, file, { contentType: file.type, upsert: false, cacheControl: '3600' });
     if (error) throw new Error(error.message || 'The photo could not be uploaded.');
-    return { url: client.storage.from('product-images').getPublicUrl(path).data.publicUrl };
+    return { url: client.storage.from(bucket).getPublicUrl(path).data.publicUrl, path };
   }
   file=await preparePhoto(file,{receipt:true});
   const body = new FormData();

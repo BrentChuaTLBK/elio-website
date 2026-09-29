@@ -2,6 +2,7 @@ import {deliveryFeeSummary,separateDeliveryPaid} from '../delivery-fee.js';
 import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-mobile-audit-1';
 import {mountCalendar} from './calendar-manager.js?v=summary-1';
 import {mountMaintenance} from './maintenance-admin.js';
+import {mountWebsitePhotos} from './website-photos.js';
 import {mountAffiliates} from './affiliates-admin.js?v=mobile-audit-1';
 import {monthRange} from './accounting.js?v=shared-categories-1';
 import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';
@@ -62,6 +63,7 @@ let clearPhotoDrag = () => {};
 let catalogOrderController = null;
 let affiliatesController = null;
 let calendarController = null;
+let websitePhotosController = null;
 state.calendarFilters = {};
 const catalogScope = () => ['menus','flavors'].includes(state.view) ? 'flavors' : 'boxes';
 const areaCategories = () => state.categories.filter(c => c.scope === catalogScope());
@@ -158,7 +160,7 @@ const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,ow
 async function refresh() {
   if (!configured) return;
   const result = await api('admin_bootstrap');
-  if(!state.connected && ['#accounting','#affiliates','#maintenance'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
+  if(!state.connected && ['#accounting','#affiliates','#maintenance','#website-photos'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
   if(!state.connected && /^#calendar(?:\?|$)/.test(location.hash))state.view='calendar';
   Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
   state.promos = state.promos.filter(promo => !promo.newsletter_managed && !promo.affiliate_managed);
@@ -171,6 +173,9 @@ async function refresh() {
   render();
 }
 function render() {
+  const photosNav=$('[data-view="website-photos"]');if(photosNav)photosNav.hidden=!state.connected||state.role!=='owner';
+  if(state.view==='website-photos' && state.connected && state.role==='owner' && $('#website-photos-manager'))return;
+  websitePhotosController?.destroy();websitePhotosController=null;
   if(state.view==='calendar' && $('#order-calendar-manager') && calendarController){calendarController.refresh();return;}
   calendarController?.destroy();calendarController=null;
   const maintenanceNav=$('[data-view="maintenance"]');if(maintenanceNav)maintenanceNav.hidden=!state.connected||state.role!=='owner';
@@ -189,9 +194,10 @@ function render() {
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
   const currentPage=$('#dashboard-current-page');if(currentPage){const active=$('#admin-nav .sidebar-link.active');currentPage.textContent=active?.textContent.trim().replace(/\d+$/, '').trim()||'Overview';}
-  const views = { calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
+  const views = { 'website-photos':()=>'<div id="website-photos-manager"></div>', calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   unmountAnalyticsChart();
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
+  if(state.view==='website-photos')websitePhotosController=mountWebsitePhotos($('#website-photos-manager'),{owner:state.connected&&state.role==='owner'});
   unmountAnalyticsChart=state.view==='analytics'?mountAnalyticsChart($('#workspace')):()=>{};
   if(state.view==='calendar')calendarController=mountCalendar($('#order-calendar-manager'),{api,calendarConnection,role:state.role,connected:state.connected,openOrder,toast,esc,filters:state.calendarFilters});
   if(state.view==='maintenance')mountMaintenance($('#maintenance-manager'),{owner:state.connected&&state.role==='owner'});
@@ -784,6 +790,7 @@ function exportOrders() {
 
 document.addEventListener('click', async event => {
   const view = event.target.closest('[data-view]');
+  if(view && state.view==='website-photos' && view.dataset.view!==state.view){const manager=$('#website-photos-manager');if(manager?.dataset.busy==='true'){toast('Please wait for the photo to finish saving.');return;}if(manager?.dataset.dirty==='true'&&!await confirmDialog('Discard unsaved website photo changes?',{title:'Unsaved photos',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;}
   if(view && state.view==='maintenance' && view.dataset.view!==state.view){const manager=$('#maintenance-manager');if(manager?.dataset.busy==='true'){toast('Please wait for maintenance settings to save.');return;}if(manager?.dataset.dirty==='true'&&!await confirmDialog('Discard unsaved maintenance settings?',{title:'Unsaved maintenance settings',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;}
   if(view && state.view==='affiliates' && view.dataset.view!==state.view){
     const manager=$('#affiliates-manager');
@@ -1175,4 +1182,4 @@ async function init() {
 }
 init();
 
-window.addEventListener('beforeunload',event=>{if($('#accounting-manager')?.dataset.dirty==='true'||$('#affiliates-manager')?.dataset.dirty==='true'||$('#affiliates-manager')?.dataset.busy==='true'){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{if($('#website-photos-manager')?.dataset.dirty==='true'||$('#website-photos-manager')?.dataset.busy==='true'||$('#accounting-manager')?.dataset.dirty==='true'||$('#affiliates-manager')?.dataset.dirty==='true'||$('#affiliates-manager')?.dataset.busy==='true'){event.preventDefault();event.returnValue='';}});
