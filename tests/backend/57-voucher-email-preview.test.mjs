@@ -1,0 +1,29 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {renderNewsletterEmail} from '../../supabase/functions/_shared/newsletter-emails.ts';
+export default async function({db,check,state}){
+ const {api,ids,as,scalar}=state.h;
+ const terms={trigger:'first_completed',kind:'fixed',value:5000,min_subtotal_cents:50000,cap_cents:null,customer_limit:1,expiry_mode:'days',expiry_days:30};
+ const draft={name:'A little thank-you <script>',terms};
+ const totals=()=>scalar("select jsonb_build_object('promos',(select count(*) from elio.promos),'vouchers',(select count(*) from elio.vouchers),'emails',(select count(*) from elio.newsletter_outbox),'campaigns',(select count(*) from elio.voucher_campaigns))");
+ await check('Email preview is owner-only and validates saved or unsaved campaign terms',async()=>{
+  for(const who of [null,ids.staff,ids.customer])await assert.rejects(()=>api('voucher_email_preview',{campaign:draft},who),/owner/i);
+  await assert.rejects(()=>as(ids.owner,()=>db.query("select elio.voucher_email_preview('{}')")),/permission denied/);
+  await assert.rejects(()=>api('voucher_email_preview',{id:randomUUID()},ids.owner),/Choose a campaign/);
+  await assert.rejects(()=>api('voucher_email_preview',{campaign:{...draft,terms:{...terms,value:-1}}},ids.owner));
+  await assert.rejects(()=>api('voucher_email_preview',{campaign:{...draft,terms:{...terms,expiry_mode:'fixed',expires_at:'infinity'}}},ids.owner),/valid expiry/);
+ })();
+ await check('Email previews use the actual voucher renderer without issuing codes or changing campaigns',async()=>{
+  const saved=await api('voucher_save_campaign',{campaign:draft},ids.owner),before=await totals();
+  const sample=await api('voucher_email_preview',{id:saved.id},ids.owner);
+  assert.equal(sample.offer.code,'ELIO-PREVIEW');assert.equal(sample.subscriber.email,'preview@example.test');
+  assert.equal(sample.subject,'A little thank-you from Elio · your next-order voucher');
+  assert(Math.abs(Date.parse(sample.offer.expires_at)-Date.now()-30*86400000)<5000);
+  const rendered=renderNewsletterEmail(sample);assert.match(rendered.text,/₱50.00/);assert.match(rendered.text,/₱500.00/);assert.match(rendered.html,/&lt;script&gt;/);assert(!rendered.html.includes('<script>'));assert.match(rendered.html,/unsubscribe links are disabled/);
+  const changed={...saved,name:'Unsaved changes',terms:{...terms,kind:'percent',value:10,cap_cents:10000,min_subtotal_cents:0,expiry_mode:'fixed',expires_at:'2030-10-30T12:00:00+08:00'}};
+  const other=await api('voucher_email_preview',{campaign:changed},ids.owner),email=renderNewsletterEmail(other);
+  assert.equal(other.title,'Unsaved changes');assert.match(email.text,/10%/);assert.match(email.text,/₱100.00/);assert.match(email.text,/Oct 30, 2030, 12:00 PM/);
+  assert.equal((await api('voucher_email_preview',{id:saved.id},ids.owner)).offer.value,5000);
+  assert.deepEqual(await totals(),before);assert.equal(await scalar('select revision from elio.voucher_campaigns where id=$1',[saved.id]),1);
+ })();
+}

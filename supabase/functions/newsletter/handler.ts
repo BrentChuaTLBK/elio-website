@@ -37,6 +37,11 @@ const handlePost = endpoint(async (request, headers) => {
     } catch { throw new HttpError(400, "A valid JSON object is required."); }
   }
   const action = field(input.action, "Action", 40, true);
+  if (action === "preview_voucher") {
+    const preview = await ownerApi(request, "voucher_email_preview", { id: input.id, campaign: input.campaign });
+    const rendered = renderNewsletterEmail(preview);
+    return json({ ...rendered, subject: preview.subject, title: preview.title }, 200, headers);
+  }
   if (action === "activate_account") {
     const user_id = await verifiedUser(request, true);
     const result = await service("newsletter_activate_account", { user_id });

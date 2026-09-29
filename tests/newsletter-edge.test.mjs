@@ -20,6 +20,7 @@ globalThis.fetch=async(url,init)=>{
   if(address.endsWith('/auth/v1/user')){calls.push({auth:true});return Response.json(state.badUser?{}:{id:'11111111-1111-4111-8111-111111111111'},{status:state.badUser?401:200});}
   const action=body.p_action;calls.push({action,payload:body.p_payload,authorization:init.headers.Authorization});
   if(action==='newsletter_preview_campaign')return Response.json(state.forbidden?{error:'not owner'}:preview,{status:state.forbidden?403:200});
+  if(action==='voucher_email_preview')return Response.json(state.forbidden?{error:'not owner'}:{event_type:'newsletter_voucher',title:'A little thank-you',subject:'A little thank-you from Elio · your next-order voucher',settings,subscriber:{email:'preview@example.test'},offer:{code:'ELIO-PREVIEW',kind:'fixed',value:5000,min_subtotal_cents:50000,expires_at:'2030-10-30T04:00:00Z'}},{status:state.forbidden?403:200});
   if(action==='newsletter_subscribe')return Response.json({accepted:true,queued:!state.rateLimited,rate_limited:state.rateLimited,private:'must not escape'});
   if(action==='newsletter_confirm'||action==='newsletter_activate_account')return Response.json({status:'subscribed',private:'must not escape'});
   if(action==='newsletter_unsubscribe')return Response.json({status:'unsubscribed'});
@@ -40,6 +41,12 @@ const request=(payload,extra={})=>new Request('https://elio.example.test/functio
 const subscribe={action:'subscribe',email:'Reader@Example.test',source:'home_popup',consent:true};
 async function check(name,fn){calls=[];sends=[];state={};prepared=null;await fn();checks++;console.log('PASS '+name);}
 try{
+  await check('Voucher previews require owner authorization, render real email content and never send',async()=>{
+   assert.equal((await handle(request({action:'preview_voucher',id:'sample'}))).status,401);
+   state.forbidden=true;assert.equal((await handle(request({action:'preview_voucher',id:'sample'},{authorization:'Bearer test-token'}))).status,403);
+   state.forbidden=false;const response=await handle(request({action:'preview_voucher',campaign:{name:'Unsaved'}},{authorization:'Bearer test-token'}));
+   assert.equal(response.status,200);const rendered=await response.json();assert.match(rendered.html,/ELIO-PREVIEW/);assert.match(rendered.text,/₱50.00/);assert.match(rendered.subject,/thank-you/);assert.equal(sends.length,0);assert(calls.filter(c=>c.action).every(c=>c.action==='voucher_email_preview'));
+  });
   await check('GET links only open an explicit website control and never change consent',async()=>{const response=await handle(new Request('https://elio.example.test/functions/v1/newsletter?action=unsubscribe&token='+unsub));assert.equal(response.status,303);assert.equal(response.headers.get('Location'),'https://eliocheesecakes.com/newsletter.html#unsubscribe='+unsub);assert.equal((await handle(new Request('https://elio.example.test/functions/v1/newsletter?action=confirm&token='+secret))).status,405);assert.equal(calls.length,0);});
   await check('Cross-origin requests are rejected and trusted preflight succeeds',async()=>{assert.equal((await handle(new Request('https://elio.example.test/functions/v1/newsletter',{method:'OPTIONS',headers:{Origin:'https://bad.example'}}))).status,403);assert.equal((await handle(new Request('https://elio.example.test/functions/v1/newsletter',{method:'OPTIONS',headers:{Origin:'https://eliocheesecakes.com'}}))).status,204);assert.equal(calls.length,0);});
   await check('Consent and email validation happen before enqueueing',async()=>{assert.equal((await handle(request({...subscribe,consent:false}))).status,400);assert.equal((await handle(request({...subscribe,email:'bad'}))).status,400);assert.equal(calls.length,0);});

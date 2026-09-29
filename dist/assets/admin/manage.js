@@ -3,7 +3,7 @@ import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?
 import {mountCalendar} from './calendar-manager.js?v=summary-1';
 import {mountMaintenance} from './maintenance-admin.js?v=completed-status-1';
 import {mountWebsitePhotos} from './website-photos.js';
-import {mountVoucherCampaigns} from './voucher-campaigns.js';
+import {mountVoucherCampaigns} from './voucher-campaigns.js?v=email-preview-1';
 import {mountAffiliates} from './affiliates-admin.js?v=mobile-audit-1';
 import {monthRange} from './accounting.js?v=shared-categories-1';
 import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';

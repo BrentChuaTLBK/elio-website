@@ -30,3 +30,7 @@ All tables and the invoker view are private with RLS and direct grants revoked. 
 - Browser campaign creation/activation/reporting and wallet checks at 1440, 390 and 320 pixels; real local Postgres-compatible API responses.
 - Existing checkout, calculation, stock, receipt conversion and payment approval tests, including fragment voucher links.
 - Mocked email worker sender separation, rendering, unsubscribe headers and frozen retry payloads. No production customers are contacted by these tests.
+
+## Email preview
+
+Campaign cards and editors provide an owner-only email preview using the actual sending renderer. Saved campaigns load current terms; editor previews use unsaved form values without saving or activating anything. Samples use ELIO-PREVIEW and preview@example.test. Relative expiry assumes issue at preview time; fixed expiry uses the chosen Manila instant. Desktop, mobile and plain-text views show the same subject and offer content. Links are inert, HTML is sandboxed, and preview creates no voucher, outbox row or delivery request.
