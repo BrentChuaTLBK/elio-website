@@ -18,3 +18,14 @@
 .customer-account-page #account-newsletter .elio-newsletter-consent{font-size:12px}.customer-account-page #account-newsletter input{cursor:pointer}.customer-account-page #account-newsletter .elio-newsletter-links{margin-left:26px}
 .newsletter-page{margin:0;background:#f8f3ea;color:#3d251c}.newsletter-page-header{background:#3d251c;padding:26px 24px;text-align:center}.newsletter-page-header a{display:inline-block;color:#ddb57d;font:38px/1 Georgia,serif;letter-spacing:5px;text-decoration:none}.newsletter-page-header small{display:block;font:9px/1.5 Arial,sans-serif;letter-spacing:2px;margin-top:9px}.newsletter-page main{width:min(760px,calc(100% - 32px));margin:32px auto 50px}.newsletter-page section{padding:30px;background:#fffcf6;border:1px solid #d9cbbb;margin-bottom:22px}.newsletter-page h1,.newsletter-page h2{font:400 36px/1.15 var(--serif,Georgia,serif);margin:0 0 16px}.newsletter-page h2{font-size:29px}.newsletter-page p{font:14px/1.7 Arial,sans-serif;margin:0 0 16px}.newsletter-page [hidden]{display:none!important}.newsletter-page .elio-newsletter-submit{width:auto;min-width:180px}.newsletter-information{scroll-margin-top:20px}.newsletter-page footer{padding:0 24px 30px;text-align:center;font:13px/1.6 Arial,sans-serif}.newsletter-page footer a{text-decoration:underline}
 @media(max-width:620px){.elio-newsletter-layout{grid-template-columns:1fr}.elio-newsletter-photo{height:130px}.elio-newsletter-photo img{height:100%;min-height:0;object-position:center 56%}.elio-newsletter-copy{padding:24px 22px}.elio-newsletter-copy h2{font-size:38px}.elio-newsletter-copy .elio-newsletter-offer{font-size:27px}.elio-newsletter-offer>span:first-child{font-size:21px}.elio-newsletter-offer>strong{font-size:46px}.elio-newsletter-intro{font-size:14px;margin-bottom:16px}.elio-newsletter-copy h2 br{display:none}.elio-newsletter-terms{font-size:10px}.newsletter-page main{margin-top:20px}.newsletter-page section{padding:24px 20px}.newsletter-page h1{font-size:32px}}
+/* Optional checkout signup is independent of ordering. */
+#checkout-newsletter{margin:8px 0 22px;padding:18px;border:1px solid #dfd1bd;border-radius:10px;background:#f7f0e4}
+.checkout-newsletter-choice{display:flex;align-items:flex-start;gap:12px;cursor:pointer}
+.checkout-newsletter-choice input{flex:0 0 auto;width:18px;height:18px;margin:2px 0 0;accent-color:#78502b}
+.checkout-newsletter-choice span{min-width:0}
+.checkout-newsletter-choice strong{display:block;font-size:13px;line-height:1.5}
+.checkout-newsletter-choice small{display:block;margin-top:3px;font-size:12px;line-height:1.6}
+#checkout-newsletter p{margin:10px 0 0;font-size:12px;line-height:1.65;overflow-wrap:anywhere}
+#checkout-newsletter .checkout-newsletter-terms{font-size:11px;color:#786858}
+#checkout-newsletter a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+#checkout-newsletter-status:empty{display:none}

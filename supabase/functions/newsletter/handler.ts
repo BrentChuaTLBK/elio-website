@@ -60,7 +60,7 @@ const handlePost = endpoint(async (request, headers) => {
     const email = field(input.email, "Email address", 254, true).toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || /[\u0000-\u001f\u007f]/.test(email)) throw new HttpError(400, "Enter a valid email address.");
     const source = field(input.source, "Signup source", 30, true);
-    if (!["home_popup", "home_footer", "account"].includes(source)) throw new HttpError(400, "Invalid signup source.");
+    if (!["home_popup", "home_footer", "account", "checkout"].includes(source)) throw new HttpError(400, "Invalid signup source.");
     const result = await service("newsletter_subscribe", { email, source, ip_hash, consent: true, consent_version: "elio-newsletter-v2-single-opt-in" });
     if (result?.rate_limited) throw new HttpError(429, "Please wait a moment before trying to join again.");
     // Do not reveal whether an email is pending, confirmed, suppressed, or unknown.

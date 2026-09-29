@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="assets/admin/elio.css">
   <link rel="stylesheet" href="assets/admin/account.css">
   <link rel="stylesheet" href="assets/shop/newsletter.css">
+  <link rel="stylesheet" href="assets/vouchers.css">
 <link rel="stylesheet" href="assets/site-maintenance.css?v=maintenance-2"><script type="module" src="assets/site-maintenance.js?v=maintenance-2"></script>
 </head>
 <body data-account-context="customer" class="customer-account-page">
@@ -54,9 +55,10 @@
     <div id="signed-in" hidden>
       <div class="account-welcome"><div><p class="eyebrow">Your little corner</p><h1>Welcome back</h1><p class="account-identity"><span id="account-email"></span><span class="badge" id="account-verification"></span></p></div><div class="account-dashboard-actions"><a class="button account-shop-link" href="order.html">Continue to your order</a><a class="button button-secondary" id="affiliate-dashboard" href="affiliate.html" hidden>Affiliate dashboard</a><a class="button button-secondary" id="staff-dashboard" href="manage.html" hidden>Staff dashboard</a><button class="button button-secondary" id="account-signout">Sign out</button></div></div>
       <section id="account-orders" aria-label="Your orders" aria-live="polite"></section>
+      <section id="account-vouchers" aria-label="My vouchers"></section>
       <section class="panel account-email-preferences" aria-labelledby="email-preferences-heading"><h2 id="email-preferences-heading">Email preferences</h2><p>Choose whether to receive the Elio Newsletter. Your order and payment emails stay on.</p><form id="email-preference-form"><label class="account-preference-choice"><input type="checkbox" name="subscribed" disabled><span>Subscribe to the Elio Newsletter<small id="email-preference-offer">Receive Elio news, special offers, and exclusive promo codes. Unsubscribe anytime.</small></span></label><p id="email-preference-status" class="muted" role="status" aria-live="polite">Loading your preference…</p><button class="button" type="submit" disabled>Save email preference</button><button class="button button-secondary" type="button" id="email-preference-retry" hidden>Try again</button></form></section>
     </div>
   </main>
-  <script type="module" src="assets/admin/account.js"></script>
+  <script type="module" src="assets/admin/account.js?v=vouchers-1"></script>
 </body>
 </html>

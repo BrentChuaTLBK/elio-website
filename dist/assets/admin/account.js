@@ -103,6 +103,7 @@ if (newsletterChoice) newsletterModule.then(module => module.getNewsletterSettin
   field.hidden = mode !== 'signup' || !settings;
 });
 
+let voucherController=null;
 async function loadOrders() {
   const section = document.querySelector('#account-orders');
   if (!section) return;
@@ -144,7 +145,7 @@ preferences?.addEventListener('submit',async e=>{
  try{
   const settings=await api('newsletter_account_preference',{subscribed:preferences.elements.subscribed.checked});
   if(accountSession?.user.id!==id)return;
-  showEmailPreference(settings);(await newsletterModule).rememberNewsletterOptIn();
+  showEmailPreference(settings);voucherController?.refresh();const newsletter=await newsletterModule;newsletter.rememberNewsletterOptIn();if(settings.own_status==='subscribed')await newsletter.rememberNewsletterEmail(accountSession.user.email);else await newsletter.forgetNewsletterEmail(accountSession.user.email);
  }catch(error){if(accountSession?.user.id===id){document.querySelector('#email-preference-status').textContent=error.message||'Your preference could not be saved. Please try again.';button.disabled=false;preferences.elements.subscribed.disabled=false;}}
 });
 
@@ -358,7 +359,9 @@ else if (auth) {
       document.querySelector('#main').append(document.querySelector('.account-policy-links'));
       document.querySelector('#account-email').textContent=data.session.user.email;
       document.querySelector('#account-verification').textContent=data.session.user.email_confirmed_at?'Email verified':'Email not verified';
-      loadOrders();finishOAuthNewsletterConsent(data.session).then(async handled=>{if(!handled)await activateNewsletter(data.session);await loadEmailPreference();});
+      loadOrders();
+      import('./vouchers.js').then(({mountVouchers})=>{if(accountSession?.user.id===data.session.user.id)voucherController=mountVouchers(document.querySelector('#account-vouchers'));});
+      finishOAuthNewsletterConsent(data.session).then(async handled=>{if(!handled)await activateNewsletter(data.session);await loadEmailPreference();voucherController?.refresh();});
     }
     const dashboardLink = document.querySelector('#staff-dashboard');
     const affiliateLink = document.querySelector('#affiliate-dashboard');
@@ -378,4 +381,4 @@ else if (auth) {
     }
   }
 }
-auth?.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){accountSession=null;ordersRequest++;document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();message('You have signed out. Sign in again to view your account.');}});
+auth?.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){accountSession=null;ordersRequest++;voucherController?.destroy();voucherController=null;document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();message('You have signed out. Sign in again to view your account.');}});

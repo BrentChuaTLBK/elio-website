@@ -67,8 +67,8 @@ export default async function({db,check,state}) {
   await db.query("update elio.orders set refund_label=false,fulfillment_status='cancelled' where id=$1",[order.id]);assert.equal((await row()).desired,null);
   // Delete the isolated fixture's dependent history before its order; the sync
   // queue deliberately has no FK and must survive this explicit cleanup.
-  const dependencies=(await db.query("select conrelid::regclass::text as name from pg_constraint where contype='f' and confrelid='elio.orders'::regclass")).rows;
-  for(const {name} of dependencies)await db.query(`delete from ${name} where order_id=$1`,[order.id]);
+  const dependencies=(await db.query("select c.conrelid::regclass::text as name,a.attname as column from pg_constraint c join pg_attribute a on a.attrelid=c.conrelid and a.attnum=c.conkey[1] where c.contype='f' and c.confrelid='elio.orders'::regclass")).rows;
+  for(const {name,column} of dependencies)await db.query(`delete from ${name} where "${column}"=$1`,[order.id]);
   await db.query('delete from elio.orders where id=$1',[order.id]);assert.equal((await row()).desired,null);
   for(const role of ['anon','authenticated','service_role'])assert.equal(await h.scalar("select has_function_privilege($1,'elio.delete_product(jsonb)','execute')",[role]),false);
  })();

@@ -55,6 +55,21 @@ export function renderNewsletterEmail(payload: any): { html: string; text: strin
       + emailPanel("A little something for your next box", `<p style="margin:0 0 10px;font:32px/1.2 Georgia,serif;color:#63412d">${e(offer.value)}% off</p><p style="margin:0 0 16px;font:bold 27px/1.4 Arial,sans-serif;letter-spacing:4px;color:#39251c">${e(offer.code)}</p><p style="margin:0;font-size:13px;line-height:1.8">${e(terms)}</p>`, "sand")
       + emailButton("Explore our boxes", shop);
     plain = `${heading}\n\n${intro}\n\nYour personal code: ${offer.code}\n\n${terms}\n\nExplore our boxes:\n${shop}`;
+  } else if (payload.event_type === "newsletter_voucher") {
+    const offer = payload.offer;
+    if (!offer?.code || !["fixed", "percent"].includes(offer.kind) || !Number.isFinite(Date.parse(offer.expires_at)) || !(Number(offer.value) > 0)) throw new Error("Voucher email is incomplete.");
+    const saving = offer.kind === "fixed" ? money(offer.value) : `${Number(offer.value)}%`;
+    heading = `${saving} off your next order.`;
+    subject = "A little thank-you from Elio";
+    intro = "Your order is complete. Thank you for ordering with Elio—we hope you enjoyed every bite. Here’s a little treat for your next order.";
+    const expiry = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date(offer.expires_at));
+    const terms = `Minimum product spend: ${money(offer.min_subtotal_cents)}.${offer.kind === "percent" ? ` Maximum discount: ${money(offer.cap_cents)}.` : ""} Valid until ${expiry} (Manila time). One use on a website order. Sign in to your Elio account. If you checked out as a guest, create and verify an account using ${payload.subscriber.email}. Delivery is excluded. One promo code per order.`;
+    const account = new URL("account.html#account-vouchers", site).toString();
+    body = emailIntro("A little thank-you from Elio", heading, intro)
+      + emailPanel(String(payload.title || "Your next-order voucher"), `<p style="margin:0 0 16px;font:bold 26px/1.4 Arial,sans-serif;letter-spacing:2px;overflow-wrap:anywhere;color:#39251c">${e(offer.code)}</p><p style="margin:0;font-size:13px;line-height:1.8">${e(terms)}</p>`, "sand")
+      + emailButton("View my vouchers", account)
+      + `<p style="font-size:13px;color:#786858">Your voucher is saved in My vouchers, so you can find it again when you’re ready to order.</p>`;
+    plain = `${heading}\n\n${intro}\n\n${payload.title || "Your voucher"}\nCode: ${offer.code}\n\n${terms}\n\nView my vouchers:\n${account}`;
   } else if (payload.event_type === "newsletter_welcome_back") {
     heading = "Welcome back.";
     subject = "Welcome back to the Elio Newsletter";

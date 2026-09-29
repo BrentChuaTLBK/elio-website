@@ -26,6 +26,7 @@ try{
     if(action==='site_status')data={active:false,uploads_paused:false,announce:false,server_time:new Date().toISOString()};
     else if(action==='newsletter_settings')data=settings();
     else if(action==='newsletter_account_preference'){if(failSave)return route.fulfill({status:400,contentType:'application/json',body:'{"error":"Please try again."}'});subscribed=payload.subscribed;data=settings();}
+    else if(action==='my_vouchers')data={vouchers:[],total:0,offset:0,limit:50,counts:{available:0,used:0,expired:0}};
     else if(action==='account_access')data={role:'owner'};
     else if(action==='affiliate_status')data={assigned:true};
     else if(action==='my_orders')data=showOrder?[{id:'order-1',reference:'ELIO-TEST01',fulfillment_date:'2026-09-30',method:'pickup',payment_status:'awaiting_payment',total_cents:95000}]:[];
@@ -49,7 +50,7 @@ try{
   showOrder=true;await page.locator('[data-orders-refresh]').click();await page.getByText('ELIO-TEST01',{exact:true}).waitFor();assert.match(await page.locator('.account-order').textContent(),/₱950.00.*awaiting payment/);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.goto(origin+'/account.html?guest');await page.getByRole('heading',{name:'Sign in to Elio.',exact:true}).waitFor();assert.equal(await page.locator('#signed-in').isVisible(),false);await page.locator('#account-reset').click();await page.getByRole('heading',{name:'Reset your password.',exact:true}).waitFor();assert.equal(await page.locator('#password-field').isVisible(),false);
-  await page.goto(origin+'/manage.html');await page.locator('[data-view=promos]').click();await page.waitForFunction(()=>document.querySelector('.newsletter-conversion-metrics strong')?.textContent==='4');
+  await page.goto(origin+'/manage.html');if(width<=760)await page.locator('#dashboard-navigation > summary').click();await page.locator('[data-view=promos]').click();await page.waitForFunction(()=>document.querySelector('.newsletter-conversion-metrics strong')?.textContent==='4');
   assert.equal(await page.locator('.newsletter-conversion-metrics .panel').count(),3);assert.deepEqual(await page.locator('.newsletter-conversion-metrics span').allTextContents(),['Issued','Expired','Converted to a sale']);
   assert.equal(await page.locator('.newsletter-code-details').evaluate(el=>el.open),false);await page.locator('.newsletter-code-details summary').click();
   assert.equal(await page.locator('[name=discount_percent]').inputValue(),'5');

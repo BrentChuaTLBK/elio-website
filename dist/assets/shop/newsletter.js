@@ -8,6 +8,27 @@ const acceptedMessage = 'Welcome to the Elio Newsletter. Look forward to flavor 
 let settingsPromise, activeSettings, memoryState, refreshPopup = () => {};
 let settingsVersion = 0;
 
+// Browser hints hide repeat invitations only; the server remains authoritative.
+// Store hashes, not email addresses, and keep only recent explicit signups.
+const joinedEmailsKey = 'elio-newsletter-joined-emails-v1';
+async function emailFingerprint(email) {
+ const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(email).trim().toLowerCase()));
+ return Array.from(new Uint8Array(bytes), n => n.toString(16).padStart(2, '0')).join('');
+}
+function joinedEmails() {
+ try { return JSON.parse(localStorage.getItem(joinedEmailsKey) || '[]').filter(row => typeof row?.hash === 'string' && Date.now()-row.at < 180*86400000).slice(-5); }
+ catch { return []; }
+}
+export async function rememberNewsletterEmail(email) {
+ try { const hash=await emailFingerprint(email);localStorage.setItem(joinedEmailsKey,JSON.stringify([...joinedEmails().filter(row=>row.hash!==hash),{hash,at:Date.now()}].slice(-5))); } catch { /* Signup still succeeds without browser storage. */ }
+}
+export async function newsletterEmailKnown(email) {
+ try { const hash=await emailFingerprint(email);return joinedEmails().some(row=>row.hash===hash); } catch { return false; }
+}
+export async function forgetNewsletterEmail(email) {
+ try { if(!email){localStorage.removeItem(joinedEmailsKey);return;}const hash=await emailFingerprint(email);localStorage.setItem(joinedEmailsKey,JSON.stringify(joinedEmails().filter(row=>row.hash!==hash))); } catch { /* Browser hints are optional. */ }
+}
+
 function updateOfferCopy(settings) {
   const offer = newsletterOffer(settings);
   document.querySelectorAll('#newsletter-title strong, .elio-newsletter-offer strong').forEach(node => { node.textContent = `${offer.discount_percent}% OFF`; });
@@ -50,6 +71,7 @@ export async function activateAccountNewsletter() {
 export async function subscribeNewsletter(email, source, website = '') {
   const result = await newsletterRequest({ action: 'subscribe', email: email.trim(), source, consent: true, website });
   if (result?.accepted !== true) throw new Error('We couldn’t finish your request. Please try again.');
+  await rememberNewsletterEmail(email);
   rememberNewsletterOptIn();
   return acceptedMessage;
 }
@@ -182,6 +204,7 @@ function initializeTokenPage() {
       if (result?.status !== (confirm ? 'subscribed' : 'unsubscribed')) throw new Error('We couldn’t update your subscription. Please try again.');
       title.textContent = confirm ? 'You’re on the list.' : 'You’re unsubscribed.';
       description.textContent = confirm ? 'Thanks for joining the Elio Newsletter. If eligible, your personal welcome code will arrive by email. Use it with an email-verified Elio account under the same email address.' : 'You won’t receive Elio’s newsletter updates or offers. Account and order emails are unchanged.';
+      if(!confirm)void forgetNewsletterEmail();
       status.textContent = confirm ? 'Your subscription is confirmed.' : 'Your newsletter preference is saved.';button.hidden = true;rememberPopup('submitted');
       history.replaceState(null, '', location.pathname + (confirm ? '#confirmed' : '#unsubscribed'));
     } catch (error) { status.textContent = error.message || 'This link couldn’t be used. Please try again or request a new confirmation below.';button.disabled = false;button.textContent = label; }

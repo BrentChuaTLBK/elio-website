@@ -3,6 +3,7 @@ import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?
 import {mountCalendar} from './calendar-manager.js?v=summary-1';
 import {mountMaintenance} from './maintenance-admin.js?v=completed-status-1';
 import {mountWebsitePhotos} from './website-photos.js';
+import {mountVoucherCampaigns} from './voucher-campaigns.js';
 import {mountAffiliates} from './affiliates-admin.js?v=mobile-audit-1';
 import {monthRange} from './accounting.js?v=shared-categories-1';
 import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';
@@ -65,6 +66,7 @@ let affiliatesController = null;
 let calendarController = null;
 let websitePhotosController = null;
 let maintenanceController = null;
+let voucherCampaignsController = null;
 state.calendarFilters = {};
 const catalogScope = () => ['menus','flavors'].includes(state.view) ? 'flavors' : 'boxes';
 const areaCategories = () => state.categories.filter(c => c.scope === catalogScope());
@@ -174,6 +176,9 @@ async function refresh() {
   render();
 }
 function render() {
+  const offersNav=$('[data-view="offers"]');if(offersNav)offersNav.hidden=!state.connected||state.role!=='owner';
+  if(state.view==='offers' && state.connected && state.role==='owner' && $('#voucher-campaigns-manager'))return;
+  voucherCampaignsController?.destroy();voucherCampaignsController=null;
   if(state.view!=='maintenance' || !state.connected || state.role!=='owner'){maintenanceController?.destroy();maintenanceController=null;}
   const photosNav=$('[data-view="website-photos"]');if(photosNav)photosNav.hidden=!state.connected||state.role!=='owner';
   if(state.view==='website-photos' && state.connected && state.role==='owner' && $('#website-photos-manager'))return;
@@ -196,9 +201,10 @@ function render() {
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
   const currentPage=$('#dashboard-current-page');if(currentPage){const active=$('#admin-nav .sidebar-link.active');currentPage.textContent=active?.textContent.trim().replace(/\d+$/, '').trim()||'Overview';}
-  const views = { 'website-photos':()=>'<div id="website-photos-manager"></div>', calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
+  const views = { offers:()=>'<div id="voucher-campaigns-manager"></div>', 'website-photos':()=>'<div id="website-photos-manager"></div>', calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   unmountAnalyticsChart();
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
+  if(state.view==='offers')voucherCampaignsController=mountVoucherCampaigns($('#voucher-campaigns-manager'),{owner:state.connected&&state.role==='owner'});
   if(state.view==='website-photos')websitePhotosController=mountWebsitePhotos($('#website-photos-manager'),{owner:state.connected&&state.role==='owner'});
   unmountAnalyticsChart=state.view==='analytics'?mountAnalyticsChart($('#workspace')):()=>{};
   if(state.view==='calendar')calendarController=mountCalendar($('#order-calendar-manager'),{api,calendarConnection,role:state.role,connected:state.connected,openOrder,toast,esc,filters:state.calendarFilters});
