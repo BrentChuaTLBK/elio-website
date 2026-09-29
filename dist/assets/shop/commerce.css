@@ -290,3 +290,17 @@ dialog.elio-commerce::backdrop{background: rgba(36, 26, 20, 0.42); backdrop-filt
 @media (max-width: 380px) {:where(.elio-commerce) .option-choice{gap: 8px;}
 :where(.elio-commerce) .option-choice-controls{flex-direction: column; gap: 3px; align-items: flex-end;}}
 :where(.elio-commerce) .product-description{white-space: pre-wrap; overflow-wrap: anywhere;}
+
+/* Receipt feedback follows actual image preparation and server receipt. */
+:where(.elio-commerce) .receipt-progress{margin:18px 0 12px}
+:where(.elio-commerce) .receipt-progress-title{display:flex;align-items:center;gap:10px;font-size:13px}
+:where(.elio-commerce) .receipt-progress p,:where(.elio-commerce) .receipt-upload-error p{margin:6px 0 0;font-size:12px;line-height:1.65;overflow-wrap:anywhere}
+:where(.elio-commerce) .receipt-upload-error>strong{font-size:13px}
+:where(.elio-commerce) .receipt-steps{display:flex;flex-wrap:wrap;gap:12px;border-top:1px solid var(--line);margin-top:14px;padding-top:12px;font-size:10px;color:var(--muted)}
+:where(.elio-commerce) .receipt-steps span:before{content:'○';margin-right:5px}
+:where(.elio-commerce) .receipt-steps .active{font-weight:700;color:var(--ink)}
+:where(.elio-commerce) .receipt-steps .active:before{content:'●'}
+:where(.elio-commerce) .receipt-steps .done:before{content:'✓'}
+:where(.elio-commerce) .receipt-spinner{width:13px;height:13px;flex:0 0 13px;border:2px solid #d7c3aa;border-top-color:#765030;border-radius:50%;animation:receipt-spin 1s linear infinite}
+@keyframes receipt-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){:where(.elio-commerce) .receipt-spinner{animation:none}}

@@ -44,10 +44,12 @@ export default async function({db,check,state}){
   source=await create();assert.equal((await stats(campaign.id)).issued,undefined);
   source=await pay(source);assert.equal((await wallet()).vouchers.length,1);
   source=await complete(source);voucher=(await wallet()).vouchers.find(v=>v.source==='order');assert(voucher);
+  for(const offer of [welcome,voucher]){assert.match(offer.code,/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);assert.match(offer.code,/[A-Z]/);assert.match(offer.code,/[2-9]/);}
   assert.equal(voucher.value,5000);assert.equal(voucher.title,'A little thank-you');
   assert.equal((await stats(campaign.id)).issued,1);
   assert.equal(await scalar('select subject from elio.newsletter_outbox where voucher_id=$1',[voucher.id]),'Your next Elio treat is on us 🍰');
   const message=await scalar('select payload from elio.newsletter_outbox where voucher_id=$1',[voucher.id]);
+  assert.equal(message.offer.code,voucher.code);
   assert.equal(message.email_copy.eyebrow,'Baked with care');assert.equal(message.email_copy.message,'Thank you! Enjoy {{discount}} next time.');
   const rendered=renderNewsletterEmail(message);assert.match(rendered.text,/₱50.00 off your next order/);assert.match(rendered.text,/₱500.00/);assert.match(rendered.html,/View my vouchers/);assert.match(rendered.text,/Manila time/);assert.match(rendered.text,/Unsubscribe/);
   assert(newsletterHeaders(message,'https://example.supabase.co')['List-Unsubscribe-Post']);

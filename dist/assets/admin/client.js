@@ -135,7 +135,7 @@ export async function calendarConnection(action, payload = {}) {
   return edge('calendar-sync', { ...payload, action });
 }
 
-export async function upload(file, { kind = 'proof', order_id, token, payment_reference } = {}) {
+export async function upload(file, { kind = 'proof', order_id, token, payment_reference, onProgress } = {}) {
   if (!(file instanceof File) || !file.size) throw new Error('Choose a photo to upload.');
   if (kind === 'product' || kind === 'website') {
     const client = await connection();
@@ -149,6 +149,7 @@ export async function upload(file, { kind = 'proof', order_id, token, payment_re
     if (error) throw new Error(error.message || 'The photo could not be uploaded.');
     return { url: client.storage.from(bucket).getPublicUrl(path).data.publicUrl, path };
   }
+  if(typeof onProgress==='function')onProgress('preparing');
   file=await preparePhoto(file,{receipt:true});
   const body = new FormData();
   body.set('file', file);
@@ -156,6 +157,7 @@ export async function upload(file, { kind = 'proof', order_id, token, payment_re
   if (order_id) body.set('order_id', order_id);
   if (token) body.set('token', token);
   if (payment_reference) body.set('payment_reference', payment_reference.trim());
+  if(typeof onProgress==='function')onProgress('uploading');
   return edge('proof-upload', body);
 }
 

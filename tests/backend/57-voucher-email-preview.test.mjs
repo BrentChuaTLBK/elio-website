@@ -31,7 +31,7 @@ export default async function({db,check,state}){
   let saved=await save({...draft,email_copy:copy});assert.deepEqual(saved.email_copy,copy);
   const sample=await api('voucher_email_preview',{id:saved.id},ids.owner),rendered=renderNewsletterEmail(sample);
   assert.match(rendered.html,/For our Elio friends/);assert.match(rendered.html,/Enjoy ₱50.00 — &lt;sweet&gt;!/);assert.match(rendered.html,/Elio.<br>Enjoy ₱50.00/);assert.match(rendered.html,/&lt;script&gt;/);assert(!rendered.html.includes('<script>'));
-  assert.match(rendered.text,/\n\n<script>Keep this as text<\/script>/);assert.match(rendered.text,/Minimum product spend: ₱500.00/);assert.match(rendered.text,/ELIO-PREVIEW/);
+  assert.match(rendered.text,/\n\n<script>Keep this as text<\/script>/);assert.match(rendered.text,/Minimum product spend: ₱500.00/);assert.match(rendered.text,/K7M4Q2/);
   const customized=await api('voucher_email_preview',{campaign:{...saved,email_copy:{...copy,heading:'A gift for you'},terms:{...terms,kind:'percent',value:10,cap_cents:10000}}},ids.owner);
   assert.match(renderNewsletterEmail(customized).text,/10% off products/);assert.match(renderNewsletterEmail(customized).text,/Maximum discount: ₱100.00/);
   const oldClient={...saved};delete oldClient.email_copy;saved=await save(oldClient);assert.deepEqual(saved.email_copy,copy);
@@ -48,7 +48,7 @@ export default async function({db,check,state}){
  await check('Email previews use the actual voucher renderer without issuing codes or changing campaigns',async()=>{
   const saved=await api('voucher_save_campaign',{campaign:draft},ids.owner),before=await totals();
   const sample=await api('voucher_email_preview',{id:saved.id},ids.owner);
-  assert.equal(sample.offer.code,'ELIO-PREVIEW');assert.equal(sample.subscriber.email,'preview@example.test');
+  assert.equal(sample.offer.code,'K7M4Q2');assert.equal(sample.subscriber.email,'preview@example.test');
   assert.equal(sample.subject,'A little thank-you from Elio · your next-order voucher');
   assert(Math.abs(Date.parse(sample.offer.expires_at)-Date.now()-30*86400000)<5000);
   const rendered=renderNewsletterEmail(sample);assert.match(rendered.text,/₱50.00/);assert.match(rendered.text,/₱500.00/);assert.match(rendered.html,/&lt;script&gt;/);assert(!rendered.html.includes('<script>'));assert.match(rendered.html,/unsubscribe links are disabled/);
