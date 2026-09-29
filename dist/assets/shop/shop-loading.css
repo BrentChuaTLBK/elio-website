@@ -1,0 +1,11 @@
+/* Initial catalog placeholders share the real shop's responsive grid and media ratio. */
+.shop-loading .elio-product-card{pointer-events:none;transition:none}
+.shop-loading .elio-product-media,.shop-loading-line{background:#e9dece}
+.shop-loading-line{display:block;height:11px;width:90%;max-width:100%;border-radius:3px;margin:5px 0 10px}
+.shop-loading-title{height:21px;width:70%;margin:0 0 12px}
+.shop-loading-short{width:66%}
+.shop-loading-price{width:34%;height:17px;margin-top:30px;margin-bottom:25px}
+.shop-loading-date{width:145px;height:16px;margin:3px 0}
+.shop-loading-basket{min-height:262px;padding:38px 0 18px}
+.shop-loading-action{width:100%;height:44px;margin-top:60px}
+@media(max-width:720px){.shop-loading-date-field{grid-column:1/-1;min-width:0}}

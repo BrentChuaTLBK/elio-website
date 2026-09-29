@@ -22,6 +22,7 @@
 
 <link rel="stylesheet" href="assets/shop/commerce.css"><link rel="stylesheet" href="assets/shop/customer-calendar.css"><link rel="stylesheet" href="assets/shop/elio-commerce.css"><script type="module" src="assets/shop/shop.js?v=vouchers-1"></script>
 <link rel="stylesheet" href="assets/quantity-stepper.css">
+<link rel="stylesheet" href="assets/shop/shop-loading.css?v=1">
 <script type="module" src="assets/quantity-stepper.js"></script>
 <script type="module" src="assets/shop/faqs.js"></script>
 <link rel="stylesheet" href="assets/shop/newsletter.css">
@@ -45,7 +46,24 @@
     </section>
     <div class="shop-shell">
       <nav class="shop-breadcrumb" aria-label="Breadcrumb"><a href="index.html">Home</a><span aria-hidden="true">/</span><span aria-current="page">Shop</span></nav>
-      <div id="app" class="elio-commerce"><p role="status">Loading the shop…</p><noscript><p>Enable JavaScript to choose a date, add boxes to your basket, and check out.</p></noscript></div>
+      <div id="app" class="elio-commerce" aria-busy="true">
+        <div class="shop-loading">
+          <p class="sr-only" role="status">Loading the shop…</p>
+          <div aria-hidden="true" inert>
+            <div class="fulfillment-bar"><div class="date-field"><span>When is your Elio day?</span><div class="shop-loading-date-field"><div class="customer-calendar-trigger"><span class="shop-loading-line shop-loading-date"></span></div></div></div><div class="method-toggle"><button type="button" disabled>Pickup</button><button type="button" disabled>Delivery</button></div></div>
+            <div class="shop-layout">
+              <section><div class="section-heading"><h2>Our Cheesecake Boxes</h2><span class="muted">A box for every craving.</span></div><div class="product-grid">
+                <div class="elio-product-card"><div class="elio-product-media"></div><div class="elio-product-copy"><span class="shop-loading-line shop-loading-title"></span><span class="shop-loading-line"></span><span class="shop-loading-line shop-loading-short"></span><span class="shop-loading-line shop-loading-price"></span></div></div>
+                <div class="elio-product-card"><div class="elio-product-media"></div><div class="elio-product-copy"><span class="shop-loading-line shop-loading-title"></span><span class="shop-loading-line"></span><span class="shop-loading-line shop-loading-short"></span><span class="shop-loading-line shop-loading-price"></span></div></div>
+                <div class="elio-product-card"><div class="elio-product-media"></div><div class="elio-product-copy"><span class="shop-loading-line shop-loading-title"></span><span class="shop-loading-line"></span><span class="shop-loading-line shop-loading-short"></span><span class="shop-loading-line shop-loading-price"></span></div></div>
+                <div class="elio-product-card"><div class="elio-product-media"></div><div class="elio-product-copy"><span class="shop-loading-line shop-loading-title"></span><span class="shop-loading-line"></span><span class="shop-loading-line shop-loading-short"></span><span class="shop-loading-line shop-loading-price"></span></div></div>
+              </div></section>
+              <aside class="panel cart-panel"><div class="cart-head"><h2>Your basket</h2></div><div class="shop-loading-basket"><span class="shop-loading-line"></span><span class="shop-loading-line shop-loading-short"></span><span class="shop-loading-line shop-loading-action"></span></div></aside>
+            </div>
+          </div>
+        </div>
+        <noscript><style>.shop-loading{display:none}</style><p>Enable JavaScript to choose a date, add boxes to your basket, and check out.</p></noscript>
+      </div>
       <section class="shop-flavor-section" id="catalog" aria-labelledby="shop-flavors-title">
         <div class="shop-section-heading"><div><h2 id="shop-flavors-title">Not sure which flavors to choose?</h2><p>Meet the collection. Each one a little moment of happiness.</p></div><a class="text-link" href="flavors.html">Explore the flavors <span aria-hidden="true">→</span></a></div>
         <div class="shop-flavor-strip" id="order-products"></div>

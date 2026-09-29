@@ -12,6 +12,7 @@ import {api,auth,ready,configured,money,escapeHtml as esc,formatDate,toast,uploa
 import {PHOTO_ACCEPT,RECEIPT_HELP,validatePhoto} from '../admin/photo-upload.js';
 import {dateInManila,addDays,availability,selectionPrice,selectionLabels,earliestLeadDate,deliveryRestriction,deliveryZone,customerBookingWindow,customerDateIssue,allowsSameDay,sameDayBasketEligible,basketStockIssues,firstAvailableDate,prepareCatalog,flavorStock} from './shop-rules.js';
 const $=s=>document.querySelector(s), app=$('#app');
+const shopLoadingMarkup=app.innerHTML;
 const demo=false;
 const storageKey='elio-checkout-v1';
 let state={items:[],fulfillment_date:'',method:'pickup',buyer:{},recipient:{},address:{},instructions:'',promo_code:'',idempotency_key:crypto.randomUUID()};
@@ -253,15 +254,18 @@ async function renderOrder(provided=null){
 }
 window.addEventListener('elio-maintenance-change',()=>{if(location.hash.includes('order=')&&!busy)renderOrder();});
 async function init(){
+ app.setAttribute('aria-busy','true');
+ app.innerHTML=new URLSearchParams(location.hash.slice(1)).has('order')?'<div class="loading" role="status">Opening your order…</div>':shopLoadingMarkup;
+ try{
  await ready;
  await window.ELIO_CONTENT_READY;
  if(auth){const {data}=await auth.getSession();session=data.session;auth.onAuthStateChange((event,next)=>{session=next;updatePromoUi();if(event==='SIGNED_OUT'&&location.hash.includes('order=')&&!new URLSearchParams(location.hash.slice(1)).get('token'))setTimeout(()=>renderOrder(),0)});}
- try{
   if(configured)catalog=prepareCatalog(await api('catalog'));else catalog.settings.paused=true;
   state.method='pickup';state.fulfillment_date=firstAvailableDate(state.items,catalog.products,catalog.settings,catalog.inventory);persist();
   if(new URLSearchParams(location.hash.slice(1)).has('order'))await renderOrder();
   else {renderShop();const requested=new URLSearchParams(location.search).get('product');const product=catalog.products.find(p=>p.id===requested||p.slug===requested);if(product)openProduct(product.id);else if(requested)toast("This box is not currently listed in the shop.");if(['#your-bag','#your-basket'].includes(location.hash))$('#cart')?.scrollIntoView({block:'start'});}
  }catch(e){app.innerHTML=`<div class="panel empty-state"><h2>The menu is taking a little longer</h2><p>${esc(e.message)}</p><button class="button" id="retry-menu">Try again</button></div>`;$('#retry-menu').onclick=init;}
+ finally{app.removeAttribute('aria-busy');}
 }
 window.addEventListener('hashchange',()=>{if(location.hash.includes('order='))renderOrder();else if(location.hash==='#your-bag'||location.hash==='#your-basket')$('#cart')?.scrollIntoView({behavior:'smooth'});else if(document.body.classList.contains('viewing-order'))renderShop()});
 init();
