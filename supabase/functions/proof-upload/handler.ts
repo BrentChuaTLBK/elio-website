@@ -1,5 +1,5 @@
 import { credentials, endpoint, field, HttpError, json, readBody, service, storageRequest, uuid, verifiedUser } from "../_shared/http.ts";
-import { imageType, MAX_IMAGE_BYTES } from "../_shared/images.ts";
+import { imageType, validateImage, MAX_IMAGE_BYTES } from "../_shared/images.ts";
 
 export const handle = endpoint(async (request, headers) => {
   const contentType = request.headers.get("content-type") || "";
@@ -23,6 +23,7 @@ export const handle = endpoint(async (request, headers) => {
   const paymentReference = field(suppliedReference, "Payment reference", 200);
   const authorization = await service("authorize_upload", { kind, order_id: orderId, token, user_id: userId });
   if (!authorization?.allowed) throw new HttpError(403, "You cannot upload an image for this request.");
+  await validateImage(contents);
   const bucket = kind === "proof" ? "payment-proofs" : "product-images";
   const path = `${kind === "proof" ? orderId : userId}/${crypto.randomUUID()}.${image.extension}`;
   await storageRequest(`object/${bucket}/${path}`, "POST", contents, image.mime);

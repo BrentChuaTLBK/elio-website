@@ -57,6 +57,8 @@ try{
   await page.locator('[name=proof]').setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from(bytes)});await page.getByRole('button',{name:'Submit payment proof',exact:true}).click();await page.getByRole('heading',{name:'Your payment is under review'}).waitFor();
   assert.equal(uploads.length,1);assert.equal((await h.order(created.id)).payment_status,'under_review');
   const paid=await h.action('approve_payment',await h.order(created.id));assert.equal(paid.total_cents,created.total_cents);
+  // Valid long contact values must remain readable without widening the page.
+  await db.query("update elio.orders set data=jsonb_set(jsonb_set(data,'{buyer,email}',to_jsonb($2::text)),'{instructions}',to_jsonb($3::text)) where id=$1",[created.id,'customer.with.a.long.address+order-confirmation@example.test','Long reference: '+ 'A'.repeat(150)]);
   await page.locator('#refresh-order').click();await page.getByRole('heading',{name:'Payment approved',exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
   await page.screenshot({path:join(out,`paid-${width}-${method}.png`),fullPage:true});

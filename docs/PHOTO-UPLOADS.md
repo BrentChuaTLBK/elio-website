@@ -25,6 +25,16 @@ Converted results are cached per file and purpose, so retrying a payout uses
 identical bytes and preserves its idempotency fingerprint. Conversion failures
 clear the cache so a retry can recover. PDFs remain unsupported.
 
+Receipt and product-upload Edge Functions also decode the submitted PNG, JPEG,
+or WebP before writing Storage or changing an order/payout. A recognizable file
+header alone is insufficient. The server uses pinned `@imagemagick/magick-wasm`
+0.0.43 (Apache-2.0), bundled through the function's Deno import map, with bounded
+memory/dimensions and a single decoded frame. Damaged pixel data returns 415;
+an unavailable validator returns 503 and leaves the order unchanged. The server
+accepts at most 12 megapixels after browser conversion (the browser receipt
+limit is 3200px). Install the pinned development dependency with `npm ci` to run
+the same actual decoder in the local endpoint tests.
+
 Conversion normally uses browser image decoding and WebP encoding. Two pinned
 dependencies are loaded only when needed:
 

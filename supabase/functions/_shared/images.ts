@@ -1,6 +1,13 @@
 import { HttpError } from "./http.ts";
+import { validatePixels } from './image-codec.ts';
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+export async function validateImage(bytes: Uint8Array): Promise<{ mime: string; extension: string }> {
+  const type = imageType(bytes);
+  await validatePixels(bytes, type.mime);
+  return type;
+}
 
 export function imageType(bytes: Uint8Array): { mime: string; extension: string } {
   if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) throw new HttpError(413, "Choose an image of 5 MB or smaller.");

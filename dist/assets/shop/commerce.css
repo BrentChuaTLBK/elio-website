@@ -146,9 +146,9 @@ dialog.elio-commerce::backdrop{background: rgba(36, 26, 20, 0.42); backdrop-filt
 :where(.elio-commerce) .order-title{display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 30px;}
 :where(.elio-commerce) .order-title h1{font-size: 30px; margin: 8px 0px;}
 :where(.elio-commerce) .order-statuses{display: flex; gap: 8px; flex-wrap: wrap;}
-:where(.elio-commerce) .order-section{margin-bottom: 24px;}
+:where(.elio-commerce) .order-section{margin-bottom: 24px; min-width: 0; overflow-wrap: anywhere;}
 :where(.elio-commerce) .order-section h2{font-size: 17px; border-bottom: 1px solid var(--line); padding-bottom: 14px;}
-:where(.elio-commerce) .info-grid{display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 12px;}
+:where(.elio-commerce) .info-grid{display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; font-size: 12px;}
 :where(.elio-commerce) .info-grid strong{display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 5px;}
 :where(.elio-commerce) .payment-details{white-space: pre-wrap; padding: 16px; border: 1px dashed rgb(203, 184, 160); border-radius: 9px; background: rgb(251, 244, 233); font-size: 12px; margin: 16px 0px;}
 :where(.elio-commerce) .timeline{list-style: none; padding: 0px; margin: 0px; font-size: 12px;}

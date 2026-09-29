@@ -44,6 +44,10 @@ try{
   assert.equal((await upload(request({file:'<html>not an image</html>'}))).status,415);
   assert.equal((await upload(request({file:Buffer.alloc(5*1024*1024+1)}))).status,413);assert.equal(calls.length,0);
  });
+ await check('corrupt WebP cannot reserve a review or write Storage',async()=>{
+  const file=Buffer.alloc(22);file.write('RIFF');file.writeUInt32LE(14,4);file.write('WEBPVP8L',8);file.writeUInt32LE(2,16);
+  assert.equal((await upload(request({file,mime:'image/webp'}))).status,415);assert(!calls.some(c=>c.path.startsWith('/storage/')));assert(!calls.some(c=>typeof c.options.body==='string'&&c.options.body.includes('commit_proof')));
+ });
  await check('guest receipt stores privately and submits for manual review',async()=>{
   const response=await upload(request({reference:'PAY-123'}));assert.equal(response.status,201);assert.equal((await response.json()).order.payment_status,'under_review');
   const storage=calls.find(c=>c.path.startsWith('/storage/'));assert.match(storage.path,new RegExp(`/payment-proofs/${order}/[a-f0-9-]+\\.png$`));assert.equal(storage.options.headers['x-upsert'],'false');

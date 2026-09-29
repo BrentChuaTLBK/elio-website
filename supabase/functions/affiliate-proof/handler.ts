@@ -1,5 +1,5 @@
 import {credentials,endpoint,field,HttpError,json,readBody,readJson,service,storageRequest,uuid,verifiedUser} from '../_shared/http.ts';
-import {imageType,MAX_IMAGE_BYTES} from '../_shared/images.ts';
+import {imageType,validateImage,MAX_IMAGE_BYTES} from '../_shared/images.ts';
 
 const bucket='affiliate-payout-proofs';
 const digest=async (bytes:Uint8Array)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
@@ -36,6 +36,7 @@ export const handle=endpoint(async(request,headers)=>{
  const authorization=await service('affiliate_authorize_payout',{...payload,user_id,request_hash});
  if(authorization?.recorded)return json({payout:publicPayout(authorization.payout)},200,headers);
  if(authorization?.allowed!==true)throw new HttpError(403,'Only an owner can record affiliate payments.');
+ await validateImage(contents);
  const path=`${affiliate_id}/${id}/${crypto.randomUUID()}.${image.extension}`;
  await storageRequest(`object/${bucket}/${path}`,'POST',contents,image.mime);
  try{
