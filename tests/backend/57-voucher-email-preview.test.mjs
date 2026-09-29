@@ -5,6 +5,21 @@ export default async function({db,check,state}){
  const {api,ids,as,scalar}=state.h;
  const terms={trigger:'first_completed',kind:'fixed',value:5000,min_subtotal_cents:50000,cap_cents:null,customer_limit:1,expiry_mode:'days',expiry_days:30};
  const draft={name:'A little thank-you <script>',terms};
+ await check('Campaign subjects validate, round-trip, and survive saves from older clients',async()=>{
+  const save=campaign=>api('voucher_save_campaign',{campaign},ids.owner);
+  for(const subject of ['', '   ', 'x'.repeat(201), 'Hello\r\nBcc: other@example.test', 'Hello\tworld']){
+   await assert.rejects(()=>save({...draft,email_subject:subject}),/email subject/);
+   await assert.rejects(()=>api('voucher_email_preview',{campaign:{...draft,email_subject:subject}},ids.owner),/email subject/);
+  }
+  await assert.rejects(()=>as(ids.owner,()=>db.query("select elio.voucher_email_subject('test')")),/permission denied/);
+  let saved=await save({...draft,email_subject:'  Here’s ₱50 for your next Elio box 🍰  '});
+  assert.equal(saved.email_subject,'Here’s ₱50 for your next Elio box 🍰');
+  assert.equal((await api('voucher_email_preview',{id:saved.id},ids.owner)).subject,saved.email_subject);
+  assert.equal((await api('voucher_campaigns',{},ids.owner)).campaigns.find(c=>c.id===saved.id).email_subject,saved.email_subject);
+  const oldClient={...saved};delete oldClient.email_subject;
+  saved=await save(oldClient);assert.equal(saved.email_subject,'Here’s ₱50 for your next Elio box 🍰');
+  const boundary=await save({...saved,email_subject:'x'.repeat(200)});assert.equal(boundary.email_subject.length,200);
+ })();
  const totals=()=>scalar("select jsonb_build_object('promos',(select count(*) from elio.promos),'vouchers',(select count(*) from elio.vouchers),'emails',(select count(*) from elio.newsletter_outbox),'campaigns',(select count(*) from elio.voucher_campaigns))");
  await check('Email preview is owner-only and validates saved or unsaved campaign terms',async()=>{
   for(const who of [null,ids.staff,ids.customer])await assert.rejects(()=>api('voucher_email_preview',{campaign:draft},who),/owner/i);
@@ -20,8 +35,9 @@ export default async function({db,check,state}){
   assert.equal(sample.subject,'A little thank-you from Elio · your next-order voucher');
   assert(Math.abs(Date.parse(sample.offer.expires_at)-Date.now()-30*86400000)<5000);
   const rendered=renderNewsletterEmail(sample);assert.match(rendered.text,/₱50.00/);assert.match(rendered.text,/₱500.00/);assert.match(rendered.html,/&lt;script&gt;/);assert(!rendered.html.includes('<script>'));assert.match(rendered.html,/unsubscribe links are disabled/);
-  const changed={...saved,name:'Unsaved changes',terms:{...terms,kind:'percent',value:10,cap_cents:10000,min_subtotal_cents:0,expiry_mode:'fixed',expires_at:'2030-10-30T12:00:00+08:00'}};
+  const changed={...saved,name:'Unsaved changes',email_subject:'Something sweet for you 🍰',terms:{...terms,kind:'percent',value:10,cap_cents:10000,min_subtotal_cents:0,expiry_mode:'fixed',expires_at:'2030-10-30T12:00:00+08:00'}};
   const other=await api('voucher_email_preview',{campaign:changed},ids.owner),email=renderNewsletterEmail(other);
+  assert.equal(other.subject,'Something sweet for you 🍰');assert.equal((await api('voucher_email_preview',{id:saved.id},ids.owner)).subject,sample.subject);
   assert.equal(other.title,'Unsaved changes');assert.match(email.text,/10%/);assert.match(email.text,/₱100.00/);assert.match(email.text,/Oct 30, 2030, 12:00 PM/);
   assert.equal((await api('voucher_email_preview',{id:saved.id},ids.owner)).offer.value,5000);
   assert.deepEqual(await totals(),before);assert.equal(await scalar('select revision from elio.voucher_campaigns where id=$1',[saved.id]),1);

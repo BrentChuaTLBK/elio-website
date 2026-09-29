@@ -34,3 +34,7 @@ All tables and the invoker view are private with RLS and direct grants revoked. 
 ## Email preview
 
 Campaign cards and editors provide an owner-only email preview using the actual sending renderer. Saved campaigns load current terms; editor previews use unsaved form values without saving or activating anything. Samples use ELIO-PREVIEW and preview@example.test. Relative expiry assumes issue at preview time; fixed expiry uses the chosen Manila instant. Desktop, mobile and plain-text views show the same subject and offer content. Links are inert, HTML is sandboxed, and preview creates no voucher, outbox row or delivery request.
+
+## Campaign email subject
+
+Owners can set an email subject separately from the campaign name (1–200 characters, one line). Saved and unsaved previews show it. Existing campaigns keep their current default subject. Issuance snapshots the subject into the marketing outbox; later campaign edits apply only to future messages and cannot alter queued messages or frozen retries. Older clients that omit the field preserve an existing custom subject.
