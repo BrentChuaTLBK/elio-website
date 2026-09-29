@@ -10,7 +10,7 @@ function render(){
  banner.innerHTML=`<strong>${current.active?'Website maintenance':'Planned maintenance'}</strong><span>${esc(current.message)}</span>${time?`<span>${esc(time)}</span>`:''}${current.active&&current.uploads_paused?'<span>Payment-proof uploads and deadlines are paused.</span>':''}`;
  const file=location.pathname.split('/').pop().replace(/\.html$/,'')||'index';
  const existingOrder=file==='order'&&new URLSearchParams(location.hash.slice(1)).has('order');
- const block=current.active&&['index','flavors','box','order',''].includes(file)&&!existingOrder;
+ const block=current.active&&['index','story','flavors','box','order',''].includes(file)&&!existingOrder;
  let screen=document.querySelector('#site-maintenance-screen');
  if(!screen){screen=document.createElement('section');screen.id='site-maintenance-screen';document.body.append(screen);}
  screen.hidden=!block;document.body.classList.toggle('site-under-maintenance',block);

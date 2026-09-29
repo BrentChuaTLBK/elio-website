@@ -4,7 +4,7 @@ const preferenceKey = 'elio-analytics-choice-v1';
 const lifetime = 180 * 24 * 60 * 60 * 1000;
 const productionHosts = new Set(['eliocheesecakes.com', 'www.eliocheesecakes.com']);
 const publicPages = new Map([
- ['/', 'Home'], ['/index', 'Home'], ['/flavors', 'Flavors'], ['/box', 'The Elio box'],
+ ['/', 'Home'], ['/index', 'Home'], ['/story', 'Our Story'], ['/flavors', 'Flavors'], ['/box', 'The Elio box'],
  ['/order', 'Shop'], ['/newsletter', 'Newsletter'], ['/privacy', 'Privacy'], ['/terms', 'Website terms'],
 ]);
 const publicParameters = new Set(['product', 'collection', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_id', 'utm_content', 'utm_term']);
