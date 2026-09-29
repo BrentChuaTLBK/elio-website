@@ -64,6 +64,10 @@ export async function syncNewsletterContacts(key: string) {
             if ((await action("context"))?.stale) { stats.pending = true; continue; }
             const removed = await api.request(`/contacts/${contact.id}`, "DELETE", undefined, true);
             if (removed && removed.deleted !== true) throw new Error("Contact deletion was not confirmed.");
+            // A successful DELETE acknowledgement can precede provider read consistency.
+            // Leave durable work pending until a read confirms absence.
+            const stillPresent = await api.request(`/contacts/${encodeURIComponent(local.email)}`, "GET", undefined, true);
+            if (stillPresent) throw new Error("Contact removal is awaiting provider confirmation.");
             contact = null;stats.removed++;
           }
         }

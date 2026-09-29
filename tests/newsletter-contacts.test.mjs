@@ -27,7 +27,7 @@ globalThis.fetch=async(url,options={})=>{
  }
  if(u.pathname.endsWith('/segments/segment'))return Response.json({id:'contact'});
  if(method==='DELETE'){
-  assert(!topics.some(t=>t.subscription==='opt_in'));contact=null;
+  assert(!topics.some(t=>t.subscription==='opt_in'));if(!flags.eventualDelete)contact=null;
   if(flags.deleteReplyLost){flags.deleteReplyLost=false;throw Error('Deletion acknowledgement lost');}
   return Response.json({deleted:true});
  }
@@ -62,6 +62,16 @@ try{
  });
  await check('Stale consent and an active broadcast prevent membership writes',async()=>{
   flags.stale=true;await syncNewsletterContacts('fallback');assert(!calls.some(c=>c.path.startsWith('/contacts')));reset();flags.busy=true;assert.equal((await syncNewsletterContacts('fallback')).pending,true);assert(!calls.some(c=>c.path.startsWith('/contacts')));
+ });
+ await check('Deletion acknowledged before it is visible stays pending, then confirms on retry',async()=>{
+  local.status='unsubscribed';local.fresh_consent=false;contact={id:'contact',email:local.email};flags.eventualDelete=true;
+  const first=await syncNewsletterContacts('fallback');assert.equal(first.failed,1);assert.equal(first.removed,0);assert(!flags.saved);assert.match(flags.error,/awaiting provider confirmation/);
+  flags.eventualDelete=false;const second=await syncNewsletterContacts('fallback');assert.equal(second.removed,1);assert.equal(flags.saved.contact_id,null);
+ });
+ await check('Other-brand consent appearing during delayed deletion prevents another delete',async()=>{
+  local.status='unsubscribed';local.fresh_consent=false;contact={id:'contact',email:local.email};flags.eventualDelete=true;await syncNewsletterContacts('fallback');
+  topics[1].subscription='opt_in';const before=calls.filter(c=>c.method==='DELETE'&&c.path==='/contacts/contact').length;
+  const second=await syncNewsletterContacts('fallback');assert.equal(second.retained,1);assert.equal(calls.filter(c=>c.method==='DELETE'&&c.path==='/contacts/contact').length,before);
  });
  console.log(`Passed ${checks} contact lifecycle checks; no real contacts or emails changed.`);
 }finally{globalThis.fetch=originalFetch;globalThis.setTimeout=originalTimeout;}

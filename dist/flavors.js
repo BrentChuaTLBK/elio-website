@@ -4,6 +4,7 @@
   const controls = () => shell.querySelectorAll('.flavors-toolbar button, .flavors-toolbar input, .flavor-filters button');
   try {
   await window.ELIO_CONTENT_READY;
+  const {responsiveImage}=await import('./assets/responsive-images.js');
   const { flavorMetaHtml } = await import('./assets/shop/flavor-details.js');
   const data = window.ELIO_CONTENT;
   const { flavors, featuredOrder, productImage } = data;
@@ -13,7 +14,7 @@
   const isFeatured = flavor => data.currentMenuShown !== false && (data.monthlyMenu || []).includes(flavor.id);
   const isNext = flavor => data.nextMenuShown === true && (data.nextMonthlyMenu || []).includes(flavor.id);
   const photo = flavor => flavor.image || flavor.imagePosition !== undefined
-    ? `<span class="product-photo${flavor.image ? ' single-photo' : ''}" style="--image-left:-${(parseFloat(flavor.imagePosition) || 0) * 2}%"><img src="${escape(flavor.image || productImage)}" width="${flavor.image ? 724 : 2172}" height="724" alt="${escape(flavor.name)} Basque cheesecake" loading="lazy" decoding="async"></span>`
+    ? `<span class="product-photo${flavor.image ? ' single-photo' : ''}" style="--image-left:-${(parseFloat(flavor.imagePosition) || 0) * 2}%"><img ${flavor.image?responsiveImage(flavor.image,'(max-width:600px) 88px, 116px'):''} src="${escape(flavor.image || productImage)}" width="${flavor.image ? 724 : 2172}" height="724" alt="${escape(flavor.name)} Basque cheesecake" loading="lazy" decoding="async"></span>`
     : `<span class="product-photo product-placeholder" role="img" aria-label="${escape(flavor.name)} — photograph coming soon"><span class="placeholder-brand" aria-hidden="true">ELIO</span><span class="placeholder-name" aria-hidden="true">${escape(flavor.name)}</span><span class="placeholder-note" aria-hidden="true">Photograph coming soon</span></span>`;
   const card = (flavor, kind) => {
     const badge = kind === 'collection' ? (isFeatured(flavor) ? 'This month' : isNext(flavor) ? 'Next month' : '') : '';

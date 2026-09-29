@@ -3,7 +3,7 @@ let nextConfirmationId = 0;
 const defaultMoney = cents => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(cents / 100);
 
 // This second modal leaves the edit form mounted so cancelling preserves the draft.
-export function confirmOrderTotalChange({ oldTotal, newTotal, paymentStatus }, { money = defaultMoney, parentDialog, document: doc = globalThis.document } = {}) {
+export function confirmOrderTotalChange({ oldTotal, newTotal, paymentStatus, oldDate, newDate, oldMethod, newMethod, oldItems=[], newItems=[] }, { money = defaultMoney, parentDialog, document: doc = globalThis.document } = {}) {
   if (parentDialog && (!parentDialog.open || !parentDialog.isConnected)) return Promise.resolve(false);
   if (![oldTotal, newTotal].every(value => Number.isSafeInteger(value) && value >= 0)) {
     return Promise.reject(new Error('The order totals are invalid. Check the order again before saving.'));
@@ -31,7 +31,7 @@ export function confirmOrderTotalChange({ oldTotal, newTotal, paymentStatus }, {
     close.type = 'button';
     close.setAttribute('aria-label', 'Keep editing');
     header.append(title, close);
-    const description = make('p', 'order-edit-confirmation__description', 'Your changes update the order total. Review the amounts before saving.');
+    const description = make('p', 'order-edit-confirmation__description', 'Review the date, items and amounts before saving. Availability is checked again when you confirm.');
     description.id = `${id}-description`;
     const totals = make('dl', 'order-edit-confirmation__totals');
     for (const [label, value, className] of [['Current total', oldTotal, ''], ['New total', newTotal, 'order-edit-confirmation__new-total']]) {
@@ -43,8 +43,16 @@ export function confirmOrderTotalChange({ oldTotal, newTotal, paymentStatus }, {
     const differenceRow = make('p', 'order-edit-confirmation__difference');
     differenceRow.append(make('span', '', difference > 0 ? 'Increase' : difference < 0 ? 'Decrease' : 'Difference'), make('strong', '', money(Math.abs(difference))));
     shell.append(header, description, totals, differenceRow);
+    const comparison=make('div','order-edit-impact');
+    const readableDate=value=>value?new Intl.DateTimeFormat('en-PH',{timeZone:'Asia/Manila',dateStyle:'medium'}).format(new Date(value+'T12:00:00+08:00')):'—';
+    for(const [title,date,method,items] of [['Current order',oldDate,oldMethod,oldItems],['After saving',newDate,newMethod,newItems]]){
+      if(!date&&!items.length)continue;
+      const column=make('section','');column.append(make('h3','',title),make('p','',`${readableDate(date)} · ${method||'—'}`));
+      const list=make('ul','');for(const item of items){const li=make('li','',`${item.quantity} × ${item.name||'Item'}`);const labels=(item.selection_labels?.length?item.selection_labels:item.flavor_contents||[]).map(label=>typeof label==='string'?label:`${label.quantity} × ${label.label||label.name}`);if(labels.length)li.append(make('small','',labels.join(', ')));list.append(li);}column.append(list);comparison.append(column);
+    }
+    if(comparison.childElementCount){shell.append(comparison,make('p','order-edit-confirmation__description','The saved allocation will be replaced by the checked items on the new date. This preview does not reserve extra stock.'));}
     if (paymentStatus === 'paid') {
-      shell.append(make('p', 'order-edit-confirmation__payment', 'Payment will remain Paid. Settle any difference directly with the customer.'));
+      shell.append(make('p', 'order-edit-confirmation__payment', 'Payment will remain Paid. Settle any difference directly with the customer. Saving or adding a Refund label does not transfer money.'));
     }
     const actions = make('div', 'order-edit-confirmation__actions');
     const cancel = make('button', 'button button-secondary', 'Keep editing');

@@ -21,6 +21,7 @@ try{
    if(u.pathname==='/api'){
     const {action,payload}=route.request().postDataJSON();calls.push({action,payload});let data;
     if(action==='site_status')data=state();
+    else if(action==='calendar_list')data={connection:{connected:false},orders:[]};
     else if(action==='admin_bootstrap')data={role:'owner',products:[],categories:[],orders:[pickupOrder],inventory:[],zones:[],staff:[],promos:[],email_status:[emailAlert],settings:{paused:false}};
     else if(action==='get_order')data=pickupOrder;
     else if(action==='send_pickup_reminder'){assert.equal(payload.order_id,pickupOrder.id);assert.equal(payload.revision,pickupOrder.revision);assert(payload.idempotency_key);pickupOrder={...pickupOrder,revision:2,pickup_reminder_count:1,pickup_reminder_requested_at:new Date().toISOString()};data=pickupOrder;}

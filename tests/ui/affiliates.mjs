@@ -24,6 +24,7 @@ try{
    if(url.pathname==='/fixture-api'){
     const {action,payload:p}=route.request().postDataJSON();calls.push({action,payload:p});let data;
     if(action==='site_status')data={active:false,uploads_paused:false,announce:false,server_time:new Date().toISOString()};
+    else if(action==='calendar_list')data={connection:{connected:false},orders:[]};
     else if(action==='admin_bootstrap')data={role,products:[],categories:[],orders:[],inventory:[],zones:[],staff:[],promos:[{id:'affiliate-code',affiliate_managed:true,code:'PRIVATEAFF'},{id:'newsletter-code',newsletter_managed:true,code:'PRIVATENEWS'}],settings:{paused:false}};
     else if(action==='affiliate_admin'){
      const partners=affiliates.map(a=>({...a,...stats(),paid_orders:earned>0?1:0,code_count:codes.length}));

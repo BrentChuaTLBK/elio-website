@@ -21,9 +21,9 @@ try{
   await db.query('update elio.settings set data=data||$1::jsonb',[JSON.stringify({pickup_hours:pickupHours,delivery_window:deliveryHours})]);
   const fixture=await accountingFixture(h),flavor=fixture.product.box_flavors[0];
   await db.query('update elio.inventory set available=false where product_id=$1 and date<>$2',[flavor,fixture.date]);
-  const user=guest?null:h.ids.customer,calls=[],errors=[],uploads=[];let created,failNewsletter=width===1440;
+  const user=guest?null:h.ids.customer,calls=[],errors=[],uploads=[];let created,failNewsletter=width===1440,loseCreateReply=width===1440;
   const ctx=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'});
-  await ctx.exposeBinding('checkoutRpc',async(_,{action,payload,token})=>serial(async()=>{try{calls.push(action);const data=await h.api(action,payload,user,token);if(action==='create_order')created=data;return {data,error:null};}catch(e){return {data:null,error:{message:e.message}};}}));
+  await ctx.exposeBinding('checkoutRpc',async(_,{action,payload,token})=>serial(async()=>{try{calls.push(action);const data=await h.api(action,payload,user,token);if(action==='create_order'){created=data;if(loseCreateReply){loseCreateReply=false;return {data:null,error:{message:'Failed to fetch'}};}}return {data,error:null};}catch(e){return {data:null,error:{message:e.message}};}}));
   await ctx.addInitScript(()=>localStorage.setItem('elio-newsletter-popup-v1',JSON.stringify({state:'submitted',firstVisit:Date.now(),updatedAt:Date.now()})));
   await ctx.exposeBinding('checkoutNewsletter',async(_,body)=>serial(async()=>{if(failNewsletter){failNewsletter=false;return {error:{message:'Connection interrupted'}};}try{return {data:await h.service('newsletter_subscribe',{...body,consent_version:'elio-newsletter-v2-single-opt-in',ip_hash:createHash('sha256').update(randomUUID()).digest('hex')})};}catch(e){return {error:{message:e.message}};}}));
   await ctx.exposeBinding('checkoutProof',async(_,{fields,file})=>serial(async()=>{try{assert.equal(file.type,'image/webp');assert.equal(String.fromCharCode(...file.header.slice(8)),'WEBP');uploads.push(file);const data=await h.service('commit_proof',{...fields,user_id:user,path:fields.order_id+'/'+randomUUID()+'.webp'});return {data,error:null};}catch(e){return {data:null,error:{message:e.message}};}}));
@@ -64,7 +64,9 @@ try{
   await page.setViewportSize({width,height:1000});
   await page.locator('#edit-checkout').click();assert.equal(await form.locator('[name=buyer_name]').inputValue(),'QA customer');await page.locator('#review-order').click();await page.locator('#place-order').waitFor();assert.equal(await review.evaluate(el=>el.scrollTop),0);
   await page.screenshot({path:join(out,`review-${width}-${method}.png`),fullPage:true});
-  await page.locator('#place-order').click();await page.locator('#proof-form').waitFor();
+  await page.locator('#place-order').click();if(width===1440){await page.getByText(/may already be saved/).waitFor();await page.getByRole('button',{name:'Try again',exact:true}).click();}await page.locator('#proof-form').waitFor();
+  assert.equal(Number(await h.scalar('select count(*) from elio.orders where id=$1',[created.id])),1);
+  if(width===1440)assert.equal(calls.filter(a=>a==='create_order').length,2);
   assert.equal(created.total_cents,10000-(guest?0:1000)+(method==='delivery'?3000:0));assert.equal(await h.remaining({id:flavor},fixture.date),97);
   assert.equal(created[method==='delivery'?'delivery_window':'pickup_hours'],method==='delivery'?deliveryHours:pickupHours);
   assert(Math.abs(Date.parse(created.payment_deadline)-Date.parse(created.created_at)-15*60000)<1000);

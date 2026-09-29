@@ -6,10 +6,15 @@
   "scripts": {
     "start": "node server.mjs",
     "check": "node scripts/check.mjs",
-    "test:backend": "node tests/backend/run.mjs"
+    "test:backend": "node tests/backend/run.mjs",
+    "test:release": "node scripts/run-release-tests.mjs",
+    "build": "node scripts/build-assets.mjs"
   },
   "type": "module",
   "devDependencies": {
-    "@imagemagick/magick-wasm": "0.0.43"
+    "@imagemagick/magick-wasm": "0.0.43",
+    "playwright": "1.62.1",
+    "exceljs": "4.4.0",
+    "jszip": "3.10.2"
   }
 }

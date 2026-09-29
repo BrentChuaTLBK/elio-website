@@ -42,6 +42,7 @@ try{
     const {action,payload}=route.request().postDataJSON();calls.push({action,payload});let response;
     if(action==='admin_bootstrap')response={role,products:[],categories:[],orders:[order,pickup],inventory:[],zones:[],staff:[],promos:[],settings:{paused:false}};
     else if(action==='get_order')response=payload.order_id===pickup.id?pickup:order;
+    else if(action==='calendar_list')response={connection:{connected:false},orders:[]};
     else if(action==='accounting_report'){
      const all=[...entries,...(cost?.amount_cents!=null?[{id:order.id,category_id:'cost',kind:'expense',entry_date:cost.cost_date,amount_cents:cost.amount_cents,note:cost.note,source:'Delivery cost',order_id:order.id,reference:order.reference}]:[])].filter(e=>e.entry_date>=payload.start&&e.entry_date<=payload.end&&(!excludeOrder||e.order_id!==order.id));
      response={...payload,report_version:2,categories,entries:all,summary:categories.filter(c=>!c.archived).map(c=>({...c,sales_cents:all.filter(e=>e.category_id===c.id&&e.kind==='sale').reduce((n,e)=>n+e.amount_cents,0),expense_cents:all.filter(e=>e.category_id===c.id&&e.kind==='expense').reduce((n,e)=>n+e.amount_cents,0),entry_count:all.filter(e=>e.category_id===c.id).length})),deliveries:excludeOrder?[]:[{order_id:order.id,reference:order.reference,approval_date:'2026-09-24',status:order.fulfillment_status,fee_cents:15000,cost_cents:cost?.amount_cents??null,cost_date:cost?.cost_date||null}],legacy_count:0};

@@ -3,8 +3,9 @@
   "compatibility_date": "2026-09-19",
   "workers_dev": true,
   "preview_urls": true,
+  "build": { "command": "node scripts/build-assets.mjs" },
   "assets": {
-    "directory": "./dist"
+    "directory": "./.release"
   },
   "routes": [
     {

@@ -30,6 +30,7 @@ try{
     else if(action==='account_access')data={role:'owner'};
     else if(action==='affiliate_status')data={assigned:true};
     else if(action==='my_orders')data=showOrder?[{id:'order-1',reference:'ELIO-TEST01',fulfillment_date:'2026-09-30',method:'pickup',payment_status:'awaiting_payment',total_cents:95000}]:[];
+    else if(action==='calendar_list')data={connection:{connected:false},orders:[]};
     else if(action==='admin_bootstrap')data={role:'owner',products:[],categories:[],orders:[],inventory:[],zones:[],staff:[],promos:[],settings:{paused:false}};
     else if(action==='newsletter_admin')data={settings:settings(),offer_counts:{issued:4,expired:1,converted},offer_total:1,offers:[{id:'code',email:'elio@example.test',code:'AB3D4F',issued_at:'2026-09-01',expires_at:'2026-09-08',offer_terms:missingTerms?undefined:{kind:'percent',value:10,min_subtotal_cents:75000,cap_cents:15000},conversion_status:converted?'converted':'expired'}]};
     else throw Error('Unexpected API '+action);

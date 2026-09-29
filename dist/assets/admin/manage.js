@@ -1,3 +1,5 @@
+import {mountBackup} from './backup.js';
+import {renderAttention,loadAttentionCalendar} from './needs-attention.js';
 import {deliveryFeeSummary,separateDeliveryPaid} from '../delivery-fee.js';
 import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-mobile-audit-1';
 import {mountCalendar} from './calendar-manager.js?v=summary-1';
@@ -163,7 +165,7 @@ const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,ow
 async function refresh() {
   if (!configured) return;
   const result = await api('admin_bootstrap');
-  if(!state.connected && ['#accounting','#affiliates','#maintenance','#website-photos'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
+  if(!state.connected && ['#accounting','#affiliates','#maintenance','#website-photos','#backup'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
   if(!state.connected && /^#calendar(?:\?|$)/.test(location.hash))state.view='calendar';
   Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
   state.promos = state.promos.filter(promo => !promo.newsletter_managed && !promo.affiliate_managed);
@@ -180,6 +182,8 @@ function render() {
   if(state.view==='offers' && state.connected && state.role==='owner' && $('#voucher-campaigns-manager'))return;
   voucherCampaignsController?.destroy();voucherCampaignsController=null;
   if(state.view!=='maintenance' || !state.connected || state.role!=='owner'){maintenanceController?.destroy();maintenanceController=null;}
+  const backupNav=$('[data-view="backup"]');if(backupNav)backupNav.hidden=!state.connected||state.role!=='owner';
+  if(state.view==='backup'&&$('#backup-manager')&&state.connected&&owner())return;
   const photosNav=$('[data-view="website-photos"]');if(photosNav)photosNav.hidden=!state.connected||state.role!=='owner';
   if(state.view==='website-photos' && state.connected && state.role==='owner' && $('#website-photos-manager'))return;
   websitePhotosController?.destroy();websitePhotosController=null;
@@ -201,9 +205,11 @@ function render() {
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
   const currentPage=$('#dashboard-current-page');if(currentPage){const active=$('#admin-nav .sidebar-link.active');currentPage.textContent=active?.textContent.trim().replace(/\d+$/, '').trim()||'Overview';}
-  const views = { offers:()=>'<div id="voucher-campaigns-manager"></div>', 'website-photos':()=>'<div id="website-photos-manager"></div>', calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
+  const views = { backup:()=>'<div id="backup-manager"></div>', offers:()=>'<div id="voucher-campaigns-manager"></div>', 'website-photos':()=>'<div id="website-photos-manager"></div>', calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   unmountAnalyticsChart();
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
+  if(state.view==='overview'&&state.connected)void loadAttentionCalendar($('#workspace'),{api,esc,dateTime});
+  if(state.view==='backup')mountBackup($('#backup-manager'),{api,owner:state.connected&&owner(),esc,money});
   if(state.view==='offers')voucherCampaignsController=mountVoucherCampaigns($('#voucher-campaigns-manager'),{owner:state.connected&&state.role==='owner'});
   if(state.view==='website-photos')websitePhotosController=mountWebsitePhotos($('#website-photos-manager'),{owner:state.connected&&state.role==='owner'});
   unmountAnalyticsChart=state.view==='analytics'?mountAnalyticsChart($('#workspace')):()=>{};
@@ -245,6 +251,7 @@ function overviewView() {
       ['Upcoming orders', upcoming.length, 'Scheduled today and beyond'],
       ['Active products', activeProducts, 'Availability set by product and date']
     ].map(([title, value, note]) => `<div class="panel metric-card"><div class="metric-label">${title}<span aria-hidden="true">↗</span></div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></div>`).join('')}</div>
+    ${state.connected?renderAttention(state,{esc,dateTime}):''}
     <section class="panel"><div class="section-heading"><h2>Coming out of the kitchen</h2><button class="button button-quiet" data-action="upcoming">View all →</button></div>${upcoming.length ? orderTable(upcoming.slice(0, 7), true) : empty('Your next bake starts here', 'Scheduled orders will appear here as customers check out. Set up your products and daily quantities to get started.')}</section>
     ${state.settings.paused ? '<p class="notice" style="margin-top:22px">New orders are paused. Existing order links and valid payment-proof uploads remain available.</p>' : ''}
     ${state.connected ? emailStatusCard() : ''}`;

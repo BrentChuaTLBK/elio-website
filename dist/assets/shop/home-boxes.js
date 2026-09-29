@@ -1,3 +1,4 @@
+import {responsiveImage} from '../responsive-images.js';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
 const imageUrl = box => (box.photos || [box.image]).find(url => typeof url === 'string' && /^(https?:\/\/|assets\/)/.test(url));
 const money = cents => new Intl.NumberFormat('en-PH', {style:'currency',currency:'PHP'}).format(Number(cents) / 100);
@@ -18,7 +19,7 @@ export function mountHomeBoxes(content) {
   const card = (box, custom = false) => {
     const href = `order.html?product=${encodeURIComponent(box.id)}`;
     const image = imageUrl(box);
-    const photo = `<a class="home-box-photo" href="${href}" tabindex="-1" aria-hidden="true">${image ? `<img src="${escape(image)}" alt="" width="1440" height="960" loading="lazy">` : '<span class="home-box-placeholder">ELIO</span>'}</a>`;
+    const photo = `<a class="home-box-photo" href="${href}" tabindex="-1" aria-hidden="true">${image ? `<img ${responsiveImage(image)} src="${escape(image)}" alt="" width="1440" height="960" loading="lazy">` : '<span class="home-box-placeholder">ELIO</span>'}</a>`;
     const details = `<h3><a href="${href}">${escape(box.name)}</a></h3><p class="home-box-description">${escape(box.description ?? box.line)}</p>`;
     const price = Number.isFinite(box.price_cents) ? `<p class="home-box-price">${custom ? 'From ' : ''}${money(box.price_cents)}</p>` : '';
     if (custom) return `<article class="home-box-card home-custom-card" data-home-custom-product="${escape(box.id)}"><div class="home-custom-copy"><p class="eyebrow">Make it uniquely yours</p>${details}</div>${photo}${price}<a class="button" href="${href}" data-custom-box-link aria-label="Customize ${escape(box.name)}">Build your box</a></article>`;

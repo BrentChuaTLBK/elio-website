@@ -23,6 +23,7 @@ try {
     if(action==='admin_bootstrap')data={role:'owner',orders:[],products:[],categories:[],zones:[],staff:[],inventory:[],promos:[],settings};
     else if(action==='site_status')data={active:false,uploads_paused:false,announce:false,server_time:new Date().toISOString()};
     else if(action==='newsletter_settings')data={enabled:false};
+    else if(action==='calendar_list')data={connection:{connected:false},orders:[]};
     else if(action==='catalog')data={settings,products:[],categories:[],zones:[],inventory:[]};
     else if(action==='get_order')data=order;
     else if(action==='save_settings'){settings=payload.settings;data=settings;}

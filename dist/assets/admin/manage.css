@@ -289,3 +289,8 @@
 
 /* Keep deletion guidance below its action, clear of the shared input-help margin. */
 .product-delete-section{display:flex;flex-direction:column;align-items:flex-start;gap:12px}.product-delete-section>.help-text{margin:0;max-width:100%;line-height:1.6}
+
+.order-edit-impact{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}.order-edit-impact h3{font-size:13px}.order-edit-impact p,.order-edit-impact li{font-size:12px;overflow-wrap:anywhere}.order-edit-impact ul{padding-left:17px}.order-edit-impact small{display:block;margin:3px 0 9px}.needs-attention{margin-bottom:22px}.needs-attention ul{list-style:none;padding:0}.needs-attention li{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #eadbca;padding:14px 0}.needs-attention li p{font-size:12px;margin:5px 0}.needs-attention li small{color:#806a59}.needs-attention button{flex-shrink:0}@media(max-width:500px){.order-edit-impact{grid-template-columns:1fr}.needs-attention li{align-items:flex-start;flex-direction:column}}
+.backup-panel{margin-bottom:20px}
+.backup-panel .row-actions{margin-top:16px;margin-bottom:14px;gap:10px}
+.backup-panel .help-text{margin-top:14px;margin-bottom:14px}

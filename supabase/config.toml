@@ -63,3 +63,8 @@ verify_jwt = false
 # separate high-entropy Vault credential through a service-only RPC.
 [functions.calendar-sync]
 verify_jwt = false
+
+# Google backup verifies a private Vault worker credential or owner Auth.
+# Google service-account secrets remain on the server.
+[functions.order-backup]
+verify_jwt = false

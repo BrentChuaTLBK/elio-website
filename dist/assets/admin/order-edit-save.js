@@ -22,7 +22,7 @@ export function normalizeOrderEditReason(value) {
 export async function prepareOrderSave({ order, changes, reason, idempotencyKey, preview, confirmTotalChange, isCurrent = () => true, onPreview = () => {} }) {
   const snapshot = freeze(structuredClone({
     order_id: order?.id, revision: order?.revision, oldTotal: order?.total_cents,
-    paymentStatus: order?.payment_status, changes, reason: normalizeOrderEditReason(reason), idempotency_key: idempotencyKey,
+    paymentStatus: order?.payment_status, oldDate:order?.fulfillment_date, oldMethod:order?.method, oldItems:order?.items||[], changes, reason: normalizeOrderEditReason(reason), idempotency_key: idempotencyKey,
   }));
   const checkCurrent = () => {
     if (!isCurrent()) throw new Error('The order or form changed while checking. Review your changes and save again.');
@@ -46,8 +46,10 @@ export async function prepareOrderSave({ order, changes, reason, idempotencyKey,
   ].map(key => [key, checked[key]])));
   onPreview(checked);
   checkCurrent();
-  if (checked.total_cents !== snapshot.oldTotal) {
-    const confirmed = await confirmTotalChange(freeze({ oldTotal: snapshot.oldTotal, newTotal: checked.total_cents, paymentStatus: snapshot.paymentStatus }));
+  if (checked.total_cents !== snapshot.oldTotal || ['items','fulfillment_date','method'].some(key=>Object.hasOwn(snapshot.changes,key))) {
+    const confirmed = await confirmTotalChange(freeze({ oldTotal: snapshot.oldTotal, newTotal: checked.total_cents, paymentStatus: snapshot.paymentStatus,
+      oldDate:snapshot.oldDate,newDate:checked.fulfillment_date||snapshot.oldDate,oldMethod:snapshot.oldMethod,newMethod:checked.method||snapshot.oldMethod,
+      oldItems:snapshot.oldItems,newItems:checked.items }));
     checkCurrent();
     if (confirmed !== true) return null;
   }
