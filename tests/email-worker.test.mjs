@@ -77,6 +77,16 @@ try {
     assert.equal(providerBodies[1].body.from, 'Elio Newsletter <news@eliocheesecakes.com>');
     assert.equal(providerBodies[1].body.reply_to, 'elio.cheesecakes@gmail.com');
   });
+  await check('submitted payment layout is frozen once and reused after a lost acknowledgement', async () => {
+    setup.row = { ...row, event_key:'submitted/sample-order', subject:'Your Elio order', payload:{ ...row.payload, event_type:'order_submitted',
+      order:{ ...row.payload.order, access_token:'sample-private-token', payment_deadline:'2026-10-04T04:15:00Z',
+        payment_options:[{label:'Sample bank',account_name:'Elio sample',account_number:'0000123',note:'Keep this reference.'}],payment_note:'Pay only once.',
+        payment_instructions:'Accepted Payment Methods:\n\nSample bank\nElio sample\n0000123\nKeep this reference.\n\nPay only once.' } } };
+    setup.ackFailure=true;await handle(request());
+    const sent=providerBodies[0];assert(sent.body.html.includes('How to pay'));assert(sent.body.html.includes('0000123'));assert(sent.body.text.includes('Amount to pay: ₱990.00'));assert(sent.body.text.includes('Pay only once.'));
+    setup.ackFailure=false;setup.row.payload.order.payment_options=[];setup.row.payload.order.payment_instructions='Changed after acceptance';await handle(request());
+    assert.equal(providerBodies.length,2);assert.deepEqual(providerBodies[1],sent);assert.equal(sent.key,'elio/submitted/sample-order');
+  });
   await check('revoked or stale messages are skipped before delivery', async () => {
     setup.skip = true; assert.equal((await (await handle(request())).json()).skipped, 1); assert.equal(providerBodies.length, 0);
   });

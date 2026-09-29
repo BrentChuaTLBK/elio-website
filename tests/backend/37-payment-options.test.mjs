@@ -25,8 +25,10 @@ export default async function({db,check,state}) {
   const f2=await accountingFixture(h);const fresh=await api('create_order',h.checkout(f2.product,f2.date),ids.customer);assert.deepEqual(fresh.payment_options,expanded);assert.match(fresh.payment_instructions,/Fourth method\nAnother name\n000000000004/);
   const q=await scalar('select payload from elio.outbox where order_id=$1 and event_type=\'order_submitted\' limit 1',[fresh.id]);
   assert.equal(q.order.payment_instructions,fresh.payment_instructions);assert.match(renderEmail(q).text,/000000000004/);
+  assert.deepEqual(q.order.payment_options,expanded);assert.match(renderEmail(q).html,/Choose one payment method/);assert.match(renderEmail(q).html,/Pay only once\./);
   const oldEmail=await scalar('select payload from elio.outbox where order_id=$1 and event_type=\'order_submitted\' limit 1',[o.id]);
   assert.doesNotMatch(renderEmail({...oldEmail,settings:await saved()}).text,/Fourth method|000000000004/);
+  assert.match(renderEmail({...oldEmail,settings:await saved()}).html,/001234567890/);assert.doesNotMatch(renderEmail({...oldEmail,settings:await saved()}).html,/Fourth method|000000000004/);
  })();
  await check('recognized legacy methods migrate without changing account numbers or existing instructions',async()=>{
   const sql=await readFile(new URL('../../supabase/migrations/20260928055726_elio_payment_options.sql',import.meta.url),'utf8');

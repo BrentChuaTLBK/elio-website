@@ -9,6 +9,31 @@ const date = (value: string, includeTime = false) => {
   return new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", ...(includeTime ? { timeStyle: "short" as const } : {}) }).format(parsed) + (includeTime ? " (Asia/Manila)" : "");
 };
 const lines = (value: unknown) => escape(value).replace(/\n/g, "<br>");
+function paymentInstructions(order: any, settings: any): { html: string; text: string } {
+  // Never substitute today's accounts for a saved order's payment snapshot.
+  const options = order.payment_options;
+  const validOptions = Array.isArray(options) && options.length > 0 && options.every((option: any) => option
+    && ["label", "account_name", "account_number"].every(key => typeof option[key] === "string" && option[key].trim())
+    && (option.note == null || typeof option.note === "string"));
+  const note = typeof order.payment_note === "string" ? order.payment_note : "";
+  const accountText = validOptions ? options.map((option: any) => [option.label, option.account_name, option.account_number, option.note].filter(Boolean).join("\n")).join("\n\n") : "";
+  const structuredText = ["Accepted Payment Methods:", accountText, note].filter(Boolean).join("\n\n");
+  const savedText = typeof order.payment_instructions === "string" ? order.payment_instructions : null;
+  const normalize = (value: string) => value.replace(/\r\n/g, "\n").trim();
+  // Unrecognized/custom legacy instructions remain intact instead of being parsed or dropped.
+  const grouped = validOptions && (savedText == null || normalize(savedText) === normalize(structuredText));
+  const instructions = grouped ? structuredText : settings.payment_instructions || "Open your order page for payment instructions.";
+  const deadline = order.order_source === "direct" ? "" : date(order.payment_deadline, true);
+  const amount = money(order.total_cents);
+  const rows = grouped ? options.map((option: any) => `<tr><td style="padding:13px 0;border-bottom:1px solid #dfd1bd;font-size:14px;line-height:1.65;overflow-wrap:anywhere;word-break:break-word"><strong style="color:#63412d">${escape(option.label)}</strong><br><span>${escape(option.account_name)}</span><br><span style="font-size:15px;font-weight:bold;letter-spacing:.3px">${escape(option.account_number)}</span>${option.note ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.65">${lines(option.note)}</p>` : ""}</td></tr>`).join("") : "";
+  const details = grouped
+    ? `<p style="margin:0;font-size:13px;color:#786858">Choose one payment method:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed">${rows}</table>${note ? `<p style="margin:14px 0 0;font-size:13px;line-height:1.65">${lines(note)}</p>` : ""}`
+    : `<p style="margin:0;font-size:14px;line-height:1.8">${lines(instructions)}</p>`;
+  return {
+    html: emailPanel("How to pay", `<p style="margin:0 0 3px;font-size:12px;color:#786858">Amount to pay</p><p style="margin:0 0 12px;font:bold 24px/1.3 Arial,sans-serif;color:#39251c">${escape(amount)}</p>${deadline ? `<p style="margin:0 0 14px;font-size:13px;line-height:1.65"><strong>Upload your payment proof by</strong><br>${escape(deadline)}</p>` : ""}${details}`),
+    text: `How to pay\nAmount to pay: ${amount}${deadline ? `\nUpload your payment proof by: ${deadline}` : ""}\n\n${instructions}`,
+  };
+}
 const selectionParts = (item: any): string[] => (Array.isArray(item.selection_labels) && item.selection_labels.length ? item.selection_labels : (item.flavor_contents || []).map((f: any) => ({ label: f.name, quantity: f.quantity })))
   .map((choice: any) => typeof choice === "string" ? choice : `${choice.group ? `${choice.group}: ` : ""}${choice.label || "Option"}${choice.quantity ? ` × ${choice.quantity}` : ""}${Number(choice.surcharge_cents) ? ` (+${money(choice.surcharge_cents)} each)` : ""}`)
 ;
@@ -88,14 +113,14 @@ export function renderEmail(payload: any): { html: string; text: string } {
   let heading: string;
   let message: string;
   let instructions = "";
+  const payment = payload.event_type === "order_submitted" ? paymentInstructions(order, settings) : null;
   switch (payload.event_type) {
     case "order_submitted":
       heading = "Your order has been received";
       message = "Your order is awaiting full initial payment and manual approval. Upload your proof of payment through the secure order link before the deadline. A payment reference is optional. Uploading proof places the payment under review; it does not confirm payment.";
-      instructions = `Payment instructions:\n${settings.payment_instructions || "Open your order page for payment instructions."}\n\nPayment-proof deadline: ${date(order.payment_deadline, true)}.`;
+      instructions = payment!.text;
       if (order.order_source === "direct") {
         message = "Your order details are saved. Please pay the full amount and upload your proof through the private order link below. Our team will review it before confirming payment. This link has no automatic payment deadline; it remains open until you submit proof or our team closes the order.";
-        instructions = `Payment instructions:\n${settings.payment_instructions || "Open your order page for payment instructions."}`;
       }
       break;
     case "payment_approved":
@@ -170,7 +195,7 @@ export function renderEmail(payload: any): { html: string; text: string } {
   const text = `${settings.shop_name || "Elio Basque Cheesecake"}\n${heading}\nOrder reference: ${order.reference}\n\n${message}\n\n${instructions ? `${instructions}\n\n` : ""}${trackingText}Fulfillment: ${date(order.fulfillment_date)} · ${order.method}\n${fulfillment}\n\n${itemText}\n\n${totals}\n\nView your order securely:\n${link}\n\nKeep this link private; it grants access to this order.\nThis is an automated update. Please use your order page to upload payment proof and check your status.\nFor changes, cancellations, or payment concerns, contact us${contact ? `: ${contact}` : " using the details on your order page"}.`;
   const detailTitle = order.method === "delivery" ? "Delivery details" : "Pickup details";
   const detailsHtml = emailPanel(detailTitle, `<p style="margin:0 0 14px;font-size:15px;font-weight:bold">${escape(date(order.fulfillment_date))}</p><p style="margin:0;font-size:14px;line-height:1.8">${lines(fulfillment || "See your order page for details.")}</p>`, "sand");
-  const nextSteps = instructions ? emailPanel(payload.event_type === "order_submitted" ? "Payment instructions" : "What happens next", `<p style="margin:0;font-size:14px;line-height:1.8">${lines(instructions)}</p>`) : "";
+  const nextSteps = payment?.html || (instructions ? emailPanel("What happens next", `<p style="margin:0;font-size:14px;line-height:1.8">${lines(instructions)}</p>`) : "");
   const trackingPanel = showTracking && !trackingUpdate ? emailPanel("Delivery tracking", `<p style="margin:0;font-size:14px;line-height:1.8">${trackingMessage}</p>${emailButton(trackingLabel, trackingLink)}`) : "";
   const action = trackingUpdate && showTracking
     ? emailButton(trackingLabel, trackingLink) + `<p style="margin:0 0 20px;font-size:14px"><a href="${escape(link)}" style="color:#63412d;text-decoration:underline">View your order details</a></p>`
