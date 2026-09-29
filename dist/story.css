@@ -1,13 +1,14 @@
 /* Editorial story layout, using the storefront's existing type and palette. */
 .story-page{background:#faf6ee}
-.story-page .site-header{position:relative;background:var(--ivory);color:var(--brown)}
-.story-page .site-header .brand{color:var(--bronze)}
-.story-page .site-header .desktop-nav,.story-page .site-header .header-actions{color:var(--brown)}
-.story-page .site-header .header-order{background:var(--brown);color:var(--ivory);border-color:var(--brown)}
-.story-page .site-header .header-order:hover{background:#58382a}
-.story-page .site-header a:focus-visible,.story-page .site-header button:focus-visible{outline-color:var(--bronze)}
-.story-page .site-header .menu-toggle span{background:var(--brown)}
-.story-page .site-header .mobile-nav{background:var(--ivory);color:var(--brown)}
+.story-page .site-header{position:relative;background:var(--brown);color:var(--ivory)}
+.story-page .site-header .brand{color:var(--bronze-light)}
+.story-page .site-header .desktop-nav,.story-page .site-header .header-actions{color:var(--ivory)}
+.story-page .site-header .header-order{background:transparent;color:var(--ivory);border-color:var(--gold);font:17px/1.3 var(--body);min-height:44px;padding:12px 25px}
+.story-page .site-header .header-order:hover{background:rgba(248,243,234,.12)}
+.story-page .site-header a:focus-visible,.story-page .site-header button:focus-visible{outline-color:var(--bronze-light)}
+.story-page .site-header .menu-toggle span{background:var(--ivory)}
+.story-page .site-header .mobile-nav:not([hidden]){background:var(--brown);color:var(--ivory);border-color:#795c46}
+.story-page .site-header .mobile-nav a{border-color:#795c46}
 .story-page .desktop-nav [aria-current=page],.story-page .mobile-nav [aria-current=page]{text-decoration:underline;text-underline-offset:7px;text-decoration-color:var(--gold)}
 .story-page #main{max-width:1600px;margin-inline:auto}
 .story-hero{height:clamp(280px,31vw,440px);overflow:hidden;background:var(--beige)}
