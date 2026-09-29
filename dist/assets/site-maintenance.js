@@ -25,6 +25,13 @@ function updateCountdown(){
  if(total===0&&checkedEnd!==end&&!pending){checkedEnd=end;refresh();}
 }
 
+function updateManualStatus(){
+ const status=document.querySelector('[data-maint-manual-status]');
+ if(!status)return;
+ const message=refreshFailed?'We couldn’t check just now. We’ll try again shortly.':'This page will reopen automatically when we’re ready.';
+ if(status.textContent!==message)status.textContent=message;
+}
+
 function render(){
  if(!current)return;
  let banner=document.querySelector('#site-maintenance-banner');
@@ -46,10 +53,10 @@ function render(){
   if(nextScreen!==screenSignature){
    screenSignature=nextScreen;
    const scheduled=Number.isFinite(reopening());
-   screen.innerHTML=`<header class="maintenance-brand"><span class="maintenance-wordmark">ELIO</span><span class="maintenance-brand-description">BASQUE CHEESECAKE</span><span class="maintenance-byline">by TLB Kitchen</span></header><div class="maintenance-wrap"><main class="maintenance-content" aria-labelledby="maintenance-title"><p class="maintenance-eyebrow"><span aria-hidden="true"></span>A LITTLE PAUSE</p>${cake}<h1 id="maintenance-title">A little care<br>behind the scenes.</h1><p class="maintenance-message">${esc(current.message)}</p>${scheduled?`<div class="maintenance-reopening"><p class="maintenance-countdown-label">BACK TO SOMETHING SWEET IN</p><div class="maintenance-countdown" data-maint-countdown role="timer" aria-live="off" aria-label="Time until scheduled reopening">${['days','hours','minutes','seconds'].map(unit=>`<div class="maintenance-time-cell" ${unit==='days'?'data-maint-day-cell hidden':''}><span data-maint-${unit}>00</span><small>${unit}</small></div>`).join('')}</div><p class="maintenance-schedule">Scheduled to reopen<br><time datetime="${esc(current.ends_at)}">${esc(date(current.ends_at))}</time><span> · Manila time</span></p><p class="maintenance-auto" data-maint-reopening-status role="status"></p></div>`:'<p class="maintenance-manual">We’ll be back as soon as our updates are complete.</p>'}<div class="maintenance-order-note"><p>Your existing orders are still here.</p>${current.uploads_paused?'<p>Payment-proof uploads are paused.<br>Your remaining upload time is protected.</p>':''}</div><div class="maintenance-actions"><a class="maintenance-account" href="account.html">Your account & orders <span aria-hidden="true">↗</span></a><a class="maintenance-contact" href="mailto:elio.cheesecakes@gmail.com">Contact Elio</a></div><button type="button" data-maint-check>Check again <span aria-hidden="true">↻</span></button></main><p class="maintenance-signoff">Burnt beautifully. Soft within.</p></div>`;
+   screen.innerHTML=`<header class="maintenance-brand"><span class="maintenance-wordmark">ELIO</span><span class="maintenance-brand-description">BASQUE CHEESECAKE</span><span class="maintenance-byline">by TLB Kitchen</span></header><div class="maintenance-wrap"><main class="maintenance-content" aria-labelledby="maintenance-title"><p class="maintenance-eyebrow"><span aria-hidden="true"></span>A LITTLE PAUSE</p>${cake}<h1 id="maintenance-title">A little care<br>behind the scenes.</h1><p class="maintenance-message">${esc(current.message)}</p>${scheduled?`<div class="maintenance-reopening"><p class="maintenance-countdown-label">BACK TO SOMETHING SWEET IN</p><div class="maintenance-countdown" data-maint-countdown role="timer" aria-live="off" aria-label="Time until scheduled reopening">${['days','hours','minutes','seconds'].map(unit=>`<div class="maintenance-time-cell" ${unit==='days'?'data-maint-day-cell hidden':''}><span data-maint-${unit}>00</span><small>${unit}</small></div>`).join('')}</div><p class="maintenance-schedule">Scheduled to reopen<br><time datetime="${esc(current.ends_at)}">${esc(date(current.ends_at))}</time><span> · Manila time</span></p><p class="maintenance-auto" data-maint-reopening-status role="status"></p></div>`:'<div class="maintenance-manual"><span class="maintenance-pause-mark" aria-hidden="true"><span></span><span></span></span><p class="maintenance-countdown-label">A MOMENT OF CARE</p><h2>We’ll be back soon.</h2><p class="maintenance-manual-message">We’ll be back as soon as our updates are complete.</p><p class="maintenance-auto" data-maint-manual-status role="status"></p></div>'}<div class="maintenance-order-note"><p>Your existing orders are still here.</p>${current.uploads_paused?'<p>Payment-proof uploads are paused.<br>Your remaining upload time is protected.</p>':''}</div><div class="maintenance-actions"><a class="maintenance-account" href="account.html">Your account & orders <span aria-hidden="true">↗</span></a><a class="maintenance-contact" href="mailto:elio.cheesecakes@gmail.com">Contact Elio</a></div><button type="button" data-maint-check>Check again <span aria-hidden="true">↻</span></button></main><p class="maintenance-signoff">Burnt beautifully. Soft within.</p></div>`;
    screen.querySelector('[data-maint-check]').onclick=refresh;
   }
-  updateCountdown();
+  updateCountdown();updateManualStatus();
   if(Number.isFinite(reopening()))countdownTimer=setInterval(updateCountdown,1000);
  }
  const next=JSON.stringify([current.active,current.uploads_paused]);
@@ -70,7 +77,7 @@ async function refresh(){
  try{
   current=await api('site_status');serverTime=Date.parse(current.server_time);receivedAt=performance.now();refreshFailed=false;
   render();
- }catch{refreshFailed=true;updateCountdown();}
+ }catch{refreshFailed=true;updateCountdown();updateManualStatus();}
  finally{pending=false;const check=document.querySelector('[data-maint-check]');if(check)check.disabled=false;scheduleRefresh();}
 }
 window.addEventListener('hashchange',render);

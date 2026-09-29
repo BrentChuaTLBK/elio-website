@@ -28,7 +28,12 @@ body.site-under-maintenance{margin:0;background:#f8f3ea}
 .maintenance-schedule{font-size:11px;line-height:1.8;color:#7a634e}
 .maintenance-schedule time{font-weight:600;color:#604630}
 #site-maintenance-screen .maintenance-auto{font-size:10px;line-height:1.6;color:#7a634e;margin-top:6px;min-height:16px}
-#site-maintenance-screen .maintenance-manual{margin:0 auto 24px;max-width:360px;color:#79634e;font-size:13px}
+.maintenance-manual{margin:0 auto 24px;padding:21px 18px 19px;max-width:420px;border:1px solid #e3d4be;border-radius:14px;background:linear-gradient(180deg,#fbf5e9,#f6ecdc);color:#79634e}
+.maintenance-pause-mark{display:flex;align-items:center;justify-content:center;gap:5px;width:34px;height:34px;border:1px solid #d9bd96;border-radius:50%;margin:0 auto 12px;color:#9b7145}
+.maintenance-pause-mark>span{display:block;width:3px;height:12px;border-radius:2px;background:currentColor}
+#site-maintenance-screen .maintenance-manual h2{margin:9px 0 10px;font:31px/1.1 'Elio Maintenance Serif',Georgia,serif;letter-spacing:-.02em;color:#573923}
+.maintenance-manual-message{max-width:280px;margin-inline:auto!important;font-size:12px;line-height:1.7}
+#site-maintenance-screen .maintenance-manual .maintenance-auto{margin-top:12px;padding-top:12px;border-top:1px solid #e5d6c0}
 .maintenance-order-note{border-top:1px solid #eadfce;padding-top:17px;margin:0 auto;max-width:430px;color:#7a634e;font-size:11px;line-height:1.7}
 .maintenance-order-note p:first-child{font-size:12px;font-weight:600;color:#604630}
 #site-maintenance-screen .maintenance-order-note p+p{margin-top:4px}

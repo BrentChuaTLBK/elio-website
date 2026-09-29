@@ -70,7 +70,27 @@ try{
   f.status({ends_at:null});await f.check();assert.equal(await page.locator('[data-maint-countdown]').count(),0);
   assert(await page.getByText('We’ll be back as soon as our updates are complete.',{exact:true}).isVisible());
   await page.screenshot({path:join(output,'manual-320.png'),fullPage:true});await f.close();
-  console.log('PASS multi-day schedules and switching to manual maintenance');
+ console.log('PASS multi-day schedules and switching to manual maintenance');
+ }
+ for(const width of [1440,390,320]){
+  const f=await fixture(width,{manual:true}),{page}=f;
+  assert(await page.getByRole('heading',{name:'We’ll be back soon.',exact:true}).isVisible());
+  assert.equal(await page.locator('[data-maint-countdown],.maintenance-schedule,time').count(),0);
+  assert.equal(await page.locator('[data-maint-manual-status]').textContent(),'This page will reopen automatically when we’re ready.');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.evaluate(()=>document.fonts.ready);
+  await page.screenshot({path:join(output,`open-ended-${width}.png`),fullPage:true});
+  f.fail(true);await f.advance(30000);
+  await page.getByText('We couldn’t check just now. We’ll try again shortly.',{exact:true}).waitFor();
+  assert(await page.locator('#site-maintenance-screen').isVisible());
+  assert.equal(f.calls(),2);
+  f.fail(false);f.status({uploads_paused:false});await f.check();
+  assert.equal(await page.locator('[data-maint-manual-status]').textContent(),'This page will reopen automatically when we’re ready.');
+  assert(!((await page.locator('.maintenance-order-note').textContent()).includes('uploads are paused')));
+  f.status({active:false,announce:false});await f.advance(30000);
+  await page.locator('#site-maintenance-screen').waitFor({state:'hidden'});
+  assert(await page.getByRole('heading',{name:'Storefront',exact:true}).isVisible());
+  await f.close();console.log(`PASS open-ended maintenance layout, offline recovery and automatic reopening ${width}px`);
  }
  {
   const f=await fixture(390,{path:'/order.html#order=existing'}),{page}=f;
