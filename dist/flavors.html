@@ -11,11 +11,12 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/elio-apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="order.css">
-  <link rel="stylesheet" href="flavors.css?v=flavor-list-1">
+  <link rel="stylesheet" href="flavors.css?v=flavor-loading-1">
+  <noscript><style>#monthly-flavors,#filter-status,[data-flavor-count]{display:none!important}</style></noscript>
   <link rel="stylesheet" href="assets/shop/newsletter.css">
   <script type="module" src="assets/shop/newsletter.js"></script>
   <script src="content.js" defer></script>
-  <script src="flavors.js?v=flavor-name-search-1" defer></script>
+  <script src="flavors.js?v=flavor-loading-1" defer></script>
 <link rel="stylesheet" href="assets/site-maintenance.css?v=maintenance-2"><script type="module" src="assets/site-maintenance.js?v=maintenance-2"></script>
 <link rel="stylesheet" href="assets/site-analytics.css"><script type="module" src="assets/site-analytics.js"></script>
   <link rel="stylesheet" href="assets/storefront-footer.css?v=1">
@@ -33,26 +34,31 @@
       <img data-website-photo="flavors_hero" src="assets/home-editorial-hero.webp" width="1916" height="821" alt="A golden square Basque cheesecake with a beautifully burnt top" fetchpriority="high">
       <div class="flavors-hero-copy"><p class="eyebrow">The Elio collection</p><h1 id="flavors-title">Find your favorite.</h1><p>Burnt beautifully. Soft within.</p><p class="flavors-hero-note">A little discovery in every square.</p></div>
     </section>
-    <div class="flavors-shell">
+    <div class="flavors-shell" data-loading>
       <div class="flavors-toolbar">
       <div class="flavor-tabs" role="tablist" aria-label="Explore our flavors">
-        <button type="button" id="monthly-tab" role="tab" data-view="monthly" aria-controls="monthly-panel" aria-selected="true">This month</button>
-        <button type="button" id="collection-tab" role="tab" data-view="collection" aria-controls="collection-panel" aria-selected="false" tabindex="-1">Full collection</button>
+        <button type="button" id="monthly-tab" role="tab" data-view="monthly" aria-controls="monthly-panel" aria-selected="true" disabled>This month</button>
+        <button type="button" id="collection-tab" role="tab" data-view="collection" aria-controls="collection-panel" aria-selected="false" tabindex="-1" disabled>Full collection</button>
       </div>
-      <label class="flavor-search"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6"/></svg><span class="sr-only">Find a flavor</span><input id="flavor-search" type="search" placeholder="Find a flavor…" maxlength="160" autocomplete="off"></label>
+      <label class="flavor-search"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6"/></svg><span class="sr-only">Find a flavor</span><input id="flavor-search" type="search" placeholder="Find a flavor…" maxlength="160" autocomplete="off" disabled></label>
       </div>
       <div class="flavor-filterbar">
       <div class="flavor-filters" role="group" aria-label="Filter flavors by taste">
-        <button type="button" data-category="all" aria-pressed="true">All flavors</button>
+        <button type="button" data-category="all" aria-pressed="true" disabled>All flavors</button>
       </div>
       <span class="flavor-result-summary" aria-hidden="true"></span>
       </div>
-      <p class="sr-only" id="filter-status" role="status" aria-atomic="true"></p>
+      <p class="sr-only" id="filter-status" role="status" aria-atomic="true">Loading the flavor collection.</p>
       <div id="monthly-panel" role="tabpanel" aria-labelledby="monthly-tab" tabindex="0">
       <p class="flavors-empty" id="monthly-unavailable" hidden>This month’s selection is coming soon. Explore the full collection to find your favorite.</p>
       <section class="flavor-section" id="monthly-menu" aria-labelledby="monthly-title">
-        <div class="flavor-section-heading"><div><p class="flavor-section-label" id="monthly-label">This month</p><h2 id="monthly-title">Flavors of the Month</h2></div><div class="flavor-section-note"><p>A little discovery in every square.</p><span data-flavor-count></span></div></div>
-        <div class="flavors-grid" id="monthly-flavors"></div>
+        <div class="flavor-section-heading"><div><p class="flavor-section-label" id="monthly-label">This month</p><h2 id="monthly-title">Flavors of the Month</h2></div><div class="flavor-section-note"><p>A little discovery in every square.</p><span data-flavor-count>Loading flavors…</span></div></div>
+        <div class="flavors-grid" id="monthly-flavors" aria-busy="true">
+          <div class="flavor-tile flavor-skeleton" aria-hidden="true"><div class="flavor-tile-image"><span class="product-photo flavor-skeleton-block"></span></div><div class="flavor-tile-copy"><span class="flavor-skeleton-line flavor-skeleton-title"></span><span class="flavor-skeleton-line flavor-skeleton-tagline"></span><span class="flavor-skeleton-line"></span><span class="flavor-skeleton-line"></span><span class="flavor-skeleton-line flavor-skeleton-short"></span></div></div>
+          <div class="flavor-tile flavor-skeleton" aria-hidden="true"><div class="flavor-tile-image"><span class="product-photo flavor-skeleton-block"></span></div><div class="flavor-tile-copy"><span class="flavor-skeleton-line flavor-skeleton-title"></span><span class="flavor-skeleton-line flavor-skeleton-tagline"></span><span class="flavor-skeleton-line"></span><span class="flavor-skeleton-line"></span><span class="flavor-skeleton-line flavor-skeleton-short"></span></div></div>
+          <div class="flavor-tile flavor-skeleton" aria-hidden="true"><div class="flavor-tile-image"><span class="product-photo flavor-skeleton-block"></span></div><div class="flavor-tile-copy"><span class="flavor-skeleton-line flavor-skeleton-title"></span><span class="flavor-skeleton-line flavor-skeleton-tagline"></span><span class="flavor-skeleton-line"></span><span class="flavor-skeleton-line"></span><span class="flavor-skeleton-line flavor-skeleton-short"></span></div></div>
+          <div class="flavor-tile flavor-skeleton" aria-hidden="true"><div class="flavor-tile-image"><span class="product-photo flavor-skeleton-block"></span></div><div class="flavor-tile-copy"><span class="flavor-skeleton-line flavor-skeleton-title"></span><span class="flavor-skeleton-line flavor-skeleton-tagline"></span><span class="flavor-skeleton-line"></span><span class="flavor-skeleton-line"></span><span class="flavor-skeleton-line flavor-skeleton-short"></span></div></div>
+        </div>
         <p class="flavors-empty" id="monthly-empty" hidden></p>
       </section>
       <section class="flavor-section" id="next-month-menu" aria-labelledby="next-month-title" hidden>

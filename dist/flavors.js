@@ -1,5 +1,8 @@
 (async () => {
   'use strict';
+  const shell = document.querySelector('.flavors-shell');
+  const controls = () => shell.querySelectorAll('.flavors-toolbar button, .flavors-toolbar input, .flavor-filters button');
+  try {
   await window.ELIO_CONTENT_READY;
   const { flavorMetaHtml } = await import('./assets/shop/flavor-details.js');
   const data = window.ELIO_CONTENT;
@@ -110,4 +113,26 @@
   window.addEventListener('hashchange', followFlavorLink);
   window.addEventListener('popstate', followFlavorLink);
   followFlavorLink();
+  controls().forEach(control => { control.disabled = false; });
+  document.querySelector('#filter-status').textContent = data.collectionLoaded === false
+    ? 'The flavor collection is temporarily unavailable.'
+    : 'Flavor collection loaded. ' + document.querySelector('.flavor-result-summary').textContent + '.';
+  } catch {
+    // A failed content/module load must not leave a permanent skeleton or partial catalog.
+    shell.querySelectorAll('.flavors-grid').forEach(grid => grid.replaceChildren());
+    shell.querySelectorAll('.flavor-section').forEach(section => { section.hidden = true; });
+    document.querySelector('#monthly-panel').hidden = false;
+    document.querySelector('#collection-panel').hidden = true;
+    document.querySelector('#monthly-tab').setAttribute('aria-selected', 'true');
+    document.querySelector('#collection-tab').setAttribute('aria-selected', 'false');
+    controls().forEach(control => { control.disabled = true; });
+    const message = document.querySelector('#monthly-unavailable');
+    message.hidden = false;
+    message.textContent = 'We couldn’t load the flavor collection. Please reload this page, or visit the shop for current ordering availability.';
+    document.querySelector('#filter-status').textContent = message.textContent;
+  } finally {
+    shell.removeAttribute('data-loading');
+    shell.querySelectorAll('[aria-busy]').forEach(element => element.removeAttribute('aria-busy'));
+    shell.querySelectorAll('.flavor-skeleton').forEach(element => element.remove());
+  }
 })();
