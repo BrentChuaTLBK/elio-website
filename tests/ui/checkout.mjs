@@ -17,6 +17,8 @@ await h.api('save_promo',{promo:{code:'CHECKOUT10',kind:'percent',value:10,min_s
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true}),results=[];let chain=Promise.resolve();const serial=fn=>{const p=chain.then(fn);chain=p.catch(()=>{});return p;};
 try{
  for(const [width,method,guest] of [[1440,'pickup',false],[390,'delivery',false],[320,'pickup',true]]){
+  const pickupHours=guest?'':'11:30 AM – 7 PM',deliveryHours='8:30 AM – 5 PM';
+  await db.query('update elio.settings set data=data||$1::jsonb',[JSON.stringify({pickup_hours:pickupHours,delivery_window:deliveryHours})]);
   const fixture=await accountingFixture(h),flavor=fixture.product.box_flavors[0];
   await db.query('update elio.inventory set available=false where product_id=$1 and date<>$2',[flavor,fixture.date]);
   const user=guest?null:h.ids.customer,calls=[],errors=[],uploads=[];let created,failNewsletter=width===1440;
@@ -52,9 +54,20 @@ try{
   }
   if(method==='delivery'){await form.locator('[name=recipient_name]').fill('QA recipient');await form.locator('[name=recipient_phone]').fill('09170000001');await form.locator('[name=locality]').selectOption('QA City');await form.locator('[name=line1]').fill('Test address only');}
   if(!guest){assert.equal(await form.locator('[name=promo_code]').inputValue(),'CHECKOUT10');assert(!new URL(page.url()).hash.includes('voucher='));await page.locator('#apply-promo').click();await page.locator('#promo-status').filter({hasText:'applied'}).waitFor();}
-  await page.locator('#review-order').click();await page.locator('#place-order').waitFor();await page.screenshot({path:join(out,`review-${width}-${method}.png`),fullPage:true});
+  await page.locator('#review-order').click();await page.locator('#place-order').waitFor();
+  const review=page.locator('#checkout-dialog');
+  assert.equal(await review.evaluate(el=>el.scrollTop),0);assert.equal(await page.evaluate(()=>document.activeElement.id),'checkout-title');
+  assert.equal(await review.locator('.review-payment li').count(),2);assert.match(await review.locator('.review-payment').innerText(),/Pay in full/);assert.match(await review.locator('.review-payment').innerText(),/15 minutes/);assert.match(await review.locator('.review-payment').innerText(),/confirmed after payment approval/);
+  if(method==='delivery'){assert.match(await review.locator('.review-window').innerText(),/8:30 AM – 5 PM/);assert.match(await review.locator('.review-window').innerText(),/cannot be selected or guaranteed/);}
+  else if(pickupHours)assert.match(await review.locator('.review-window').innerText(),/11:30 AM – 7 PM/);else assert.equal(await review.locator('.review-window').count(),0);
+  for(const checkWidth of [320,390,768,1440]){await page.setViewportSize({width:checkWidth,height:1000});assert(await review.evaluate(el=>el.scrollWidth<=el.clientWidth+1));}
+  await page.setViewportSize({width,height:1000});
+  await page.locator('#edit-checkout').click();assert.equal(await form.locator('[name=buyer_name]').inputValue(),'QA customer');await page.locator('#review-order').click();await page.locator('#place-order').waitFor();assert.equal(await review.evaluate(el=>el.scrollTop),0);
+  await page.screenshot({path:join(out,`review-${width}-${method}.png`),fullPage:true});
   await page.locator('#place-order').click();await page.locator('#proof-form').waitFor();
   assert.equal(created.total_cents,10000-(guest?0:1000)+(method==='delivery'?3000:0));assert.equal(await h.remaining({id:flavor},fixture.date),97);
+  assert.equal(created[method==='delivery'?'delivery_window':'pickup_hours'],method==='delivery'?deliveryHours:pickupHours);
+  assert(Math.abs(Date.parse(created.payment_deadline)-Date.parse(created.created_at)-15*60000)<1000);
   for(const label of ['GCash','BDO','East West'])assert(await page.getByText(label,{exact:true}).count()>0);
   const bytes=await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=360;c.height=140;const x=c.getContext('2d');x.fillStyle='white';x.fillRect(0,0,360,140);x.fillStyle='black';x.font='24px Arial';x.fillText('QA PAYMENT RECEIPT',10,60);return [...new Uint8Array(await(await new Promise(r=>c.toBlob(r,'image/png'))).arrayBuffer())];});
   await page.locator('[name=proof]').setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from(bytes)});await page.getByRole('button',{name:'Submit payment proof',exact:true}).click();await page.getByRole('heading',{name:'Your payment is under review'}).waitFor();
@@ -69,4 +82,3 @@ try{
   await ctx.close();
  }
 }finally{await browser.close();await db.close();await writeFile(join(out,'report.json'),JSON.stringify(results,null,2));}
-
