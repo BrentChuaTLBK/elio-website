@@ -11,11 +11,11 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/elio-apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="order.css">
-  <link rel="stylesheet" href="flavors.css">
+  <link rel="stylesheet" href="flavors.css?v=flavor-list-1">
   <link rel="stylesheet" href="assets/shop/newsletter.css">
   <script type="module" src="assets/shop/newsletter.js"></script>
   <script src="content.js" defer></script>
-  <script src="flavors.js" defer></script>
+  <script src="flavors.js?v=flavor-list-1" defer></script>
 <link rel="stylesheet" href="assets/site-maintenance.css?v=maintenance-2"><script type="module" src="assets/site-maintenance.js?v=maintenance-2"></script>
 <link rel="stylesheet" href="assets/site-analytics.css"><script type="module" src="assets/site-analytics.js"></script>
   <link rel="stylesheet" href="assets/storefront-footer.css?v=1">
@@ -39,32 +39,36 @@
         <button type="button" id="monthly-tab" role="tab" data-view="monthly" aria-controls="monthly-panel" aria-selected="true">This month</button>
         <button type="button" id="collection-tab" role="tab" data-view="collection" aria-controls="collection-panel" aria-selected="false" tabindex="-1">Full collection</button>
       </div>
+      <label class="flavor-search"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6"/></svg><span class="sr-only">Find a flavor</span><input id="flavor-search" type="search" placeholder="Find a flavor…" maxlength="160" autocomplete="off"></label>
+      </div>
+      <div class="flavor-filterbar">
       <div class="flavor-filters" role="group" aria-label="Filter flavors by taste">
         <button type="button" data-category="all" aria-pressed="true">All flavors</button>
       </div>
+      <span class="flavor-result-summary" aria-hidden="true"></span>
       </div>
       <p class="sr-only" id="filter-status" role="status" aria-atomic="true"></p>
       <div id="monthly-panel" role="tabpanel" aria-labelledby="monthly-tab" tabindex="0">
       <p class="flavors-empty" id="monthly-unavailable" hidden>This month’s selection is coming soon. Explore the full collection to find your favorite.</p>
       <section class="flavor-section" id="monthly-menu" aria-labelledby="monthly-title">
-        <div class="flavor-section-heading"><h2 id="monthly-title">Flavors of the Month</h2></div>
+        <div class="flavor-section-heading"><div><p class="flavor-section-label" id="monthly-label">This month</p><h2 id="monthly-title">Flavors of the Month</h2></div><div class="flavor-section-note"><p>A little discovery in every square.</p><span data-flavor-count></span></div></div>
         <div class="flavors-grid" id="monthly-flavors"></div>
         <p class="flavors-empty" id="monthly-empty" hidden></p>
       </section>
       <section class="flavor-section" id="next-month-menu" aria-labelledby="next-month-title" hidden>
-        <div class="flavor-section-heading"><h2 id="next-month-title">Coming Next Month</h2></div>
+        <div class="flavor-section-heading"><div><p class="flavor-section-label" id="next-month-label">Coming next month</p><h2 id="next-month-title">Next month’s selection</h2></div><div class="flavor-section-note"><p>A little something to look forward to.</p><span data-flavor-count></span></div></div>
         <div class="flavors-grid" id="next-month-flavors"></div><p class="flavors-empty" id="next-month-empty" hidden></p>
       </section>
       </div>
       <div id="collection-panel" role="tabpanel" aria-labelledby="collection-tab" tabindex="0" hidden>
       <section class="flavor-section flavor-archive" id="other-flavors" aria-labelledby="other-title">
-        <div class="flavor-section-heading"><h2 id="other-title">The full collection.</h2><p>Familiar favorites. New discoveries.</p></div>
+        <div class="flavor-section-heading"><h2 id="other-title">The full collection.</h2><div class="flavor-section-note"><p>Familiar favorites. New discoveries.</p><span data-flavor-count></span></div></div>
         <div class="flavors-grid" id="other-flavors-grid"></div>
         <p class="flavors-empty" id="other-empty" hidden></p>
       </section>
       </div>
       <section class="flavors-box" aria-labelledby="flavors-box-title">
-        <div class="flavors-box-copy"><p class="eyebrow">A little box. A lovely moment.</p><h2 id="flavors-box-title">Find your perfect box.</h2><p>Your favorite flavors, beautifully boxed.<br>Choose a signature set or make it your own.</p><div class="flavors-box-actions"><a class="button" href="order.html#cheesecake-boxes">Shop our boxes <span aria-hidden="true">→</span></a><a class="button button-outline" href="order.html#cheesecake-boxes">Build your own <span aria-hidden="true">→</span></a></div></div>
+        <div class="flavors-box-copy"><h2 id="flavors-box-title">Find your perfect box.</h2><p>Your favorite flavors, beautifully boxed.</p><div class="flavors-box-actions"><a class="button button-outline" href="order.html#cheesecake-boxes">Shop our boxes <span aria-hidden="true">→</span></a></div></div>
         <img data-website-photo="flavors_box" src="assets/home-editorial-gift.webp" width="1860" height="846" loading="lazy" alt="An Elio cheesecake gift box in warm brown with gold lettering">
       </section>
       <p class="flavors-footnote">Our selections change throughout the year. Visit the shop for ordering availability on your chosen date.</p>
@@ -79,6 +83,5 @@
     </div>
     <div class="elio-footer-bottom"><p>© 2026 Elio · by TLB Kitchen</p><nav aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Website terms</a></nav></div>
   </footer>
-  <dialog id="flavor-dialog" aria-labelledby="dialog-title"><button class="dialog-close icon-button" type="button" aria-label="Close details"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19"/></svg></button><div id="flavor-dialog-content"></div></dialog>
 </body>
 </html>
