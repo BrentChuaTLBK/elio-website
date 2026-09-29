@@ -362,7 +362,7 @@ else if (auth) {
       document.querySelector('#account-email').textContent=data.session.user.email;
       document.querySelector('#account-verification').textContent=data.session.user.email_confirmed_at?'Email verified':'Email not verified';
       loadOrders();
-      import('./vouchers.js').then(({mountVouchers})=>{if(accountSession?.user.id===data.session.user.id)voucherController=mountVouchers(document.querySelector('#account-vouchers'));});
+      import('./vouchers.js?v=compact-wallet-1').then(({mountVouchers})=>{if(accountSession?.user.id===data.session.user.id)voucherController=mountVouchers(document.querySelector('#account-vouchers'));});
       finishOAuthNewsletterConsent(data.session).then(async handled=>{if(!handled)await activateNewsletter(data.session);await loadEmailPreference();voucherController?.refresh();});
     }
     const dashboardLink = document.querySelector('#staff-dashboard');

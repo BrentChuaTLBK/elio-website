@@ -52,14 +52,14 @@ try{
   assert.equal(await p.getByLabel('Email subject',{exact:true}).inputValue(),customSubject);await p.screenshot({path:join(out,'email-subject-editor-'+width+'.png'),fullPage:true});
   assert.equal(await p.locator('[name=status]').inputValue(),'draft');await p.locator('[name=status]').selectOption('active');await p.getByRole('button',{name:'Save campaign',exact:true}).click();await p.getByText('Campaign active. Future qualifying completions will issue vouchers.').waitFor();
   const o=await h.api('create_order',h.checkout(fixture.product,fixture.date),user);await h.proof(o,{user_id:user});await h.action('approve_payment',await h.order(o.id));await h.action('set_fulfillment',await h.order(o.id),{status:'completed'});
-  await p.locator('[data-offer=refresh]').click();await p.locator('.offer-card').filter({hasText:`Thank-you ${width}`}).waitFor();await p.locator('[data-voucher-refresh]').click();await p.locator('#wallet .voucher-card').first().waitFor();
-  assert.match(await p.locator('#wallet').innerText(),/10% off your next order/);assert(await p.locator('#wallet [href^="order.html#voucher="]').count()>0);
+  await p.locator('[data-offer=refresh]').click();await p.locator('.offer-card').filter({hasText:`Thank-you ${width}`}).waitFor();await p.locator('[data-voucher-refresh]').click();await p.locator('#wallet .voucher-card, #wallet .voucher-compact').first().waitFor();
+  assert.match(await p.locator('#wallet').innerText(),/10% off/);assert(await p.locator('#wallet [href^="order.html#voucher="]').count()>0);
   assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await p.screenshot({path:join(out,`overview-${width}.png`),fullPage:true});
   await p.locator('.offer-card').filter({hasText:`Thank-you ${width}`}).getByRole('button',{name:'View report'}).click();await p.locator('.offer-recipient').waitFor();assert.match(await p.locator('.offer-recipient').innerText(),/skipped/);
   assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await p.screenshot({path:join(out,`report-${width}.png`),fullPage:true});
   await p.locator('[data-voucher-tab=used]').click();await p.getByText('No vouchers here yet. Eligible offers will appear automatically.').waitFor();
   fail=true;await p.locator('[data-voucher-refresh]').click();await p.getByText('Connection unavailable. Try again.').waitFor();fail=false;
-  await p.locator('[data-voucher-tab=available]').click();await p.locator('#wallet .voucher-card').first().waitFor();
+  await p.locator('[data-voucher-tab=available]').click();await p.locator('#wallet .voucher-card, #wallet .voucher-compact').first().waitFor();
   assert.deepEqual(errors,[]);console.log(`PASS voucher campaign, account wallet, report and retry at ${width}px`);await ctx.close();
  }
 }finally{await browser.close();await db.close();}

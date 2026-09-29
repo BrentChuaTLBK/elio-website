@@ -42,3 +42,7 @@ Owners can set an email subject separately from the campaign name (1–200 chara
 ## Campaign email text
 
 The small heading, main heading and message are editable plain text. `{{discount}}` inserts the fixed peso amount or percentage from the issued offer, and message line breaks are preserved. The code, actual discount, terms, expiry, account link and unsubscribe controls are generated independently. Previews use unsaved text; issuing a voucher snapshots it so later campaign edits cannot rewrite queued messages. Old queued messages without `email_copy` retain the original copy. HTML is escaped.
+
+## Compact wallet
+
+A tab containing one voucher retains its full card. Tabs with multiple vouchers use compact rows, four per page, showing value, minimum/cap and expiry. Details opens a keyboard-accessible dialog with the complete terms, code and copy action. Only available vouchers link to checkout. Pagination uses the existing bounded wallet API and recovers when voucher counts shrink. Preview examples use local fixtures, not issued vouchers.
