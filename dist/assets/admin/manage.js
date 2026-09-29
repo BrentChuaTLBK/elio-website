@@ -223,7 +223,7 @@ function flavorMenusView() {
 }
 function editFlavorMenu(id) {
   const flavor = state.products.find(p => p.id === id);
-  showDialog(flavor ? 'Edit ' + flavor.name : 'Add a flavor', `<form data-form="flavor-menu-editor">${formError}${flavorMenuFields(state,id,{ today: manilaDate(),esc,input,textarea,select,option,check,disabled:ownerLocked() })}${actions(flavor ? 'Save flavor' : 'Add to collection')}${flavor && owner() ? `<div class="subsection"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(flavor.id)}">Delete flavor</button></div>` : ''}</form>`);
+  showDialog(flavor ? 'Edit ' + flavor.name : 'Add a flavor', `<form data-form="flavor-menu-editor">${formError}${flavorMenuFields(state,id,{ today: manilaDate(),esc,input,textarea,select,option,check,disabled:ownerLocked() })}${actions(flavor ? 'Save flavor' : 'Add to collection')}${flavor && owner() ? `<div class="subsection product-delete-section"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(flavor.id)}">Delete flavor</button></div>` : ''}</form>`);
 }
 function productionView() {
   const report=buildProduction(state.orders,state.productionRange.from,state.productionRange.to);
@@ -475,7 +475,7 @@ function renderProductDialog() {
     ${categoryFields(p,areaCategories(),esc,ownerLocked())}
     ${productLabelEditor(p.label)}
     <section class="subsection"><h3>Photos</h3><p class="muted">${PHOTO_HELP} Product photos are public. The first photo is the cover.</p><p class="help-text" id="photo-order-help">Drag photos to rearrange them, or focus a photo and use the arrow keys. Save the item to publish changes.</p><div id="product-photo-order">${renderProductPhotos(p.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) })}</div><p id="photo-order-status" class="sr-only" role="status" aria-live="polite"></p>${input('photos', 'Upload photos', '', 'file', `accept="${PHOTO_ACCEPT}" multiple id="product-photos" ` + ownerLocked())}</section>
-    ${actions(p.id ? 'Save changes' : 'Create ' + names[kind])}${p.id && owner() ? `<div class="subsection"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(p.id)}">Delete ${names[kind]}</button><p class="help-text">Existing orders and records are preserved.</p></div>` : ''}
+    ${actions(p.id ? 'Save changes' : 'Create ' + names[kind])}${p.id && owner() ? `<div class="subsection product-delete-section"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(p.id)}">Delete ${names[kind]}</button><p class="help-text">Existing orders and records are preserved.</p></div>` : ''}
   </form>`);
   bindPhotoOrder();
   updateProductLabelPreview();
