@@ -1,3 +1,4 @@
+import {navigateDashboard} from '../helpers/dashboard-navigation.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFile,mkdir} from 'node:fs/promises';
@@ -60,13 +61,13 @@ try{for(const width of [1440,390,320]){
  await page.clock.fastForward(16000);assert.equal(await page.locator('[data-calendar-filter=area]').inputValue(),'Makati');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'No horizontal page overflow');
  await page.locator('#order-calendar-manager').screenshot({path:join(output,`calendar-${width}.png`)});
- await page.locator('[data-view=boxes]').click();await page.getByText('2 production days',{exact:true}).waitFor();
- await page.locator('[data-view=flavors]').click();await page.locator('[data-action=edit-product][data-id=flavor]').click();
+ await navigateDashboard(page,'boxes');await page.getByText('2 production days',{exact:true}).waitFor();
+ await navigateDashboard(page,'flavors');await page.locator('[data-action=edit-product][data-id=flavor]').click();
  await page.locator('[data-action=delete-product]').click();const prompt=page.getByRole('dialog',{name:'Delete flavor',exact:true});assert.match(await prompt.textContent(),/Box fixture/);
  await prompt.getByRole('button',{name:'Keep item',exact:true}).click();assert.equal(calls.filter(c=>c.action==='delete_product').length,0);
  await page.locator('[data-action=delete-product]').click();await prompt.getByRole('button',{name:'Delete',exact:true}).click();await page.locator('#admin-dialog').waitFor({state:'hidden'});
  assert.equal(await page.locator('[data-action=edit-product][data-id=flavor]').count(),0);
- await page.locator('[data-view=boxes]').click();await page.getByText('Unavailable · contains a deleted flavor',{exact:true}).waitFor();
+ await navigateDashboard(page,'boxes');await page.getByText('Unavailable · contains a deleted flavor',{exact:true}).waitFor();
  const count=calls.filter(c=>c.action==='calendar_list').length;await page.clock.fastForward(31000);assert.equal(calls.filter(c=>c.action==='calendar_list').length,count);
  assert.deepEqual(errors,[]);await ctx.close();console.log(`PASS calendar, quick copy, filters, polling, catalog deletion and production days at ${width}px`);
 }}finally{await browser.close();}

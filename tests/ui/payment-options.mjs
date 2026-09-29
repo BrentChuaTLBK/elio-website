@@ -1,3 +1,4 @@
+import {navigateDashboard} from '../helpers/dashboard-navigation.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFile,mkdir} from 'node:fs/promises';
@@ -21,6 +22,7 @@ try {
     const {action,payload}=route.request().postDataJSON();calls.push({action,payload});let data;
     if(action==='admin_bootstrap')data={role:'owner',orders:[],products:[],categories:[],zones:[],staff:[],inventory:[],promos:[],settings};
     else if(action==='site_status')data={active:false,uploads_paused:false,announce:false,server_time:new Date().toISOString()};
+    else if(action==='newsletter_settings')data={enabled:false};
     else if(action==='catalog')data={settings,products:[],categories:[],zones:[],inventory:[]};
     else if(action==='get_order')data=order;
     else if(action==='save_settings'){settings=payload.settings;data=settings;}
@@ -31,7 +33,7 @@ try {
    const file=resolve(root,'.'+url.pathname);if(!file.startsWith(root+sep))return route.abort();
    try {
     let body=await readFile(file);
-    if(url.pathname==='/order.html')body=body.toString().replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,tag=>tag.includes('src="assets/shop/shop.js"')?tag:'');
+    if(url.pathname==='/order.html')body=body.toString().replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,tag=>/src=["']assets\/shop\/shop\.js(?:\?[^"']*)?["']/.test(tag)?tag:'');
     return route.fulfill({contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2'})[extname(file)]||'application/octet-stream',body});
    }catch{return route.fulfill({status:404,body:''});}
   });
@@ -67,7 +69,7 @@ try {
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   }
   await page.locator('#delivery-tracking').screenshot({path:join(output,`tracking-${width}.png`)});
-  await page.goto(origin+'/manage.html');await page.locator('[data-view=settings]').click();assert.equal(await page.locator('.payment-option-editor').count(),3);
+  await page.goto(origin+'/manage.html');await navigateDashboard(page,'settings');assert.equal(await page.locator('.payment-option-editor').count(),3);
   assert.equal(await page.locator('.payment-option-editor details[open]').count(),0);
   const first=page.locator('.payment-option-editor').first();
   await first.locator('summary').click();await first.locator('[name=note]').fill('Edited before reordering');await first.locator('summary').click();
@@ -79,7 +81,7 @@ try {
   await page.getByRole('button',{name:'+ Add payment option',exact:true}).click();const fourth=page.locator('.payment-option-editor').nth(3);
   await fourth.locator('[name=label]').fill('Maya');await fourth.locator('[name=account_name]').fill('Test Shop');await fourth.locator('[name=account_number]').fill('09170000004');await fourth.locator('[name=note]').fill('Use your order reference.');
   await page.getByRole('button',{name:'Save shop settings',exact:true}).click();await page.getByText('Shop settings saved.',{exact:true}).waitFor();assert.equal(settings.payment_options.length,4);assert.equal(settings.payment_options[3].account_number,'09170000004');
-  await page.reload();await page.locator('[data-view=settings]').click();assert.equal(await page.locator('.payment-option-editor').count(),4);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.reload();await navigateDashboard(page,'settings');assert.equal(await page.locator('.payment-option-editor').count(),4);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.locator('.payment-options-editor').screenshot({path:join(output,`admin-${width}.png`)});
   await page.screenshot({path:join(output,`settings-${width}.png`),fullPage:true});
   await page.locator('.payment-option-editor').nth(3).getByRole('button',{name:'Remove Maya'}).click();assert.equal(await page.locator('.payment-option-editor').count(),3);assert.equal(settings.payment_options.length,4);assert.equal(await page.locator('[name=contact_email]').inputValue(),'shop@example.test');

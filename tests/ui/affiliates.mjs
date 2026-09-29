@@ -1,3 +1,4 @@
+import {navigateDashboard} from '../helpers/dashboard-navigation.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFile,mkdir} from 'node:fs/promises';
@@ -62,7 +63,7 @@ try{
     await page.locator('[data-aff=edit-affiliate]').click();assert(await form.locator('[name=email]').isEditable()===false);await form.locator('[name=commission]').fill('20');
     // Explicit refresh preserves unsaved form fields and its original revision.
     await page.locator('[data-aff=refresh]').click();assert.equal(await form.locator('[name=commission]').inputValue(),'20');
-    await page.locator('[data-view=orders]').click();const dirty=page.getByRole('dialog',{name:'Unsaved affiliate changes',exact:true});await dirty.getByRole('button',{name:'Keep editing',exact:true}).click();assert.equal(await form.locator('[name=commission]').inputValue(),'20');await form.locator('[type=submit]').click();await page.getByText('Current commission:',{exact:false}).waitFor();assert.equal(affiliates[0].commission_bps,2000);
+    await navigateDashboard(page,'orders');const dirty=page.getByRole('dialog',{name:'Unsaved affiliate changes',exact:true});await dirty.getByRole('button',{name:'Keep editing',exact:true}).click();assert.equal(await form.locator('[name=commission]').inputValue(),'20');await form.locator('[type=submit]').click();await page.getByText('Current commission:',{exact:false}).waitFor();assert.equal(affiliates[0].commission_bps,2000);
     earned=9500;await page.locator('[data-aff=refresh]').click();await page.locator('.aff-detail .aff-stats .panel').first().getByText('₱95.00',{exact:true}).waitFor();await page.screenshot({path:join(output,`owner-${width}.png`),fullPage:true});
     await page.locator('[data-aff=new-payout]').click();await form.locator('[name=amount]').fill('50');await form.locator('[name=reference]').fill('GCASH-123');await form.locator('[name=proof]').setInputFiles({name:'bad.txt',mimeType:'text/plain',buffer:Buffer.from('test')});await form.locator('[type=submit]').click();await page.getByText('Choose a JPG, PNG, or WebP receipt.',{exact:true}).waitFor();assert.equal(payouts.length,0);
     await form.locator('[name=proof]').setInputFiles(join(root,'assets/elio-favicon.png'));await page.screenshot({path:join(output,`payout-${width}.png`),fullPage:true});await form.locator('[type=submit]').dblclick();await page.getByText('Payment recorded. The balance and Accounting have been updated.',{exact:true}).waitFor();assert.equal(payouts.length,1);assert.equal(payouts[0].amount_cents,5000);await page.locator('.aff-detail .aff-stats .panel').first().getByText('₱45.00',{exact:true}).waitFor();

@@ -1,3 +1,4 @@
+import {navigateDashboard} from '../helpers/dashboard-navigation.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFile,mkdir} from 'node:fs/promises';
@@ -32,7 +33,7 @@ try {
       try{return route.fulfill({contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.png':'image/png','.webp':'image/webp'})[extname(file)]||'application/octet-stream',body:await readFile(file)});}catch{return route.fulfill({status:404,body:''});}
     });
     const page=await ctx.newPage();page.on('pageerror',error=>errors.push(error.message));
-    await page.clock.install();await page.goto(origin+'/manage.html');await page.locator('[data-view=analytics]').click();
+    await page.clock.install();await page.goto(origin+'/manage.html');await navigateDashboard(page,'analytics');
     const panel=page.locator('#website-visitors'),today=panel.locator('[data-traffic-metric=today]'),active=panel.locator('[data-traffic-metric=realtime]');
     await page.waitForFunction(()=>document.querySelector('[data-traffic-metric=today]')?.textContent==='1,234');
     assert.equal(await active.textContent(),'6');assert((await panel.textContent()).includes('Asia/Manila'));
@@ -49,7 +50,7 @@ try {
     await page.waitForFunction(()=>document.querySelector('[data-traffic-metric=today]')?.textContent==='0');assert.equal(await active.textContent(),'0');
     report={status:'not_configured'};await page.clock.fastForward(61000);
     await page.waitForFunction(()=>document.querySelector('#website-visitors')?.textContent.includes('still need reporting access'));assert.equal(await today.textContent(),'—');
-    const count=requests;await page.locator('[data-view=orders]').click();await page.clock.fastForward(61000);assert.equal(requests,count);
+    const count=requests;await navigateDashboard(page,'orders');await page.clock.fastForward(61000);assert.equal(requests,count);
     assert.deepEqual(errors,[]);await ctx.close();console.log(`Passed dashboard reporting at ${width}px.`);
   }
 } finally {await browser.close();}

@@ -1,3 +1,4 @@
+import {navigateDashboard} from '../helpers/dashboard-navigation.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFile,mkdir} from 'node:fs/promises';
@@ -27,7 +28,7 @@ try{
    const file=resolve(root,'.'+url.pathname);if(!file.startsWith(root+sep))return route.abort();
    try{return route.fulfill({contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.png':'image/png','.webp':'image/webp'})[extname(file)]||'application/octet-stream',body:await readFile(file)});}catch{return route.fulfill({status:404,body:''});}
   });
-  const page=await ctx.newPage();page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/manage.html');await page.locator('[data-view=analytics]').click();
+  const page=await ctx.newPage();page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/manage.html');await navigateDashboard(page,'analytics');
   await page.locator('#analytics-period').selectOption('last7');
   const points=page.locator('.analytics-chart-point'),tooltip=page.locator('.analytics-chart-tooltip'),chart=page.locator('[data-sales-chart]');
   const target=page.locator(`.analytics-chart-point[data-period="${dateLabel(day(-2))}"]`);
