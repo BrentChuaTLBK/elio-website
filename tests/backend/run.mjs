@@ -54,6 +54,8 @@ try {
   process.stderr.write(`FAIL ${error.message}\n`);
   if (error.detail) process.stderr.write(`DETAIL ${error.detail}\n`);
   if (error.where) process.stderr.write(`CONTEXT ${error.where}\n`);
+  if (error.position) process.stderr.write(`POSITION ${error.position}\n`);
+  if (error.internalQuery) process.stderr.write(`INTERNAL ${error.internalQuery}\n`);
   if (error.query) process.stderr.write(`QUERY ${error.query.slice(0, 300)}\n`);
   process.exitCode = 1;
 } finally {

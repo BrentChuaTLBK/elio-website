@@ -1,4 +1,5 @@
 import {mountBackup} from './backup.js';
+import {mountMarketingInsights} from './marketing-insights.js';
 import {renderAttention,loadAttentionCalendar} from './needs-attention.js';
 import {deliveryFeeSummary,separateDeliveryPaid} from '../delivery-fee.js';
 import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-mobile-audit-1';
@@ -65,6 +66,8 @@ let productDraft = null;
 let clearPhotoDrag = () => {};
 let catalogOrderController = null;
 let affiliatesController = null;
+let marketingController = null;
+let initialAffiliate = null;
 let calendarController = null;
 let websitePhotosController = null;
 let maintenanceController = null;
@@ -165,7 +168,7 @@ const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,ow
 async function refresh() {
   if (!configured) return;
   const result = await api('admin_bootstrap');
-  if(!state.connected && ['#accounting','#affiliates','#maintenance','#website-photos','#backup'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
+  if(!state.connected && ['#accounting','#affiliates','#maintenance','#website-photos','#backup','#marketing'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
   if(!state.connected && /^#calendar(?:\?|$)/.test(location.hash))state.view='calendar';
   Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
   state.promos = state.promos.filter(promo => !promo.newsletter_managed && !promo.affiliate_managed);
@@ -178,6 +181,9 @@ async function refresh() {
   render();
 }
 function render() {
+  const marketingNav=$('[data-view="marketing"]');if(marketingNav)marketingNav.hidden=!state.connected||state.role!=='owner';
+  if(state.view==='marketing' && state.connected && owner() && $('#marketing-insights-manager'))return;
+  marketingController?.destroy();marketingController=null;
   const offersNav=$('[data-view="offers"]');if(offersNav)offersNav.hidden=!state.connected||state.role!=='owner';
   if(state.view==='offers' && state.connected && state.role==='owner' && $('#voucher-campaigns-manager'))return;
   voucherCampaignsController?.destroy();voucherCampaignsController=null;
@@ -207,16 +213,18 @@ function render() {
   const currentPage=$('#dashboard-current-page');if(currentPage){const active=$('#admin-nav .sidebar-link.active');currentPage.textContent=active?.textContent.trim().replace(/\d+$/, '').trim()||'Overview';}
   const views = { backup:()=>'<div id="backup-manager"></div>', offers:()=>'<div id="voucher-campaigns-manager"></div>', 'website-photos':()=>'<div id="website-photos-manager"></div>', calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   unmountAnalyticsChart();
+  views.marketing=()=>'<div id="marketing-insights-manager"></div>';
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
   if(state.view==='overview'&&state.connected)void loadAttentionCalendar($('#workspace'),{api,esc,dateTime});
   if(state.view==='backup')mountBackup($('#backup-manager'),{api,owner:state.connected&&owner(),esc,money});
+  if(state.view==='marketing')marketingController=mountMarketingInsights($('#marketing-insights-manager'),{api,owner:state.connected&&owner(),esc,money,today:manilaDate(),openOrder,openAffiliate(id){initialAffiliate=id;state.view='affiliates';render();}});
   if(state.view==='offers')voucherCampaignsController=mountVoucherCampaigns($('#voucher-campaigns-manager'),{owner:state.connected&&state.role==='owner'});
   if(state.view==='website-photos')websitePhotosController=mountWebsitePhotos($('#website-photos-manager'),{owner:state.connected&&state.role==='owner'});
   unmountAnalyticsChart=state.view==='analytics'?mountAnalyticsChart($('#workspace')):()=>{};
   if(state.view==='calendar')calendarController=mountCalendar($('#order-calendar-manager'),{api,calendarConnection,role:state.role,connected:state.connected,openOrder,toast,esc,filters:state.calendarFilters});
   if(state.view==='maintenance')maintenanceController=mountMaintenance($('#maintenance-manager'),{owner:state.connected&&state.role==='owner'});
   if(state.view==='accounting')mountAccounting($('#accounting-manager'),{api,role:state.role,connected:state.connected,money,escapeHtml:esc,today:manilaDate(),filters:state.accountingFilter,openOrder});
-  if(state.view==='affiliates')affiliatesController=mountAffiliates($('#affiliates-manager'),{role:state.role,connected:state.connected});
+  if(state.view==='affiliates'){affiliatesController=mountAffiliates($('#affiliates-manager'),{role:state.role,connected:state.connected,initialAffiliate});initialAffiliate=null;}
   if(state.view==='settings')mountPaymentEditor($('#workspace'),{esc,disabled:Boolean(ownerLocked())});
   if(state.view==='faqs')bindFaqView(state,$('#workspace'),render);
   if(state.view==='newsletter')newsletterAdmin.mount($('#workspace'));

@@ -3,13 +3,13 @@ import {percent,decimalHundredths,manilaInput,manilaTimestamp,paymentMethods,ren
 import {confirmDialog} from './site-dialog.js?v=branded-dialogs-1';
 import {PHOTO_ACCEPT,RECEIPT_HELP} from './photo-upload.js';
 
-export function mountAffiliates(root,{role,connected}){
+export function mountAffiliates(root,{role,connected,initialAffiliate=null}){
  if(!root)return;
  if(!connected||role!=='owner'){root.innerHTML='<p class="notice">Sign in as the owner to manage affiliates.</p>';return;}
  const $=s=>root.querySelector(s),field=(name,label,value='',type='text',attrs='')=>`<label class="field">${label}<input name="${name}" type="${type}" value="${esc(value)}" ${attrs}></label>`;
  const check=(name,label,on)=>`<label class="check-field"><input name="${name}" type="checkbox" ${on?'checked':''}>${label}</label>`;
  const option=(value,label,current)=>`<option value="${value}" ${value===current?'selected':''}>${label}</option>`;
- let rows=[],overview=null,selected=null,report=null,draft=null,loading=false,disposed=false,request=0,orderOffset=0,payoutOffset=0;
+ let rows=[],overview=null,selected=initialAffiliate,report=null,draft=null,loading=false,disposed=false,request=0,orderOffset=0,payoutOffset=0;
  root.innerHTML=`<div class="view-heading"><div><span class="eyebrow">Elio partnerships</span><h1>Affiliates</h1><p>Your partners, their codes and the rewards they earn.</p></div><div class="row-actions"><button class="button button-secondary" data-aff="refresh">Refresh</button><button class="button" data-aff="new-affiliate">Add affiliate</button></div></div><p class="notice aff-message" role="status" hidden></p><section class="panel aff-editor" hidden></section><div class="aff-list"></div><div class="aff-detail" hidden><div class="section-heading aff-detail-heading"><div><h2 class="aff-name"></h2><p class="aff-email"></p></div><button class="button button-secondary" data-aff="edit-affiliate">Edit affiliate</button></div><div class="aff-report"></div></div>`;
  function message(text,bad=false){const el=$('.aff-message');el.textContent=text;el.hidden=!text;el.classList.toggle('danger',bad);}
  function list(){
