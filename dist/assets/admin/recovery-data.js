@@ -3,14 +3,16 @@ export function validateRecovery(data){
  if(data?.source!=='elio-paid-order-recovery'||data.schema_version!==1||!Number.isFinite(Date.parse(data.generated_at))||arrays.some(k=>!Array.isArray(data[k])))throw Error('The backup response is incomplete. Please try again.');
  if(data.active_count!==data.active_order_ids.length||data.paid_history_count!==data.paid_orders.length)throw Error('Backup order counts do not match. Please try again.');
  if(data.review_orders!==undefined&&!Array.isArray(data.review_orders))throw Error('Invalid payment-review orders.');
- const review=data.review_orders||[],paid=new Map([...data.paid_orders,...review].map(o=>[o.id,o]));if(paid.size!==data.paid_orders.length+review.length||new Set(data.active_order_ids).size!==data.active_count)throw Error('Duplicate orders in backup.');
+ if(data.unpaid_orders!==undefined&&(!Array.isArray(data.unpaid_orders)||data.download_scope!=='all_unserved'))throw Error('Invalid unpaid-order backup scope.');
+ const review=data.review_orders||[],unpaid=data.unpaid_orders||[],paid=new Map([...data.paid_orders,...review,...unpaid].map(o=>[o.id,o]));if(paid.size!==data.paid_orders.length+review.length+unpaid.length||new Set(data.active_order_ids).size!==data.active_count)throw Error('Duplicate orders in backup.');
+ if(unpaid.some(o=>!['awaiting_payment','rejected'].includes(o.payment_status)||!data.active_order_ids.includes(o.id)))throw Error('Invalid unpaid order in backup.');
  if(data.paid_orders.some(o=>o.payment_status!=='paid')||review.some(o=>o.payment_status!=='under_review'))throw Error('Invalid payment status in backup.');
  for(const id of data.active_order_ids){const o=paid.get(id);if(!o||o.refund_label||['completed','cancelled','expired','refunded'].includes(o.fulfillment_status))throw Error('Invalid active order in backup.');}
  for(const o of paid.values()){if(!Array.isArray(o.items)||!Number.isSafeInteger(o.total_cents)||Object.hasOwn(o,'access_token'))throw Error('Invalid order in backup.');}
  if(data.active_total_cents!==data.active_order_ids.reduce((sum,id)=>sum+paid.get(id).total_cents,0))throw Error('Backup totals do not match.');
  if(data.allocations.some(a=>!paid.has(a.order_id)))throw Error('Stock allocation has no matching paid order.');return data;
 }
-export const activeRecoveryOrders=data=>{const ids=new Set(data.active_order_ids);return [...data.paid_orders,...(data.review_orders||[])].filter(o=>ids.has(o.id)).sort((a,b)=>String(a.fulfillment_date||'').localeCompare(String(b.fulfillment_date||''))||a.id.localeCompare(b.id));};
+export const activeRecoveryOrders=data=>{const ids=new Set(data.active_order_ids);return [...data.paid_orders,...(data.review_orders||[]),...(data.unpaid_orders||[])].filter(o=>ids.has(o.id)).sort((a,b)=>String(a.fulfillment_date||'').localeCompare(String(b.fulfillment_date||''))||a.id.localeCompare(b.id));};
 export const recoveryFlavors=item=>(item.selection_labels?.length?item.selection_labels:item.flavor_contents||[]).map(f=>typeof f==='string'?f:`${f.quantity} × ${f.label||f.name}`).join('; ');
 const csvCell=value=>'"'+String(value??'').replace(/^[=+@\-\t\r]/,"'$&").replaceAll('"','""')+'"';
 export function fulfillmentCsv(data){

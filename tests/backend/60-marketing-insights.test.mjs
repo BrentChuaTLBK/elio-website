@@ -13,7 +13,7 @@ export default async function({db,check,state}){
   const id=randomUUID();
   await db.query(`insert into elio.orders(id,reference,access_digest,access_encrypted,created_at,fulfillment_date,method,payment_status,fulfillment_status,refund_label,data,idempotency_key,request_hash)
    values($1::uuid,$2,extensions.digest($1::uuid::text,'sha256'),extensions.digest($1::uuid::text,'sha256'),$3,'2001-01-06','delivery',$4,$5,$6,$7,$8,'cohort-fixture')`,
-   [id,'ELIO-'+id.slice(0,8),created,payment,status,refund,JSON.stringify({buyer:{email},order_source:source,is_test:test,subtotal_cents:10000,discount_cents:500,total_cents:11500,delivery_cents:2000}),randomUUID()]);
+   [id,'ELIO-'+id.slice(0,8),created,payment,status,refund,JSON.stringify({items:[],buyer:{email},order_source:source,is_test:test,subtotal_cents:10000,discount_cents:500,total_cents:11500,delivery_cents:2000}),randomUUID()]);
   if(paid)await db.query("insert into elio.payments(order_id,amount_cents,proof_path,payment_reference,approved_by,approved_at) values($1,11500,'local-fixture','QA',$2,$3)",[id,ids.owner,paid]);
   if(promo)await db.query("insert into elio.promo_usage(order_id,promo_id,user_id,state) values($1,$2,$3,$4)",[id,promo,ids.customer,payment==='paid'?'redeemed':'reserved']);
   return id;
@@ -92,3 +92,4 @@ export default async function({db,check,state}){
   const d=await api('marketing_cohort_orders',{month,kind:'campaign',group_key:campaign.id},ids.owner);assert.equal(d.total,2);assert.equal(d.totals.sales_cents,g.sales_cents);
  })();
 }
+
