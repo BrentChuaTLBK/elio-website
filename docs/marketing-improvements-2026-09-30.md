@@ -45,14 +45,14 @@ References: [GA4 event implementation](https://developers.google.com/analytics/d
 
 ## H1: existing Cloudflare measurements
 
-Read-only GraphQL query of the existing Elio account data, requested 23–30 September 2026 UTC, hostname `eliocheesecakes.com`, known public home/shop/flavor/box/story paths, bot flag 0. No customer names, references, addresses, private fragments or raw visit records were requested. The site-configuration endpoint rejected the connected authentication scheme; the existing GraphQL metrics were accessible. No beacon settings changed.
+Read-only GraphQL query of the existing Elio account data, requested 23–30 September 2026 UTC, hostname `eliocheesecakes.com`, known public home/shop/flavor/box/story paths including both `.html` and extensionless routes, bot flag 0. No customer names, references, addresses, private fragments or raw visit records were requested. The site-configuration endpoint rejected the connected authentication scheme; the existing GraphQL metrics were accessible. No beacon settings changed.
 
 | Device | LCP p75 | LCP samples | INP p75 | INP samples | CLS p75 | CLS samples |
 |---|---:|---:|---:|---:|---:|---:|
-| Desktop | 776 ms | 86 | 56 ms | 37 | 0.020 | 87 |
-| Mobile | 773 ms | 32 | 424 ms | 2 | 0.005 | 1 |
+| Desktop | 832 ms | 182 | 64 ms | 98 | 0.169 | 187 |
+| Mobile | 956 ms | 62 | 424 ms | 3 | 0.005 | 1 |
 
-Cloudflare returns LCP/INP quantiles in microseconds; the table converts to milliseconds. Metric sample counts differ because not every visit yields every metric. These are prelaunch observations that can include internal activity and are **not a representative customer performance baseline**. Mobile INP (2 samples) and CLS (1 sample) have **not enough data** for conclusions or optimization decisions. No new performance fix is justified by those tiny samples alone.
+Cloudflare returns LCP/INP quantiles in microseconds; the table converts to milliseconds. Metric sample counts differ because not every visit yields every metric. These are prelaunch observations that can include internal activity and older deployed revisions and are **not a representative customer performance baseline**. Mobile INP (3 samples) and CLS (1 sample) have **not enough data** for conclusions or optimization decisions. The desktop layout-shift sample deserves follow-up after the latest release is synced and there is launch traffic; it does not identify a reproducible new defect by itself. No new performance fix is justified by the tiny mobile samples alone.
 
 After launch, review the same public-page/device aggregates over a longer period and inspect sample sizes before prioritizing work. Existing Cloudflare measurement is sufficient to begin that review; there is no need to add a second collector now. This is a manual review method, not a newly installed monitoring job.
 
@@ -63,6 +63,8 @@ References: [Cloudflare Core Web Vitals](https://developers.cloudflare.com/web-a
 The original acquisition-source overwrite was reproduced through unsubscribe/rejoin from a different entry point and fixed by preserving separate acquisition fields. It was retested alongside original promo ID, expiry and welcome-email uniqueness. Existing subscriber consent behavior remains unchanged.
 
 During implementation, an invalid SQL parenthesis was caught by isolated migration execution and corrected before deployment. Fixture defects involving newsletter cooldown, JavaScript Date comparison and SQL parameter types were corrected; these were test-harness issues, not production commerce defects.
+
+The first clean Linux CI run exposed a pre-existing race in the calendar/catalog browser test: it asserted that a deleted flavor had disappeared immediately after the dialog closed, before the subsequent asynchronous catalog refresh rendered. Delaying that mocked refresh by 200 ms reproduced the same failure locally. The test now waits for the deleted row to detach, retains the absence assertion and exercises that delayed response. This fixes the test synchronization without changing or weakening the production deletion behavior.
 
 Local release pass: **40 suites passed, 0 failed; database runner lists 82 migrations and 261 checks**. Hosted-only infrastructure migrations remain explicitly separate from local PGlite execution.
 

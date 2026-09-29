@@ -22,7 +22,11 @@ try{for(const width of [1440,390,320]){
   if(url.pathname==='/functions/v1/calendar-sync')data={configured:true,service_account_email:'test@fixture.iam.gserviceaccount.com',connection};
   else if(url.pathname==='/fixture'){
    const {p_action:action,p_payload:payload}=route.request().postDataJSON();calls.push({action,payload});
-   if(action==='admin_bootstrap')data={role:'owner',orders:[],products,categories:[],inventory:[],zones:[],staff:[],promos:[],settings:{paused:false}};
+   if(action==='admin_bootstrap'){
+    // Make the asynchronous post-deletion refresh observable on fast and slow runners.
+    if(products.some(p=>p.deleted_at))await new Promise(resolve=>setTimeout(resolve,200));
+    data={role:'owner',orders:[],products,categories:[],inventory:[],zones:[],staff:[],promos:[],settings:{paused:false}};
+   }
    else if(action==='site_status')data={active:false,uploads_paused:false,announce:false};
    else if(action==='calendar_list')data={orders:orders.filter(o=>o.date>=payload.from&&o.date<=payload.to),connection};
    else if(action==='calendar_sync_now')data=connection;
@@ -66,6 +70,7 @@ try{for(const width of [1440,390,320]){
  await page.locator('[data-action=delete-product]').click();const prompt=page.getByRole('dialog',{name:'Delete flavor',exact:true});assert.match(await prompt.textContent(),/Box fixture/);
  await prompt.getByRole('button',{name:'Keep item',exact:true}).click();assert.equal(calls.filter(c=>c.action==='delete_product').length,0);
  await page.locator('[data-action=delete-product]').click();await prompt.getByRole('button',{name:'Delete',exact:true}).click();await page.locator('#admin-dialog').waitFor({state:'hidden'});
+ await page.locator('[data-action=edit-product][data-id=flavor]').waitFor({state:'detached'});
  assert.equal(await page.locator('[data-action=edit-product][data-id=flavor]').count(),0);
  await navigateDashboard(page,'boxes');await page.getByText('Unavailable · contains a deleted flavor',{exact:true}).waitFor();
  const count=calls.filter(c=>c.action==='calendar_list').length;await page.clock.fastForward(31000);assert.equal(calls.filter(c=>c.action==='calendar_list').length,count);
