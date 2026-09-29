@@ -21,7 +21,7 @@
     { view: 'monthly', kind: 'next', root: '#next-month-menu', grid: document.querySelector('#next-month-flavors'), empty: document.querySelector('#next-month-empty'), items: catalog.filter(isNext), shown: data.nextMenuShown === true, message: 'More flavors to look forward to. Check back soon.' },
     { view: 'collection', kind: 'collection', root: '#other-flavors', grid: document.querySelector('#other-flavors-grid'), empty: document.querySelector('#other-empty'), items: catalog, shown: true, message: 'Our flavor collection is coming soon. Check back for a little discovery.' }
   ];
-  const searchText = new Map(catalog.map(flavor => [flavor.id, normalize([flavor.name, flavor.line, flavor.description, flavor.collection_details?.product_type, flavor.collection_details?.serving].filter(Boolean).join(' '))]));
+  const searchText = new Map(catalog.map(flavor => [flavor.id, normalize(flavor.name)]));
   sections.forEach(section => {
     const root = document.querySelector(section.root);
     root.hidden = !section.shown;
