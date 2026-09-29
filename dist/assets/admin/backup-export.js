@@ -11,7 +11,7 @@ export function buildRecoveryWorkbook(data,ExcelJS){
  const items=sheet('Items',['Order reference','Product','Quantity','Flavors per box','Unit price PHP','Line total PHP'],orders.flatMap(o=>o.items.map(i=>[o.reference,i.name,i.quantity,recoveryFlavors(i),i.unit_price_cents/100,i.line_total_cents/100])));items.getColumn(5).numFmt=items.getColumn(6).numFmt='"₱"#,##0.00';
  sheet('Read me',['Detail','Value'],[['Generated at',data.generated_at],['Scope',data.download_scope==='all_unserved'?'All unserved orders, including unpaid':'Paid or under-review orders to serve'],['Payment review','Under review does not mean payment is confirmed.'],['Proof images','This workbook contains paths only. Use Download with proofs (ZIP) for actual images.'],['Recovery','The Recovery data tab contains ordered JSON chunks. Join column B from row 2 onward to recover the full snapshot, including affiliate data.'],['Privacy','Keep this workbook private. Customer order access tokens are excluded.']]);
  // Excel limits a cell to 32,767 characters. Chunk the JSON without truncation.
- const json=JSON.stringify(data),chunks=[];for(let i=0;i<json.length;i+=24000)chunks.push([chunks.length+1,json.slice(i,i+24000)]);sheet('Recovery data',['Sequence','JSON chunk'],chunks);
+ const json=JSON.stringify(data),chunks=[];for(let i=0;i<json.length;){let end=Math.min(i+24000,json.length);const last=json.charCodeAt(end-1),next=json.charCodeAt(end);if(last>=0xd800&&last<=0xdbff&&next>=0xdc00&&next<=0xdfff)end--;chunks.push([chunks.length+1,json.slice(i,end)]);i=end;}sheet('Recovery data',['Sequence','JSON chunk'],chunks);
  return wb;
 }
 export async function recoveryExcel(data){return buildRecoveryWorkbook(data,await excelLibrary()).xlsx.writeBuffer();}

@@ -31,9 +31,21 @@ Validation includes both selection scopes, owner/customer permissions, preserved
 
 The first actual verification email used the old text header; live order emails used the current image-backed header. The user updated the hosted Supabase Confirm signup template using the prepared template picker. A second actual signup email was delivered with the current header image, brown background image and Gmail button blend styling. Its confirmation link successfully verified the new test account. Gmail on a physical iOS device is not available in this environment; final device-specific appearance remains a user check. Other hosted Auth template types were not silently assumed updated.
 
+## Bug found during final live verification
+
+**Medium — false stale-backup warning after an idle period.** With an otherwise healthy copy two hours old, requesting a new backup immediately reported `stale`. Reproduced with a rollback-only production transaction before the fix. The old status calculation compared the age of the last successful copy with 15 minutes, although unchanged copies are deliberately skipped. This confused a fresh request with changes waiting too long.
+
+The correction records `pending_since` when the connection moves from synchronized to pending. Further changes keep the oldest pending timestamp; a fully successful copy clears it, and partial success starts a new window for remaining changes. Provider failures still report errors and preserve the last successful copy. First-copy requests also alert if they remain pending over 15 minutes. Changed: `20260929215000_elio_backup_pending_age.sql`; regression coverage: `62-backup-pending-age.test.mjs`. Retested fresh requests after idle, repeated requests, genuinely old pending changes, completion, partial completion, failure preservation and first-copy delay. No customer order or payment behavior changes.
+
+Production re-test: the same newly requested copy returned `connected` with `pending=true`; genuinely 16-minute-old work still returned `stale`. The existing connected backup remained successful with no pending work afterward.
+
+**Medium — Unicode loss at an Excel recovery-cell boundary.** The new Excel export initially split JSON at fixed UTF-16 offsets. Placing an emoji across the 24,000-character split reproduced a changed value after saving and reopening the workbook. The exporter now keeps surrogate pairs together. The regression reopens the actual XLSX and reconstructs the full JSON, comparing it byte-for-byte at the string level, including the boundary emoji. Changed: `backup-export.js`; regression: `manual-backup.test.mjs`. This was caught before the deployment fork was synced.
+
 ## Evidence and release
 
 Evidence: `test-results/marketing-live-fixtures`, `test-results/backup-ui`, `test-results/release`. Sensitive temporary access tokens and email links were kept out of published files. Earlier source CI run 36630460405 passed after the catalog test synchronization fix. The final backup release results are recorded in the completion message.
 
 
 Final local release: 41 suites passed, zero failures; 83 migration entries and 264 backend checks. After a final current-count label refinement, all backup browser checks were rerun at four widths. Production manual scope was also checked with a rollback-only order: default and automatic counts stayed zero, all-unserved returned one with exact items, and no access token was included. Anonymous HTTP access returned 401.
+
+Pending-age follow-up: the complete local release passed 41 suites with 84 migration entries and 266 backend checks. The subsequent Unicode boundary correction passed actual-file reconstruction and all four related browser widths. Final hosted CI runs the full suite against the final published commit.
