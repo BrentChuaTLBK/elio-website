@@ -1,7 +1,7 @@
 import {deliveryFeeSummary,separateDeliveryPaid} from '../delivery-fee.js';
 import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-mobile-audit-1';
 import {mountCalendar} from './calendar-manager.js?v=summary-1';
-import {mountMaintenance} from './maintenance-admin.js';
+import {mountMaintenance} from './maintenance-admin.js?v=branded-calendar-1';
 import {mountWebsitePhotos} from './website-photos.js';
 import {mountAffiliates} from './affiliates-admin.js?v=mobile-audit-1';
 import {monthRange} from './accounting.js?v=shared-categories-1';
