@@ -10,6 +10,8 @@ Maintenance replaces the storefront with a branded notice and blocks new checkou
 
 With **Pause payment-proof uploads and their deadlines** checked, both upload authorization and final proof submission are blocked. Remaining upload time is preserved across manual and scheduled windows, edits, and repeated pauses. For example, eight minutes remaining before maintenance means eight minutes after it ends. Overlapping windows count once; already-expired orders are never revived. Unchecking the option keeps eligible uploads and their ordinary deadlines available during maintenance.
 
+Scheduled closures show a branded countdown using the server’s clock. The digits update locally once per second, without extra API requests. At zero, the page checks the server before reopening; if maintenance is extended or the connection fails, it stays closed and retries. Manual maintenance has no countdown. Existing order links retain the compact banner.
+
 Public pages refresh status every 30 seconds, on returning to the tab, and near the next scheduled boundary. Database guards apply immediately. Settings use revision checks to reject stale edits. Maintenance history is private and retained to calculate adjusted deadlines.
 
 This feature controls application availability; it cannot guarantee error-free infrastructure or database updates. Use a staging environment for changes to payment/schema behavior. Do not turn maintenance on merely to verify a production release.
