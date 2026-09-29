@@ -1,6 +1,7 @@
 // Enhance quantity inputs without replacing their form fields or save handlers.
 const selector = 'input[data-quantity-stepper], #product-quantity';
 const tracked = new WeakSet();
+let nextLabelId = 0;
 
 function sync(input) {
   const control = input.parentElement;
@@ -22,6 +23,20 @@ function enhance(input) {
   tracked.add(input);
   const label = input.getAttribute('aria-label') ||
     [...(input.labels?.[0]?.childNodes || [])].filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent).join(' ').trim() || 'quantity';
+  // Inserting a button before an implicitly labelled input would otherwise
+  // make that button the label's control. Keep the label attached to the input.
+  for (const labelElement of [...(input.labels || [])]) {
+    if (labelElement.htmlFor) continue;
+    if (!input.id) {
+      let candidate;
+      do { candidate = `quantity-field-${++nextLabelId}`; } while (document.getElementById(candidate));
+      input.id = candidate;
+    }
+    labelElement.htmlFor = input.id;
+  }
+  if (!input.hasAttribute('aria-label') && !input.hasAttribute('aria-labelledby')) {
+    input.setAttribute('aria-label', label);
+  }
   const control = document.createElement('span');
   control.className = 'quantity-stepper';
   input.before(control);
@@ -63,3 +78,4 @@ new MutationObserver(records => {
     else scan(record.target);
   }
 }).observe(document.body, {childList:true,subtree:true,attributes:true,attributeFilter:['disabled','readonly','min','max','value']});
+

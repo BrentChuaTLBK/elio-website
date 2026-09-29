@@ -33,7 +33,10 @@ try{
    try{return route.fulfill({body:await readFile(file),contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.webp':'image/webp'})[extname(file)]||'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}
   });
   const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(origin+'/order.html'+(guest?'':'#voucher=CHECKOUT10'));await page.locator('[data-product="'+fixture.product.id+'"]').click();await page.locator('#add-to-cart').click();
+  await page.goto(origin+'/order.html'+(guest?'':'#voucher=CHECKOUT10'));await page.locator('[data-product="'+fixture.product.id+'"]').click();
+  await page.getByRole('spinbutton',{name:'Quantity',exact:true}).waitFor();
+  assert.equal(await page.locator('#product-quantity').evaluate(el=>el.labels?.[0]?.control===el),true,'quantity label remains associated after stepper enhancement');
+  await page.locator('#add-to-cart').click();
   if(method==='delivery')await page.locator('[data-method=delivery]').click();
   await page.locator('#checkout-button').click();const form=page.locator('#checkout-form');
   await form.locator('[name=buyer_name]').fill('QA customer');await form.locator('[name=buyer_email]').fill(guest?'checkout-guest@example.test':'customer@example.test');await form.locator('[name=buyer_phone]').fill('09170000000');await form.locator('[name=social_platform]').selectOption('na');assert.equal(await form.locator('[name=social_username]').inputValue(),'N/A');
@@ -66,3 +69,4 @@ try{
   await ctx.close();
  }
 }finally{await browser.close();await db.close();await writeFile(join(out,'report.json'),JSON.stringify(results,null,2));}
+
