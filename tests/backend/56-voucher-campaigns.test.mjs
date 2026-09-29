@@ -21,7 +21,7 @@ export default async function({db,check,state}){
   for(const who of [null,ids.unverified])await assert.rejects(()=>wallet('available',who),/Verify/);
   await assert.rejects(()=>save({name:'QA',status:'active',terms}),/draft/);
   for(const change of [{kind:'free'},{value:0},{customer_limit:0},{value:1.2},{expiry_days:366},{min_subtotal_cents:-1},{kind:'percent',value:101},{kind:'percent',value:10,cap_cents:0}])await assert.rejects(()=>save({name:'Invalid',terms:{...terms,...change}}));
-  campaign=await save({name:'A little thank-you',email_subject:'Your next Elio treat is on us 🍰',terms});assert.equal(campaign.status,'draft');
+  campaign=await save({name:'A little thank-you',email_subject:'Your next Elio treat is on us 🍰',email_copy:{eyebrow:'Baked with care',heading:'{{discount}} off your next order.',message:'Thank you! Enjoy {{discount}} next time.'},terms});assert.equal(campaign.status,'draft');
   campaign=await save({...campaign,status:'active'});
   await assert.rejects(()=>save({...campaign,revision:1}),/changed/);
  })();
@@ -48,6 +48,7 @@ export default async function({db,check,state}){
   assert.equal((await stats(campaign.id)).issued,1);
   assert.equal(await scalar('select subject from elio.newsletter_outbox where voucher_id=$1',[voucher.id]),'Your next Elio treat is on us 🍰');
   const message=await scalar('select payload from elio.newsletter_outbox where voucher_id=$1',[voucher.id]);
+  assert.equal(message.email_copy.eyebrow,'Baked with care');assert.equal(message.email_copy.message,'Thank you! Enjoy {{discount}} next time.');
   const rendered=renderNewsletterEmail(message);assert.match(rendered.text,/₱50.00 off your next order/);assert.match(rendered.text,/₱500.00/);assert.match(rendered.html,/View my vouchers/);assert.match(rendered.text,/Manila time/);assert.match(rendered.text,/Unsubscribe/);
   assert(newsletterHeaders(message,'https://example.supabase.co')['List-Unsubscribe-Post']);
   const percent=renderNewsletterEmail({...message,title:'<script>bad</script>',offer:{...message.offer,kind:'percent',value:10,cap_cents:10000}});assert.match(percent.text,/10%/);assert.match(percent.text,/₱100.00/);assert(!percent.html.includes('<script>'));
@@ -56,8 +57,9 @@ export default async function({db,check,state}){
   assert.equal((await stats(campaign.id)).issued,1);
  })();
  await check('Campaign edits and pauses preserve issued terms; verified customers see only their own vouchers',async()=>{
-  campaign=await save({...campaign,status:'paused',email_subject:'Come back for a little treat',terms:{...terms,value:7500,expiry_days:7}});
+  campaign=await save({...campaign,status:'paused',email_subject:'Come back for a little treat',email_copy:{eyebrow:'Until next time',heading:'A treat for you',message:'We hope to bake for you again.'},terms:{...terms,value:7500,expiry_days:7}});
   assert.equal(await scalar('select subject from elio.newsletter_outbox where voucher_id=$1',[voucher.id]),'Your next Elio treat is on us 🍰');
+  assert.equal(await scalar("select payload#>>'{email_copy,eyebrow}' from elio.newsletter_outbox where voucher_id=$1",[voucher.id]),'Baked with care');
   assert.deepEqual((await wallet()).vouchers.find(v=>v.id===voucher.id),voucher);
   assert.equal((await wallet('available',ids.stranger)).vouchers.some(v=>v.id===voucher.id),false);
   for(const action of ['save_promo','delete_promo'])await assert.rejects(()=>api(action,action==='save_promo'?{promo:{id:voucher.id,code:voucher.code}}:{id:voucher.id},ids.owner),/original terms/);
@@ -103,6 +105,7 @@ export default async function({db,check,state}){
   const guest=await create({buyer:{name:'Guest QA',email:guestEmail,phone:'09171234567',social_platform:'na',social_username:'N/A'}},null);
   await h.proof(guest);await h.action('approve_payment',await h.order(guest.id));await complete(guest);
   assert.equal(await scalar('select e.subject from elio.newsletter_outbox e join elio.vouchers v on v.promo_id=e.voucher_id where v.owner_email=$1 and v.campaign_id=$2',[guestEmail,campaign.id]),'Come back for a little treat');
+  assert.equal(await scalar("select e.payload#>>'{email_copy,eyebrow}' from elio.newsletter_outbox e join elio.vouchers v on v.promo_id=e.voucher_id where v.owner_email=$1 and v.campaign_id=$2",[guestEmail,campaign.id]),'Until next time');
   const count=await scalar('select count(*)::int from elio.vouchers where owner_email=$1',[guestEmail]);assert.equal(count,2);
   await db.query('insert into auth.users(id,email) values($1,$2)',[guestAccount,guestEmail]);
   await assert.rejects(()=>wallet('available',guestAccount),/Verify/);

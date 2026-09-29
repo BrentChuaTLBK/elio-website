@@ -20,6 +20,23 @@ export default async function({db,check,state}){
   saved=await save(oldClient);assert.equal(saved.email_subject,'Here’s ₱50 for your next Elio box 🍰');
   const boundary=await save({...saved,email_subject:'x'.repeat(200)});assert.equal(boundary.email_subject.length,200);
  })();
+ await check('Email copy validates, previews safely, and preserves older-client edits',async()=>{
+  const save=campaign=>api('voucher_save_campaign',{campaign},ids.owner);
+  const copy={eyebrow:'For our Elio friends',heading:'Enjoy {{discount}} — <sweet>!',message:'Thanks for choosing Elio.\nEnjoy {{discount}} next time.\n\n<script>Keep this as text</script>'};
+  for(const invalid of [null,'bad',{heading:''},{eyebrow:'x'.repeat(121)},{heading:'x'.repeat(201)},{message:'x'.repeat(4001)},{message:' \n '},{heading:'Line\n2'},{message:'Bad\tcontrol'},{message:123}]){
+   await assert.rejects(()=>save({...draft,email_copy:invalid}));
+   await assert.rejects(()=>api('voucher_email_preview',{campaign:{...draft,email_copy:invalid}},ids.owner));
+  }
+  await assert.rejects(()=>as(ids.owner,()=>db.query("select elio.voucher_email_copy('{}')")),/permission denied/);
+  let saved=await save({...draft,email_copy:copy});assert.deepEqual(saved.email_copy,copy);
+  const sample=await api('voucher_email_preview',{id:saved.id},ids.owner),rendered=renderNewsletterEmail(sample);
+  assert.match(rendered.html,/For our Elio friends/);assert.match(rendered.html,/Enjoy ₱50.00 — &lt;sweet&gt;!/);assert.match(rendered.html,/Elio.<br>Enjoy ₱50.00/);assert.match(rendered.html,/&lt;script&gt;/);assert(!rendered.html.includes('<script>'));
+  assert.match(rendered.text,/\n\n<script>Keep this as text<\/script>/);assert.match(rendered.text,/Minimum product spend: ₱500.00/);assert.match(rendered.text,/ELIO-PREVIEW/);
+  const customized=await api('voucher_email_preview',{campaign:{...saved,email_copy:{...copy,heading:'A gift for you'},terms:{...terms,kind:'percent',value:10,cap_cents:10000}}},ids.owner);
+  assert.match(renderNewsletterEmail(customized).text,/10% off products/);assert.match(renderNewsletterEmail(customized).text,/Maximum discount: ₱100.00/);
+  const oldClient={...saved};delete oldClient.email_copy;saved=await save(oldClient);assert.deepEqual(saved.email_copy,copy);
+  const normalized=await save({...saved,email_copy:{...copy,message:'Line one\r\nLine two'}});assert.equal(normalized.email_copy.message,'Line one\nLine two');
+ })();
  const totals=()=>scalar("select jsonb_build_object('promos',(select count(*) from elio.promos),'vouchers',(select count(*) from elio.vouchers),'emails',(select count(*) from elio.newsletter_outbox),'campaigns',(select count(*) from elio.voucher_campaigns))");
  await check('Email preview is owner-only and validates saved or unsaved campaign terms',async()=>{
   for(const who of [null,ids.staff,ids.customer])await assert.rejects(()=>api('voucher_email_preview',{campaign:draft},who),/owner/i);

@@ -31,9 +31,6 @@
 .account-order span:last-child { color:var(--brown); text-decoration:underline; margin-top:6px; }
 .admin-account button:focus-visible { outline:2px solid #a37943; outline-offset:3px; }
 .account-policy-links{font-size:12px;margin:18px 0;color:var(--muted)}.account-policy-links a{color:var(--brown)}.account-dashboard>.account-policy-links{margin-top:28px}
-.account-dashboard{max-width:1180px;padding:0 24px;margin:48px auto 70px;background:transparent;border:0;box-shadow:none;border-radius:0}.account-welcome{display:flex;justify-content:space-between;align-items:center;gap:28px;margin-bottom:30px}.account-welcome .eyebrow{margin:0 0 12px}.account-welcome h1{font:600 32px/1.2 Arial,sans-serif;letter-spacing:-1px;margin-bottom:20px}.account-identity{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px;overflow-wrap:anywhere}.account-identity .badge{font-size:10px;background:#efe4d6;border-radius:4px;padding:5px 7px}.account-dashboard-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}.account-dashboard .button{font-size:12px;border-radius:8px;padding:10px 15px;min-height:40px}.account-dashboard-actions .account-shop-link{background:#eee1cf;color:#684326;border-color:#d8bea0}.account-dashboard #account-orders{border:0;padding:0;margin:30px 0}.account-orders-heading{display:flex;justify-content:space-between;align-items:center;gap:20px}.account-dashboard #account-orders h2,.account-email-preferences h2{font:600 18px/1.35 Arial,sans-serif;margin:0 0 6px}.account-orders-heading p,.account-guest-note,.account-orders-empty p,.account-email-preferences p{font-size:13px;line-height:1.7;color:var(--muted)}.account-guest-note{margin-top:24px}.account-orders-empty{text-align:center;padding:42px 20px 30px}.account-orders-empty h3{font:600 14px/1.5 Arial,sans-serif;margin:0 0 5px}.account-orders-empty p{margin:0 0 12px}.account-orders-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:24px 0}.account-orders-grid .account-order{border:1px solid var(--line);border-radius:10px;padding:20px;background:#fffdf9;gap:9px}.account-order:hover{border-color:#a8855f}.account-email-preferences{margin-top:36px;padding:22px;border-radius:14px;background:#fffdf9}.account-email-preferences>p{margin:6px 0 18px}.account-preference-choice{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.7}.account-preference-choice input{width:17px;height:17px;flex:none;margin-top:3px;accent-color:var(--brown)}.account-preference-choice small{display:block;color:var(--muted);font-size:12px;margin-top:3px}.account-email-preferences #email-preference-status{margin:14px 0 10px}.account-dashboard #account-newsletter-result{margin-bottom:20px}.account-newsletter input:not(:disabled){cursor:pointer}
-@media(max-width:800px){.account-welcome{align-items:flex-start;flex-direction:column;gap:14px}.account-dashboard-actions{justify-content:flex-start}.account-orders-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:600px){.admin-account.account-dashboard{width:100%;padding:0 18px;margin:30px auto 45px}.account-orders-grid{grid-template-columns:1fr}.account-welcome h1{font-size:29px}.account-welcome{margin-bottom:25px}.account-orders-heading{align-items:flex-start;gap:12px}.account-orders-heading .button{flex:none}.account-orders-empty{padding:32px 5px 25px}.account-email-preferences{padding:18px}.account-dashboard-actions{gap:8px}}
 @media(max-width:600px) {
   .admin-account { margin:20px auto; padding:24px; }
   .admin-account h1 { font-size:29px; }
@@ -44,3 +41,55 @@
   .account-recovery { gap:8px; }
   .account-recovery .button { flex:1; padding-inline:8px; font-size:11px; }
 }
+
+/* Customer dashboard: warm paper surfaces and consistent section spacing. */
+.customer-account.account-dashboard #signed-in:not([hidden]){display:block}
+.customer-account-page .account-dashboard{max-width:1200px;width:calc(100% - 64px);padding:0;margin:48px auto 56px;background:transparent;border:0;box-shadow:none;border-radius:0}
+.account-welcome{margin:0 0 28px;padding:32px 36px 0;background:#eee5d7;border:1px solid #e2d4c1;border-radius:18px;overflow:hidden}
+.account-welcome-main{display:flex;align-items:center;justify-content:space-between;gap:32px;padding-bottom:26px}
+.account-welcome .eyebrow{margin:0 0 12px;font-size:10px;letter-spacing:2px}
+.account-dashboard .account-welcome h1{font:400 clamp(34px,4vw,48px)/1.12 Georgia,serif;color:#422a1e;letter-spacing:-1px;margin:0 0 12px}
+.account-welcome-note{color:#76624e;font-size:14px;margin:0 0 18px}
+.account-identity{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:#705c48;margin:0;overflow-wrap:anywhere}
+.account-identity .badge{font-weight:500;font-size:10px;background:#faf6ee;color:#645744;padding:4px 9px;border:1px solid #ddcfba;border-radius:20px}
+.account-welcome-bottom{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 0;border-top:1px solid #dcd0be}
+.account-section-links,.account-dashboard-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.account-section-links{gap:22px}.account-section-links a{font-size:12px;text-decoration:none;color:#624a34;padding:9px 0}
+.account-section-links a:hover{text-decoration:underline}.account-dashboard .button{min-height:42px;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:600}
+.account-dashboard .button-secondary{background:#fffdf8;border-color:#ded0be;color:#62442f}
+.account-dashboard .account-shop-link{flex-shrink:0;background:#493020;color:#fff9ed;border-color:#493020;gap:20px;padding:14px 20px}
+.account-dashboard-actions .button{min-height:36px;font-size:11px;padding:8px 11px;background:transparent;border-color:transparent;color:#735e49}
+.account-dashboard-actions .button:hover{background:#fff9ed;color:#422a1e}
+.account-content-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:24px;align-items:start}
+.account-dashboard #account-orders,.account-dashboard #account-vouchers{min-width:0;margin:0;padding:26px;background:#fffdf8;border:1px solid #e5d9c9;border-radius:16px;scroll-margin-top:28px}
+.account-orders-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.account-dashboard #account-orders h2,.account-dashboard #account-vouchers h2,.account-email-preferences h2{font:400 27px/1.2 Georgia,serif;color:#493020;margin:0 0 8px;letter-spacing:-.5px}
+.account-orders-heading p{font-size:12px;line-height:1.7;color:#84715f;margin:0;max-width:280px}
+.account-orders-heading .button{min-height:36px;flex:none;padding:8px 11px;font-size:11px}
+.account-orders-empty{display:flex;align-items:center;flex-direction:column;justify-content:center;text-align:center;min-height:286px;padding:32px 14px;background:#f8f4ed;border:1px dashed #dfd1be;border-radius:12px}
+.account-empty-mark{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:#efe6d7;color:#9e7b50;margin-bottom:20px}
+.account-orders-empty h3{font:400 23px/1.3 Georgia,serif;color:#65492f;max-width:270px;margin:0 0 12px}
+.account-orders-empty p{font-size:12px;line-height:1.7;color:#84715f;max-width:280px;margin:0 0 20px}
+.account-guest-note{font-size:11px;line-height:1.7;color:#8a7866;margin:18px 0 0;padding-top:15px;border-top:1px solid #eee5d9}
+.account-orders-grid{display:grid;gap:12px}.account-orders-grid .account-order{display:block;background:#fcf9f3;padding:18px;border:1px solid #e5d9c9;border-radius:11px;font-size:12px;color:#614732;text-decoration:none}
+.account-orders-grid .account-order:hover{border-color:#ae8a61;background:#f7f0e5}.account-order-top,.account-order-summary{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.account-order-top>strong{font-size:11px;letter-spacing:1px}.account-order .account-order-status{border:1px solid #e0d2be;background:#f1e7d7;border-radius:20px;padding:3px 8px;font-size:10px;color:#765334;text-decoration:none;margin:0;text-transform:capitalize}
+.account-order-summary{margin:18px 0;color:#8a7562;line-height:1.65}.account-order-method{text-transform:capitalize;color:#513822}.account-order-summary>strong{font:400 23px Georgia,serif;color:#493020}
+.account-order .account-order-open{display:flex;justify-content:space-between;border-top:1px solid #e5d9c9;padding-top:12px;font-size:11px;color:#805835;text-decoration:none;margin:0}.account-order-open span:last-child{margin:0;text-decoration:none}
+.account-dashboard .voucher-tabs{gap:6px;margin:0 0 20px}.account-dashboard .voucher-tabs button{font-size:11px;padding:9px 12px;min-height:36px}.account-dashboard .voucher-tabs span{margin-left:3px}
+.account-dashboard .voucher-grid{grid-template-columns:1fr;gap:14px}.account-dashboard .voucher-card{background:#f7f0e4;border:1px solid #dfcdb4;border-radius:12px;padding:22px}
+.account-dashboard .voucher-card .eyebrow{font-size:9px;letter-spacing:1.4px}.account-dashboard .voucher-card .badge{background:#fffaf1;border:1px solid #e6d9c5;color:#79664e;font-size:9px;font-weight:500}
+.account-dashboard .voucher-card h3{font:400 29px/1.15 Georgia,serif;color:#654328;margin:18px 0 10px;max-width:300px}
+.account-dashboard .voucher-card>p{font-size:12px}.account-dashboard .voucher-card .voucher-terms{font-size:11px;line-height:1.8;color:#7f6b53}.account-dashboard .voucher-code{border-top-color:#ccb38f;padding-top:16px;margin-top:16px;font-size:15px!important;letter-spacing:3px}
+.account-dashboard .voucher-actions{gap:8px;margin-top:16px}.account-dashboard .voucher-actions .button{flex:1}.account-dashboard .voucher-note{font-size:10px;line-height:1.8;margin:16px 0 0;color:#89755f}
+.account-dashboard .voucher-empty{margin:0;padding:32px 22px;background:#f8f4ed;border:1px dashed #dfd1be;border-radius:12px;font-size:12px;line-height:1.8;color:#8a7866}
+.account-dashboard .voucher-pagination:empty,.account-dashboard [data-voucher-message]:empty{display:none}
+.account-email-preferences{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px 44px;margin:24px 0 0;padding:26px;border:1px solid #e5d9c9;border-radius:16px;background:#fffdf8;box-shadow:none;scroll-margin-top:28px}
+.account-preferences-intro .eyebrow{font-size:9px;margin-bottom:10px}.account-preferences-intro>p:last-child{font-size:12px;line-height:1.8;color:#84715f;max-width:320px;margin-bottom:0}
+.account-preference-choice{display:flex;align-items:flex-start;gap:12px;font-size:13px;line-height:1.6}.account-preference-choice input{width:18px;height:18px;flex:none;margin:2px 0 0;accent-color:#79502f}
+.account-preference-choice small{display:block;margin-top:5px;font-size:11px;line-height:1.8;color:#84715f}.account-email-preferences #email-preference-status{font-size:11px;line-height:1.7;margin:14px 0;color:#806c57}
+.account-email-preferences #account-newsletter-result{grid-column:1/-1;border-top:1px solid #eee5d9;padding-top:14px;font-size:11px;color:#84715f}
+.account-dashboard>.account-policy-links{margin:22px 0 0;text-align:center;font-size:11px;color:#94806b}.account-policy-links a{color:#806c57}.account-newsletter input:not(:disabled){cursor:pointer}
+@media(max-width:1000px){.account-welcome-bottom{align-items:flex-start;flex-direction:column;gap:4px}.account-content-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.account-dashboard #account-orders,.account-dashboard #account-vouchers{padding:22px}.account-orders-heading{gap:10px}}
+@media(max-width:760px){.customer-account-page .account-dashboard{width:calc(100% - 32px);margin:24px auto 40px}.account-welcome{padding:24px 22px 0;margin-bottom:18px}.account-welcome-main{align-items:flex-start;flex-direction:column;gap:20px;padding-bottom:22px}.account-welcome-note{font-size:13px}.account-welcome-bottom{padding:12px 0}.account-section-links{gap:18px}.account-content-grid{grid-template-columns:1fr;gap:18px}.account-orders-empty{min-height:240px}.account-email-preferences{grid-template-columns:1fr;gap:22px;padding:22px;margin-top:18px}.account-preferences-intro>p:last-child{max-width:none}.account-orders-heading p{max-width:none}}
+@media(max-width:380px){.customer-account-page .account-dashboard{width:calc(100% - 24px)}.account-welcome{padding:22px 18px 0}.account-welcome .account-shop-link{width:100%}.account-section-links{gap:12px}.account-section-links a{font-size:11px}.account-dashboard #account-orders,.account-dashboard #account-vouchers,.account-email-preferences{padding:18px}.account-dashboard .voucher-card{padding:18px}.account-dashboard .voucher-card h3{font-size:27px}.account-identity{font-size:11px}.account-orders-heading{gap:8px}.account-dashboard .voucher-tabs button{padding:8px 10px;font-size:10px}}

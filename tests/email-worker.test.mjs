@@ -21,7 +21,7 @@ globalThis.fetch = async (url, options) => {
   calls.push(body.p_action);
   const newsletterRow = { ...row, id: 'newsletter-id', event_key: 'newsletter-test/sender-check', subject: 'Newsletter test', payload: { event_type: 'newsletter_test_campaign', settings: { site_url: 'https://eliocheesecakes.com', newsletter_mailing_address: 'Test address' }, subscriber: { email: 'qa@example.test' }, campaign: { subject: 'Newsletter test', title: 'A little Elio', body: 'A subscriber update.', template: 'letter' } } };
   if (setup.voucher) newsletterRow.subject='A sweet thank-you from Elio 🍰';
-  if (setup.voucher) newsletterRow.payload = {event_type:'newsletter_voucher',title:'A little thank-you',settings:{site_url:'https://eliocheesecakes.com',newsletter_mailing_address:'Test address'},subscriber:{email:'qa@example.test'},unsubscribe_token:'b'.repeat(64),offer:{code:'ELIO-VOUCHER',kind:'fixed',value:5000,min_subtotal_cents:50000,expires_at:'2027-01-01T00:00:00Z'}};
+  if (setup.voucher) newsletterRow.payload = {event_type:'newsletter_voucher',title:'A little thank-you',email_copy:{eyebrow:'From the Elio kitchen',heading:'{{discount}} off your next order',message:'Thank you for sharing a sweet moment with us.\nEnjoy this little treat.'},settings:{site_url:'https://eliocheesecakes.com',newsletter_mailing_address:'Test address'},subscriber:{email:'qa@example.test'},unsubscribe_token:'b'.repeat(64),offer:{code:'ELIO-VOUCHER',kind:'fixed',value:5000,min_subtotal_cents:50000,expires_at:'2027-01-01T00:00:00Z'}};
   if (body.p_action === 'newsletter_claim_emails') return Response.json(setup.newsletter ? [newsletterRow] : []);
   if (body.p_action === 'newsletter_contact_claim') return Response.json({idle:true});
   if (body.p_action === 'newsletter_broadcast_claim') return Response.json({configured:false});
@@ -139,7 +139,7 @@ try {
     setup.empty=true;setup.newsletter=true;setup.voucher=true;
     const first=await (await handle(request())).json();assert.equal(first.newsletter.accepted,1);
     const sent=providerBodies[0];assert.equal(sent.body.from,values.NEWSLETTER_EMAIL_FROM||'Elio Newsletter <news@eliocheesecakes.com>');
-    assert.equal(sent.body.subject,'A sweet thank-you from Elio 🍰');
+    assert.equal(sent.body.subject,'A sweet thank-you from Elio 🍰');assert.match(sent.body.html,/From the Elio kitchen/);assert.match(sent.body.text,/sharing a sweet moment/);
     assert.match(sent.body.text,/₱50.00 off your next order/);assert.match(sent.body.html,/My vouchers|View my vouchers/);
     assert.match(sent.body.headers['List-Unsubscribe'],/unsubscribe/);assert(!sent.body.html.includes('undefined'));
     await handle(request());assert.deepEqual(providerBodies[1],sent);

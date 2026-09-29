@@ -26,7 +26,7 @@ try{
     if(action==='site_status')data={active:false,uploads_paused:false,announce:false,server_time:new Date().toISOString()};
     else if(action==='newsletter_settings')data=settings();
     else if(action==='newsletter_account_preference'){if(failSave)return route.fulfill({status:400,contentType:'application/json',body:'{"error":"Please try again."}'});subscribed=payload.subscribed;data=settings();}
-    else if(action==='my_vouchers')data={vouchers:[],total:0,offset:0,limit:50,counts:{available:0,used:0,expired:0}};
+    else if(action==='my_vouchers')data={vouchers:payload.status==='available'?[{id:'voucher-1',source:'newsletter',title:'Your welcome treat',code:'ELIO-SWEET',kind:'percent',value:5,min_subtotal_cents:50000,cap_cents:10000,expires_at:'2030-10-30T12:00:00+08:00',status:'available'}]:[],total:payload.status==='available'?1:0,offset:0,limit:50,counts:{available:1,used:0,expired:0}};
     else if(action==='account_access')data={role:'owner'};
     else if(action==='affiliate_status')data={assigned:true};
     else if(action==='my_orders')data=showOrder?[{id:'order-1',reference:'ELIO-TEST01',fulfillment_date:'2026-09-30',method:'pickup',payment_status:'awaiting_payment',total_cents:95000}]:[];
@@ -44,10 +44,11 @@ try{
   assert(await page.getByText('Your next sweet moment starts here',{exact:true}).isVisible());
   const form=page.locator('#email-preference-form');await form.locator('[name=subscribed]').check();await form.getByRole('button',{name:'Save email preference'}).click();await page.getByText('You’re subscribed to the Elio Newsletter.',{exact:true}).waitFor();
   assert.equal(subscribed,true);assert.deepEqual(calls.find(c=>c.action==='newsletter_account_preference').payload,{subscribed:true});
+  await page.getByText('ELIO-SWEET',{exact:true}).waitFor();assert(Math.abs((await page.locator('.account-welcome').boundingBox()).width-(await page.locator('.account-content-grid').boundingBox()).width)<2);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.screenshot({path:join(output,`account-${width}.png`),fullPage:true});
   failSave=true;await form.locator('[name=subscribed]').uncheck();await form.getByRole('button',{name:'Save email preference'}).click();await form.getByText('Please try again.',{exact:true}).waitFor();assert.equal(subscribed,true);
   failSave=false;await form.getByRole('button',{name:'Save email preference'}).click();await page.getByText('You’re not subscribed to the Elio Newsletter.',{exact:true}).waitFor();assert.equal(subscribed,false);
-  showOrder=true;await page.locator('[data-orders-refresh]').click();await page.getByText('ELIO-TEST01',{exact:true}).waitFor();assert.match(await page.locator('.account-order').textContent(),/₱950.00.*awaiting payment/);
+  showOrder=true;await page.locator('[data-orders-refresh]').click();await page.getByText('ELIO-TEST01',{exact:true}).waitFor();assert.match(await page.locator('.account-order').textContent(),/₱950.00/);assert.match(await page.locator('.account-order-status').textContent(),/awaiting payment/);await page.screenshot({path:join(output,`account-with-order-${width}.png`),fullPage:true});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.goto(origin+'/account.html?guest');await page.getByRole('heading',{name:'Sign in to Elio.',exact:true}).waitFor();assert.equal(await page.locator('#signed-in').isVisible(),false);await page.locator('#account-reset').click();await page.getByRole('heading',{name:'Reset your password.',exact:true}).waitFor();assert.equal(await page.locator('#password-field').isVisible(),false);
   await page.goto(origin+'/manage.html');if(width<=760)await page.locator('#dashboard-navigation > summary').click();await page.locator('[data-view=promos]').click();await page.waitForFunction(()=>document.querySelector('.newsletter-conversion-metrics strong')?.textContent==='4');

@@ -38,3 +38,7 @@ Campaign cards and editors provide an owner-only email preview using the actual 
 ## Campaign email subject
 
 Owners can set an email subject separately from the campaign name (1–200 characters, one line). Saved and unsaved previews show it. Existing campaigns keep their current default subject. Issuance snapshots the subject into the marketing outbox; later campaign edits apply only to future messages and cannot alter queued messages or frozen retries. Older clients that omit the field preserve an existing custom subject.
+
+## Campaign email text
+
+The small heading, main heading and message are editable plain text. `{{discount}}` inserts the fixed peso amount or percentage from the issued offer, and message line breaks are preserved. The code, actual discount, terms, expiry, account link and unsubscribe controls are generated independently. Previews use unsaved text; issuing a voucher snapshots it so later campaign edits cannot rewrite queued messages. Old queued messages without `email_copy` retain the original copy. HTML is escaped.

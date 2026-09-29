@@ -59,17 +59,21 @@ export function renderNewsletterEmail(payload: any): { html: string; text: strin
     const offer = payload.offer;
     if (!offer?.code || !["fixed", "percent"].includes(offer.kind) || !Number.isFinite(Date.parse(offer.expires_at)) || !(Number(offer.value) > 0)) throw new Error("Voucher email is incomplete.");
     const saving = offer.kind === "fixed" ? money(offer.value) : `${Number(offer.value)}%`;
-    heading = `${saving} off your next order.`;
+    const copy = payload.email_copy || {};
+    const personalize = (value: unknown, fallback: string) => String(value ?? fallback).replaceAll("{{discount}}", saving);
+    const label = personalize(copy.eyebrow, "A little thank-you from Elio");
+    heading = personalize(copy.heading, "{{discount}} off your next order.");
     subject = "A little thank-you from Elio";
-    intro = "Your order is complete. Thank you for ordering with Elio—we hope you enjoyed every bite. Here’s a little treat for your next order.";
+    intro = personalize(copy.message, "Your order is complete. Thank you for ordering with Elio—we hope you enjoyed every bite. Here’s a little treat for your next order.");
     const expiry = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date(offer.expires_at));
-    const terms = `Minimum product spend: ${money(offer.min_subtotal_cents)}.${offer.kind === "percent" ? ` Maximum discount: ${money(offer.cap_cents)}.` : ""} Valid until ${expiry} (Manila time). One use on a website order. Sign in to your Elio account. If you checked out as a guest, create and verify an account using ${payload.subscriber.email}. Delivery is excluded. One promo code per order.`;
+    const terms = `${saving} off products. Minimum product spend: ${money(offer.min_subtotal_cents)}.${offer.kind === "percent" ? ` Maximum discount: ${money(offer.cap_cents)}.` : ""} Valid until ${expiry} (Manila time). One use on a website order. Sign in to your Elio account. If you checked out as a guest, create and verify an account using ${payload.subscriber.email}. Delivery is excluded. One promo code per order.`;
     const account = new URL("account.html#account-vouchers", site).toString();
-    body = emailIntro("A little thank-you from Elio", heading, intro)
+    body = '<div style="overflow-wrap:anywhere;word-break:break-word">' + emailIntro(label, heading, "").replace(/<p[^>]*><\/p>$/, "")
+      + intro.split(/\n\s*\n/).map(p => `<p style="margin:0 0 20px;font-size:15px;line-height:1.75;color:#665649;overflow-wrap:anywhere">${e(p).replace(/\n/g, "<br>")}</p>`).join("")
       + emailPanel(String(payload.title || "Your next-order voucher"), `<p style="margin:0 0 16px;font:bold 26px/1.4 Arial,sans-serif;letter-spacing:2px;overflow-wrap:anywhere;color:#39251c">${e(offer.code)}</p><p style="margin:0;font-size:13px;line-height:1.8">${e(terms)}</p>`, "sand")
       + emailButton("View my vouchers", account)
-      + `<p style="font-size:13px;color:#786858">Your voucher is saved in My vouchers, so you can find it again when you’re ready to order.</p>`;
-    plain = `${heading}\n\n${intro}\n\n${payload.title || "Your voucher"}\nCode: ${offer.code}\n\n${terms}\n\nView my vouchers:\n${account}`;
+      + `<p style="font-size:13px;color:#786858">Your voucher is saved in My vouchers, so you can find it again when you’re ready to order.</p></div>`;
+    plain = `${label}\n\n${heading}\n\n${intro}\n\n${payload.title || "Your voucher"}\nCode: ${offer.code}\n\n${terms}\n\nView my vouchers:\n${account}`;
   } else if (payload.event_type === "newsletter_welcome_back") {
     heading = "Welcome back.";
     subject = "Welcome back to the Elio Newsletter";

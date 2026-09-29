@@ -108,12 +108,13 @@ async function loadOrders() {
   const section = document.querySelector('#account-orders');
   if (!section) return;
   const request=++ordersRequest;
-  const title='<div class="account-orders-heading"><div><h2>Your orders</h2><p>All orders placed while signed in, including those awaiting payment or under review.</p></div><button class="button button-secondary" type="button" data-orders-refresh>Refresh</button></div><p class="account-guest-note">Placed an order as a guest? Open the secure link from your confirmation email.</p>';
+  const title='<div class="account-orders-heading"><div><h2>Your orders</h2><p>Keep track of your boxes, from payment to pickup or delivery.</p></div><button class="button button-secondary" type="button" data-orders-refresh>Refresh</button></div>';
+  const guestNote='<p class="account-guest-note">Ordered as a guest? Use the order link in your confirmation email.</p>';
   section.innerHTML = title+'<p>Loading your orders…</p>';
   try {
     const orders = await api('my_orders');
     if(request!==ordersRequest||!accountSession)return;
-    section.innerHTML = title+(orders.length ? '<div class="account-orders-grid">'+orders.map(order => `<a class="account-order" href="order.html#order=${encodeURIComponent(order.id)}"><strong>${esc(order.reference)}</strong><span>${esc(formatDate(order.fulfillment_date))} · ${esc(order.method)}</span><span>${esc(money(order.total_cents))} · ${esc(String(order.payment_status).replaceAll('_', ' '))}</span><span>View order →</span></a>`).join('')+'</div>' : '<div class="account-orders-empty"><h3>Your next sweet moment starts here</h3><p>Orders you place while signed in will appear here, including those awaiting payment.</p><a class="button" href="order.html">Explore the boxes</a></div>');
+    section.innerHTML = title+(orders.length ? '<div class="account-orders-grid">'+orders.map(order => `<a class="account-order" href="order.html#order=${encodeURIComponent(order.id)}"><div class="account-order-top"><strong>${esc(order.reference)}</strong><span class="account-order-status">${esc(String(order.payment_status).replaceAll('_', ' '))}</span></div><div class="account-order-summary"><span><span class="account-order-method">${esc(order.method)}</span><br>${esc(formatDate(order.fulfillment_date))}</span><strong>${esc(money(order.total_cents))}</strong></div><span class="account-order-open">View order <span aria-hidden="true">→</span></span></a>`).join('')+'</div>' : '<div class="account-orders-empty"><span class="account-empty-mark" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 32 32" fill="none"><path d="M6 11h20l2 16H4l2-16Z" stroke="currentColor" stroke-width="1.3"/><path d="M11 12V9a5 5 0 0 1 10 0v3M12 20h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><h3>Your next sweet moment starts here</h3><p>Your orders will appear here when you place them while signed in.</p><a class="button button-secondary" href="order.html">Find your next favorite</a></div>')+guestNote;
   } catch {
     if(request!==ordersRequest||!accountSession)return;
     section.innerHTML = title+'<p class="notice danger">Your order history could not load. Please refresh to try again.</p>';
@@ -357,6 +358,7 @@ else if (auth) {
     if (customer) {
       heading.hidden=true;document.querySelector('#main').classList.add('account-dashboard');
       document.querySelector('#main').append(document.querySelector('.account-policy-links'));
+      if(newsletterResult)document.querySelector('#account-email-preferences').append(newsletterResult);
       document.querySelector('#account-email').textContent=data.session.user.email;
       document.querySelector('#account-verification').textContent=data.session.user.email_confirmed_at?'Email verified':'Email not verified';
       loadOrders();
