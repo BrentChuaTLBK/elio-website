@@ -12,6 +12,8 @@ With **Pause payment-proof uploads and their deadlines** checked, both upload au
 
 Scheduled closures show a branded countdown using the server’s clock. The digits update locally once per second, without extra API requests. At zero, the page checks the server before reopening; if maintenance is extended or the connection fails, it stays closed and retries. Manual maintenance shows a matching “We’ll be back soon” panel without a countdown or estimated reopening time. It continues checking automatically and restores the storefront when maintenance is switched off. A failed check keeps the closure screen visible with a retry message. Existing order links retain the compact banner.
 
+The admin status distinguishes upcoming, active, and completed scheduled maintenance using the server time. Completed dates are retained for reference. While the Maintenance page is open, its status refreshes every 30 seconds and at schedule boundaries without replacing unsaved form values or advancing their save revision. Refresh polling stops when leaving the page.
+
 Public pages refresh status every 30 seconds, on returning to the tab, and near the next scheduled boundary. Database guards apply immediately. Settings use revision checks to reject stale edits. Maintenance history is private and retained to calculate adjusted deadlines.
 
 This feature controls application availability; it cannot guarantee error-free infrastructure or database updates. Use a staging environment for changes to payment/schema behavior. Do not turn maintenance on merely to verify a production release.

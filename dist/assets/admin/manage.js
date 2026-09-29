@@ -1,7 +1,7 @@
 import {deliveryFeeSummary,separateDeliveryPaid} from '../delivery-fee.js';
 import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-mobile-audit-1';
 import {mountCalendar} from './calendar-manager.js?v=summary-1';
-import {mountMaintenance} from './maintenance-admin.js?v=branded-calendar-1';
+import {mountMaintenance} from './maintenance-admin.js?v=completed-status-1';
 import {mountWebsitePhotos} from './website-photos.js';
 import {mountAffiliates} from './affiliates-admin.js?v=mobile-audit-1';
 import {monthRange} from './accounting.js?v=shared-categories-1';
@@ -64,6 +64,7 @@ let catalogOrderController = null;
 let affiliatesController = null;
 let calendarController = null;
 let websitePhotosController = null;
+let maintenanceController = null;
 state.calendarFilters = {};
 const catalogScope = () => ['menus','flavors'].includes(state.view) ? 'flavors' : 'boxes';
 const areaCategories = () => state.categories.filter(c => c.scope === catalogScope());
@@ -173,6 +174,7 @@ async function refresh() {
   render();
 }
 function render() {
+  if(state.view!=='maintenance' || !state.connected || state.role!=='owner'){maintenanceController?.destroy();maintenanceController=null;}
   const photosNav=$('[data-view="website-photos"]');if(photosNav)photosNav.hidden=!state.connected||state.role!=='owner';
   if(state.view==='website-photos' && state.connected && state.role==='owner' && $('#website-photos-manager'))return;
   websitePhotosController?.destroy();websitePhotosController=null;
@@ -200,7 +202,7 @@ function render() {
   if(state.view==='website-photos')websitePhotosController=mountWebsitePhotos($('#website-photos-manager'),{owner:state.connected&&state.role==='owner'});
   unmountAnalyticsChart=state.view==='analytics'?mountAnalyticsChart($('#workspace')):()=>{};
   if(state.view==='calendar')calendarController=mountCalendar($('#order-calendar-manager'),{api,calendarConnection,role:state.role,connected:state.connected,openOrder,toast,esc,filters:state.calendarFilters});
-  if(state.view==='maintenance')mountMaintenance($('#maintenance-manager'),{owner:state.connected&&state.role==='owner'});
+  if(state.view==='maintenance')maintenanceController=mountMaintenance($('#maintenance-manager'),{owner:state.connected&&state.role==='owner'});
   if(state.view==='accounting')mountAccounting($('#accounting-manager'),{api,role:state.role,connected:state.connected,money,escapeHtml:esc,today:manilaDate(),filters:state.accountingFilter,openOrder});
   if(state.view==='affiliates')affiliatesController=mountAffiliates($('#affiliates-manager'),{role:state.role,connected:state.connected});
   if(state.view==='settings')mountPaymentEditor($('#workspace'),{esc,disabled:Boolean(ownerLocked())});
