@@ -28,7 +28,7 @@ import { confirmFlavorRemoval } from './flavor-confirmation.js';
 import { socialContactMessage } from './checkout-fields.js';
 import { fulfillmentStatus, matchesFulfillmentStatus, isActiveFulfillment, needsPaymentReview } from './refund-status.js';
 import { renderProductPhotos, bindProductPhotoOrder } from './product-photos.js';
-import { printOrderSlips } from './order-slips.js';
+import { printOrderSlips } from './order-slips.js?v=items-only-slips-1';
 import { productLabelSettings, labelTextColor, MAX_LABEL_LENGTH } from './product-label.js';
 import { dateCalendar, bindDateCalendars, calendarDates, calendarMonthDays } from './date-calendar.js';
 import { quantitySelection, quantitySaveRows, quantityStatus, bulkQuantityDrafts } from './daily-quantities.js';

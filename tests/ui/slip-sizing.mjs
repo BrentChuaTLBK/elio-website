@@ -31,11 +31,13 @@ try{
    await preview.locator('#paper-size').selectOption(paper);await preview.locator('.print-slips:not([disabled])').waitFor();
    const metrics=await preview.locator('.slip').evaluateAll(nodes=>nodes.map(s=>({area:s.offsetWidth*s.offsetHeight,sheetArea:s.parentElement.offsetWidth*s.parentElement.offsetHeight,overflow:[s,...s.querySelectorAll('.slip-left,.slip-right,.slip-details')].some(e=>e.scrollHeight>e.clientHeight+1||e.scrollWidth>e.clientWidth+1)})));
    for(const m of metrics){assert(m.area<=m.sheetArea*.5);assert.equal(m.overflow,false);}
-   assert.equal(await preview.locator('.slip-total').count(),orders.length);assert.equal(await preview.locator('.slip-item').count(),orders.reduce((n,o)=>n+o.items.length,0));
+   assert.equal(await preview.locator('.slip-price,.slip-payment,.slip-total').count(),0);
+   assert.doesNotMatch(await preview.locator('#slips').textContent(),/₱|PHP|Payment breakdown|Subtotal|Discount|Order total|(?:Pickup|Delivery) fee|B5HLXN/i);
+   assert.deepEqual(await preview.locator('.slip-item-title').allTextContents(),orders.flatMap(o=>o.items.map(item=>item.quantity+'×'+item.name)));
    assert(!await preview.locator('#slips').textContent().then(t=>t.includes('NEVER PRINT PRIVATE NOTES')));
    await preview.screenshot({path:join(out,`${name}-${paper}.png`),fullPage:true});
   }
-  await preview.pdf({path:join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});await preview.close();console.log('PASS '+name+' retains all information within quarter/half-sheet bounds on A4 and Letter');
+  await preview.pdf({path:join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});await preview.close();console.log('PASS '+name+' retains items and quantities without prices within quarter/half-sheet bounds on A4 and Letter');
  }
  const unusual={...many,reference:'ELIO-100-ITEMS',items:Array.from({length:100},(_,i)=>({...many.items[0],name:'Large order box '+(i+1)})),subtotal_cents:9000000,total_cents:9020000};
  const longOptions=Array.from({length:150},(_,i)=>`Option ${i+1}: Vanilla × 1.`).join(' '),longInstructions=Array.from({length:100},(_,i)=>`Instruction ${i+1}: Keep upright.`).join('\n');
@@ -52,10 +54,9 @@ try{
    const metrics=await preview.locator('.slip').evaluateAll(nodes=>nodes.map(s=>({area:s.offsetWidth*s.offsetHeight,sheetArea:s.parentElement.offsetWidth*s.parentElement.offsetHeight,overflow:[s,...s.querySelectorAll('.slip-left,.slip-right,.slip-details')].some(e=>e.scrollHeight>e.clientHeight+1||e.scrollWidth>e.clientWidth+1)})));
    for(const m of metrics){assert(m.area<=m.sheetArea*.5);assert.equal(m.overflow,false);}
    assert.deepEqual(await preview.locator('.slip-number').allTextContents(),Array.from({length:count},(_,i)=>`Slip ${i+1} of ${count}`));
-   assert.equal(await preview.locator('.slip-total').count(),1,'Order totals appear once');
-   assert.equal(await preview.locator('.slip').last().locator('.slip-total').count(),1,'Totals stay on the last slip');
-   assert.equal(await preview.locator('.slip-item[data-continued=false]').count(),order.items.length,'Each item quantity and price prints once');
-   assert.equal(await preview.locator('.slip-price').count(),order.items.length);
+   assert.equal(await preview.locator('.slip-price,.slip-payment,.slip-total').count(),0,'Prices and payment breakdowns never print');
+   assert.doesNotMatch(await preview.locator('#slips').textContent(),/₱|PHP|Payment breakdown|Subtotal|Discount|Order total|(?:Pickup|Delivery) fee|B5HLXN/i);
+   assert.equal(await preview.locator('.slip-item[data-continued=false]').count(),order.items.length,'Each item and quantity prints once');
    assert(!await preview.locator('#slips').textContent().then(t=>t.includes('NEVER PRINT PRIVATE NOTES')));
    if(order===verbose){
     assert.equal((await preview.locator('.slip-variation').allTextContents()).join(''),longOptions);
@@ -65,6 +66,6 @@ try{
   await preview.locator('.print-sheet').first().screenshot({path:join(out,order.reference+'-first.png')});
   await preview.locator('.print-sheet').last().screenshot({path:join(out,order.reference+'-last.png')});
   await preview.pdf({path:join(out,order.reference+'.pdf'),preferCSSPageSize:true,printBackground:true});await preview.close();
-  console.log('PASS '+order.reference+' uses numbered half-sheet continuations only as needed, retaining every item/detail and one final total');
+  console.log('PASS '+order.reference+' uses numbered half-sheet continuations only as needed, retaining every item/detail without prices');
  }
 }finally{await browser.close();}

@@ -1,9 +1,9 @@
-import { escapeHtml as esc, money, formatDate } from './client.js';
+import { escapeHtml as esc, formatDate } from './client.js';
 
 const label = value => String(value || '').replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase());
 const text = value => String(value ?? '').trim();
 const lines = values => values.map(text).filter(Boolean).join('\n');
-const previewUrl = new URL('./order-print.html?v=compact-slips-3', import.meta.url).href;
+const previewUrl = new URL('./order-print.html?v=items-only-slips-1', import.meta.url).href;
 
 function photoUrl(value) {
   if (typeof value !== 'string' || !(/^(https?:\/\/|assets\/)/.test(value))) return '';
@@ -24,7 +24,7 @@ function variations(item, product) {
 }
 
 // Only fields intended for the package are copied into the print document.
-// Prices and labels come from the saved order; catalog data supplies its current photo.
+// Item labels come from the saved order; catalog data supplies its current photo.
 function printModel(order, products, settings) {
   const pickup = order.method === 'pickup';
   const buyer = order.buyer || {};
@@ -48,11 +48,8 @@ function printModel(order, products, settings) {
     items: (order.items || []).map((item, index) => {
       const product = products.find(entry => entry.id === item.product_id);
       return { index, name: text(item.name) || product?.name || 'Product', quantity: item.quantity,
-        variation: variations(item, product) || 'Standard', photo: photoUrl(product?.photos?.[0]),
-        unit: money(item.unit_price_cents), total: money(item.line_total_cents ?? item.quantity * item.unit_price_cents) };
+        variation: variations(item, product) || 'Standard', photo: photoUrl(product?.photos?.[0]) };
     }),
-    subtotal: money(order.subtotal_cents), discount: money(order.discount_cents), fee: money(order.delivery_cents),
-    total: money(order.total_cents), promo: text(order.promo_snapshot?.code),
   };
 }
 
@@ -75,17 +72,11 @@ function itemCard(doc, item, value, continued = false) {
   return element(doc, `<section class="slip-item" data-item-index="${item.index}" data-continued="${continued}">
     <div class="slip-photo">${!continued && item.photo ? `<img src="${esc(item.photo)}" alt="${esc(item.name)}" referrerpolicy="no-referrer">` : continued ? 'Cont.' : 'No photo'}</div>
     <div class="slip-item-copy"><h3 class="slip-item-title">${continued ? `<span class="slip-continuation">Item ${item.index + 1} continued</span>` : `<span class="slip-quantity">${esc(item.quantity)}×</span>${esc(item.name)}`}</h3>
-    <p class="slip-variation">${esc(value)}</p>${continued ? '' : `<p class="slip-price"><span>${esc(item.quantity)} × ${esc(item.unit)}</span><strong>${esc(item.total)}</strong></p>`}</div></section>`);
+    <p class="slip-variation">${esc(value)}</p></div></section>`);
 }
 
 function detailCard(doc, title, value, continued = false) {
   return element(doc, `<section class="slip-detail"><h2 class="slip-heading">${esc(title)}${continued ? ' (continued)' : ''}</h2><p>${esc(value)}</p></section>`);
-}
-
-function paymentCard(doc, model) {
-  return element(doc, `<section class="slip-payment"><h2 class="slip-heading">Payment breakdown - entire order</h2><dl>
-    <div><dt>Subtotal</dt><dd>${esc(model.subtotal)}</dd></div><div><dt>Discount${model.promo ? ` (${esc(model.promo)})` : ''}</dt><dd>−${esc(model.discount)}</dd></div>
-    <div><dt>${model.method === 'Pickup' ? 'Pickup' : 'Delivery'} fee</dt><dd>${esc(model.fee)}</dd></div><div class="slip-total"><dt>Order total</dt><dd>${esc(model.total)}</dd></div></dl></section>`);
 }
 
 const fits = column => column.scrollHeight <= column.clientHeight + 1;
@@ -95,11 +86,10 @@ const fitsSlip = page => ['.slip-left','.slip-right','.slip-details','.slip-body
 })&&fits(page)&&page.scrollWidth<=page.clientWidth+1;
 
 // Used only when the complete order cannot fit a compact half-sheet. Keep
-// every character, repeat the order identity, and show the totals once at the end.
+// every character of the items and instructions, and repeat the order identity.
 function overflowSlips(doc,model){
   const pages=[],items=model.items.map(item=>({item,value:item.variation,continued:false}));
   const details=model.details.filter(d=>d.value&&d.value!=='None').map(d=>({...d,continued:false}));
-  let paymentPending=true;
   const partThatFits=(page,node,value,target)=>{
     const chars=Array.from(value);let low=0,high=chars.length;
     while(low<high){const mid=Math.ceil((low+high)/2);target.textContent=chars.slice(0,mid).join('');if(fitsSlip(page))low=mid;else high=mid-1;}
@@ -108,7 +98,7 @@ function overflowSlips(doc,model){
     let cut=low;for(let i=low-1;i>=Math.floor(low*.8);i--)if(/\s/.test(chars[i])){cut=i+1;break;}
     target.textContent=chars.slice(0,cut).join('');return chars.slice(cut).join('');
   };
-  while(items.length||details.length||paymentPending){
+  while(items.length||details.length){
     const page=createSlip(doc,model);page.className='slip slip-half slip-compact';page.dataset.size='half';
     doc.querySelector('#slips').append(page);pages.push(page);
     const itemHost=page.querySelector('.slip-items');let detailHost=page.querySelector('.slip-details'),progressed=false;
@@ -140,10 +130,6 @@ function overflowSlips(doc,model){
       entry.value=partThatFits(page,node,entry.value,node.querySelector('p'));entry.continued=true;progressed=true;
       if(!entry.value)details.shift();
     }
-    if(!items.length&&!details.length&&paymentPending){
-      const payment=paymentCard(doc,model);page.querySelector('.slip-right').insertBefore(payment,page.querySelector('.slip-signoff'));
-      if(fitsSlip(page)){paymentPending=false;progressed=true;}else payment.remove();
-    }
     const indexes=[...new Set([...itemHost.children].map(node=>Number(node.dataset.itemIndex)+1))];
     page.querySelector('.slip-item-heading').textContent=indexes.length?`Items ${indexes[0]}${indexes.length>1?'–'+indexes.at(-1):''} of ${model.items.length}`:'Order details';
     if(!detailHost.children.length&&pages.length>1)detailHost.append(detailCard(doc,'Pickup / delivery details','See the earlier slips for this order.'));
@@ -158,15 +144,11 @@ function paginate(doc, model) {
   const page=createSlip(doc,model);doc.querySelector('#slips').append(page);
   const items=page.querySelector('.slip-items');
   for(const item of model.items)items.append(itemCard(doc,item,item.variation));
-  page.querySelector('.slip-left').append(paymentCard(doc,model));
   for(const detail of model.details)if(detail.value&&detail.value!=='None')page.querySelector('.slip-details').append(detailCard(doc,detail.title,detail.value));
   page.querySelector('.slip-item-heading').textContent='Items to prepare · '+model.items.length;
   page.querySelector('.slip-footer span:last-child').textContent='Keep with this order';
   for(const mode of ['quarter','quarter-compact','half','half-compact']){
     const half=mode.startsWith('half');page.className='slip'+(half?' slip-half':'')+(mode.endsWith('compact')?' slip-compact':'');
-    const payment=page.querySelector('.slip-payment');
-    if(half)page.querySelector('.slip-right').insertBefore(payment,page.querySelector('.slip-signoff'));
-    else page.querySelector('.slip-left').append(payment);
     page.dataset.size=half?'half':'quarter';page.querySelector('.slip-number').textContent=half?'Half-sheet slip':'Quarter-sheet slip';
     if(fitsSlip(page))return [page];
   }

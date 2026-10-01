@@ -77,6 +77,9 @@ try{
    const next=page.waitForEvent('popup');await page.locator('#'+kind).click();const print=await next;print.on('pageerror',e=>errors.push(e.message));
    await print.locator('.print-slips:not([disabled])').waitFor({timeout:15000}).catch(async e=>{throw Error(`${e.message}; preview: ${await print.locator('[role=status]').textContent()}; launcher: ${await page.locator('#error').textContent()}; errors: ${errors.join(', ')}`);});assert.match(print.url(),/order-print\?v=/);assert.equal(await print.locator('.slip').count(),kind==='single'?1:2);
    assert.match(await print.locator('#slips').textContent(),/The Signature Trio/);assert(!((await print.locator('#slips').textContent()).includes('NEVER PRINT THIS')));
+   assert.equal(await print.locator('.slip-price,.slip-payment,.slip-total').count(),0);
+   assert.doesNotMatch(await print.locator('#slips').textContent(),/₱|PHP|Payment breakdown|Subtotal|Discount|Order total|(?:Pickup|Delivery) fee/i);
+   assert.deepEqual(await print.locator('.slip-item-title').allTextContents(),Array(kind==='single'?1:2).fill('1×The Signature Trio'));
    if(kind==='batch')assert.match(await print.locator('#slips').textContent(),/Test recipient.*Test address/s);
    await print.locator('#paper-size').selectOption('letter');assert.equal(await print.locator('.print-sheet').first().getAttribute('data-paper'),'letter');
    await print.evaluate(()=>{window.print=()=>{window.__printed=true;}});await print.locator('.print-slips').click();assert.equal(await print.evaluate(()=>window.__printed),true);
