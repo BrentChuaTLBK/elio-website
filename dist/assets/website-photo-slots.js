@@ -23,6 +23,6 @@ export const photoSlots = [
 ].map(([id,page,name,file,alt,hint,ratio])=>({id,page,name,src:'assets/'+file,alt,hint,ratio}));
 
 export function websitePhotoUrl(path,base) {
- if(typeof path!=='string'||! /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.webp$/.test(path))return '';
+ if(typeof path!=='string'||! /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(webp|png|jpe?g|heic|heif)$/.test(path))return '';
  try{const url=new URL(base);if(url.protocol!=='https:')return '';return url.origin+'/storage/v1/object/public/website-images/'+path;}catch{return '';}
 }

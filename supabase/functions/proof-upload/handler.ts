@@ -12,7 +12,7 @@ export const handle = endpoint(async (request, headers) => {
   if (!["proof", "product"].includes(kind)) throw new HttpError(400, "Choose a payment proof or product image.");
   const file = form.get("file");
   if (!(file instanceof File) || form.getAll("file").length !== 1) throw new HttpError(400, "Choose one image to upload.");
-  if (file.size > MAX_IMAGE_BYTES) throw new HttpError(413, "Images must be 5 MB or smaller.");
+  if (file.size > MAX_IMAGE_BYTES) throw new HttpError(413, "Images must be 20 MB or smaller.");
   const contents = new Uint8Array(await file.arrayBuffer());
   const image = imageType(contents);
   const userId = await verifiedUser(request, kind === "product");

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {heicContainer} from './helpers/image-fixtures.mjs';
 
 // Boundary tests: all Auth, database, and Storage calls are mocked. No uploads.
 const values={SUPABASE_URL:'https://elio.example.test',SUPABASE_SERVICE_ROLE_KEY:'test-service-key',SUPABASE_ANON_KEY:'test-public-key'};
@@ -42,7 +43,7 @@ try{
  });
  await check('renamed files and oversized uploads are refused',async()=>{
   assert.equal((await upload(request({file:'<html>not an image</html>'}))).status,415);
-  assert.equal((await upload(request({file:Buffer.alloc(5*1024*1024+1)}))).status,413);assert.equal(calls.length,0);
+  assert.equal((await upload(request({file:Buffer.alloc(20*1024*1024+1)}))).status,413);assert.equal(calls.length,0);
  });
  await check('corrupt WebP cannot reserve a review or write Storage',async()=>{
   const file=Buffer.alloc(22);file.write('RIFF');file.writeUInt32LE(14,4);file.write('WEBPVP8L',8);file.writeUInt32LE(2,16);
@@ -55,6 +56,9 @@ try{
  });
  await check('guest publishable-key header does not impersonate a user',async()=>{
   assert.equal((await upload(request({bearer:'sb_publishable_test'}))).status,201);assert(!calls.some(c=>c.path==='/auth/v1/user'));
+ });
+ await check('HEIC originals retain their bytes and MIME in private order storage',async()=>{
+  const file=heicContainer(),response=await upload(request({file,mime:'image/heic'}));assert.equal(response.status,201);const stored=calls.find(c=>c.path.startsWith('/storage/'));assert.match(stored.path,/\.heic$/);assert.equal(new Headers(stored.options.headers).get('content-type'),'image/heic');assert.deepEqual(stored.options.body,new Uint8Array(file));
  });
  await check('expired signed-in session is refused',async()=>{
   setup.invalidSession=true;assert.equal((await upload(request({bearer:'expired-jwt'}))).status,401);assert.equal(calls.length,1);

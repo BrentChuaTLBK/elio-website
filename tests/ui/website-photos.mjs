@@ -9,7 +9,7 @@ await mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 const photos=Object.fromEntries(photoSlots.map(s=>[s.id,{path:null,alt:'',position_x:50,position_y:50,revision:0}])),uploads=[],checks=[],control={failSave:false,failRead:false};
 const sdk=`export function createClient(){return {
- auth:{initialize:async()=>({error:null}),onAuthStateChange:()=>{},getSession:async()=>({data:{session:{}}}),getUser:async()=>({data:{user:{id:'${owner}'}}})},
+ auth:{initialize:async()=>({error:null}),onAuthStateChange:()=>{},getSession:async()=>({data:{session:{user:{id:'${owner}',email:'owner@example.test'}}}}),getUser:async()=>({data:{user:{id:'${owner}'}}})},
  rpc:async(name,body)=>{try{return {data:await window.photoRpc(body)}}catch(error){return {error:{message:error.message}}}},
  storage:{from:bucket=>({upload:async(path,file)=>{await window.photoUpload({bucket,path,type:file.type,size:file.size,header:[...new Uint8Array(await file.slice(0,12).arrayBuffer())]});return {};},getPublicUrl:path=>({data:{publicUrl:'https://dzxyhckkkrzqpwpavngn.supabase.co/storage/v1/object/public/website-images/'+path}})})},functions:{invoke:async()=>({data:{}})}}};`;
 async function rpc({p_action:a,p_payload:p={}}){

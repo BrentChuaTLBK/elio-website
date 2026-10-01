@@ -12,7 +12,7 @@ export const handle=endpoint(async(request,headers)=>{
   const id=uuid(input.id,'Payout ID');
   const result=await service('affiliate_proof_read',{user_id,id});
   const affiliate=uuid(result?.affiliate_id,'Affiliate ID'),path=result?.path;
-  if(typeof path!=='string'||!new RegExp(`^${affiliate}/${id}/[a-f0-9-]{36}\\.(png|jpg|webp)$`).test(path))throw new HttpError(404,'Payout receipt unavailable.');
+  if(typeof path!=='string'||!new RegExp(`^${affiliate}/${id}/[a-f0-9-]{36}\\.(png|jpe?g|heic|heif|webp)$`).test(path))throw new HttpError(404,'Payout receipt unavailable.');
   const signed=await storageRequest(`object/sign/${bucket}/${path}`,'POST',JSON.stringify({expiresIn:300}),'application/json');
   const signedPath=signed?.signedURL||signed?.signedUrl;
   if(typeof signedPath!=='string')throw new HttpError(502,'Could not open this receipt. Please try again.');
@@ -24,7 +24,7 @@ export const handle=endpoint(async(request,headers)=>{
  try{form=await new Response(bytes,{headers:{'Content-Type':type}}).formData();}catch{throw new HttpError(400,'The upload form is invalid.');}
  const file=form.get('file');
  if(!(file instanceof File)||form.getAll('file').length!==1)throw new HttpError(400,'Choose one payment receipt image.');
- if(file.size>MAX_IMAGE_BYTES)throw new HttpError(413,'Receipt images must be 5 MB or smaller.');
+ if(file.size>MAX_IMAGE_BYTES)throw new HttpError(413,'Receipt images must be 20 MB or smaller.');
  const contents=new Uint8Array(await file.arrayBuffer()),image=imageType(contents);
  const id=uuid(form.get('id'),'Payout ID'),affiliate_id=uuid(form.get('affiliate_id'),'Affiliate ID');
  const amount=field(form.get('amount_cents'),'Payout amount',9,true);

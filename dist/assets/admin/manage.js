@@ -503,6 +503,15 @@ function bindPhotoOrder() {
     },
   });
 }
+function updateProductPhotos() {
+  // Keep the form and its focus intact; only the thumbnail list needs repainting.
+  const anchor = $('#product-photos'), before = anchor?.getBoundingClientRect().top;
+  clearPhotoDrag();
+  $('#product-photo-order').innerHTML = renderProductPhotos(productDraft.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) });
+  bindPhotoOrder();
+  if (anchor && Number.isFinite(before)) modal.scrollTop += anchor.getBoundingClientRect().top - before;
+  $('#photo-order-status').textContent = `${productDraft.photos.length} photo${productDraft.photos.length === 1 ? '' : 's'}. Save the item to keep your changes.`;
+}
 function renderProductDialog() {
   const p = productDraft;
   const kind = p.kind || 'set';
@@ -816,7 +825,7 @@ async function onAction(button) {
     case 'remove-group': captureProduct(); productDraft.option_groups.splice(index, 1); renderProductDialog(); break;
     case 'add-choice': captureProduct(); productDraft.option_groups[index].choices.push({ id: uid(), label: '', surcharge_cents: 0, active: true }); renderProductDialog(); break;
     case 'remove-choice': captureProduct(); productDraft.option_groups[Number(button.dataset.group)].choices.splice(index, 1); renderProductDialog(); break;
-    case 'remove-photo': captureProduct(); productDraft.photos.splice(index, 1); renderProductDialog(); break;
+    case 'remove-photo': captureProduct(); productDraft.photos.splice(index, 1); updateProductPhotos(); break;
     case 'new-zone': zoneDialog(); break;
     case 'edit-zone': zoneDialog(id); break;
     case 'new-promo': promoDialog(); break;
@@ -1018,9 +1027,10 @@ document.addEventListener('change', async event => {
         controls.forEach((control, index) => { control.disabled = disabled[index]; });
         // Closing or switching dialogs during upload must not reopen an old editor.
         if (modal.open && productDraft === draft && form.isConnected) {
-          renderProductDialog();
+          updateProductPhotos();
+          target.value = '';
           if (failure) $('.form-error', modal).textContent = failure + ' Successfully uploaded photos remain in this draft.';
-          else toast('Photos uploaded. Save the item to publish your changes.');
+          else { $('.form-error', modal).textContent = ''; toast('Photos uploaded. Save the item to keep your changes.'); }
         }
       }
     }

@@ -1,7 +1,7 @@
 import {credentials} from '../_shared/http.ts';
 import {BackupError,makeProofArchive as buildArchive} from '../../../dist/assets/admin/proof-archive.js';
 export {MAX_ARCHIVE_BYTES,zipFiles,sha256} from '../../../dist/assets/admin/proof-archive.js';
-const MAX_PROOF_BYTES=5*1024*1024;
+const MAX_PROOF_BYTES=20*1024*1024;
 async function bounded(response:Response){
  if(!response.ok||!response.body||Number(response.headers.get('content-length'))>MAX_PROOF_BYTES)throw new BackupError('proof_files');
  const reader=response.body.getReader(),chunks:Uint8Array[]=[];let length=0;

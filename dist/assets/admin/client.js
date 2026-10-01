@@ -1,5 +1,6 @@
 import { config } from './config.js';
-import { preparePhoto } from './photo-upload.js';
+import { preparePhoto } from './photo-upload.js?v=original-fallback-1';
+import { photoExtension } from '../image-file.js';
 
 const setupMessage = 'Backend setup is pending. Accounts and orders will be available after the shop owner connects the ordering service.';
 const currentUrl = new URL(window.location.href);
@@ -142,7 +143,9 @@ export async function upload(file, { kind = 'proof', order_id, token, payment_re
     const { data: identity, error: identityError } = await client.auth.getUser();
     if (identityError || !identity.user) throw new Error('Sign in as an owner to upload photos.');
     file = await preparePhoto(file);
-    const path = `${identity.user.id}/${crypto.randomUUID()}.webp`;
+    const extension = photoExtension(file);
+    if (!extension) throw new Error('Choose a supported photo format.');
+    const path = `${identity.user.id}/${crypto.randomUUID()}.${extension}`;
     // Storage RLS independently requires the current database-assigned owner role.
     const bucket = kind === 'website' ? 'website-images' : 'product-images';
     const { error } = await client.storage.from(bucket).upload(path, file, { contentType: file.type, upsert: false, cacheControl: '3600' });

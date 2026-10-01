@@ -1,7 +1,8 @@
+import {inspectImage} from '../image-file.js';
 import {activeRecoveryOrders,recoveryEnvelope,validateRecovery} from './recovery-data.js';
 export class BackupError extends Error {constructor(code){super(code);this.code=code;}}
 export const MAX_ARCHIVE_BYTES = 32 * 1024 * 1024;
-const MAX_PROOF_BYTES = 5 * 1024 * 1024, utf8 = new TextEncoder();
+const MAX_PROOF_BYTES = 20 * 1024 * 1024, utf8 = new TextEncoder();
 export const sha256 = async (bytes)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (n)=>n.toString(16).padStart(2, '0')).join('');
 const crcTable = Array.from({
     length: 256
@@ -68,6 +69,7 @@ export function zipFiles(files) {
 }
 function validImage(bytes, extension) {
     if (bytes.length < 12 || bytes.length > MAX_PROOF_BYTES) return false;
+    if (extension === 'heic' || extension === 'heif') { try { return inspectImage(bytes).mime === 'image/heic'; } catch { return false; } }
     if (extension === 'png') return [
         137,
         80,
@@ -94,7 +96,7 @@ export async function makeProofArchive(snapshot, download) {
         const reference = /^[A-Za-z0-9-]{1,40}$/.test(order.reference || '') ? order.reference : order.id;
         let number = 0;
         for (const path of paths){
-            if (typeof path !== 'string' || !path.startsWith(order.id + '/') || !/^[a-f0-9-]{36}\/[A-Za-z0-9_-]{1,100}\.(png|jpe?g|webp)$/i.test(path)) throw new BackupError('proof_files');
+            if (typeof path !== 'string' || !path.startsWith(order.id + '/') || !/^[a-f0-9-]{36}\/[A-Za-z0-9_-]{1,100}\.(png|jpe?g|heic|heif|webp)$/i.test(path)) throw new BackupError('proof_files');
             if (seen.has(path)) continue;
             seen.add(path);
             const bytes = await download(path), extension = path.split('.').at(-1).toLowerCase();

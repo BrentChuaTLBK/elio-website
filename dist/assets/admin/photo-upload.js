@@ -1,6 +1,7 @@
 export const PHOTO_ACCEPT = 'image/jpeg,image/png,image/heic,image/heif,image/heic-sequence,image/heif-sequence,image/webp,.jpg,.jpeg,.png,.heic,.heif,.webp';
-export const PHOTO_HELP = 'JPEG, PNG, HEIC/HEIF, or WebP · up to 20 MB each. Automatically saved as WebP.';
-export const RECEIPT_HELP = 'JPEG, PNG, HEIC/HEIF, or WebP · up to 20 MB. Automatically saved as WebP. No PDF files.';
+import {inspectImage} from '../image-file.js';
+export const PHOTO_HELP = 'JPEG, PNG, HEIC/HEIF, or WebP · up to 20 MB each. Saved as WebP when possible; otherwise the original is kept.';
+export const RECEIPT_HELP = 'JPEG, PNG, HEIC/HEIF, or WebP · up to 20 MB. Saved as WebP when possible; otherwise the original is kept. No PDF files.';
 const conversions=new WeakMap();
 export function validatePhoto(file) {
   if (!(file instanceof File) || !file.size) throw new Error('Choose a photo to upload.');
@@ -12,14 +13,16 @@ export function validatePhoto(file) {
   }
 }
 
-// Decode and encode off the UI thread. Only the resulting WebP reaches Storage.
+// Decode and encode off the UI thread; keep a validated original if this fails.
 export async function preparePhoto(file,{receipt=false}={}) {
   validatePhoto(file);
-  // Preserve identical encoded bytes when a payment upload is retried. Failed
-  // conversions are not cached, so a temporary codec download failure can retry.
+  // Cache converted or original bytes so a payout retry keeps its fingerprint.
   let cached=conversions.get(file);if(!cached){cached=new Map();conversions.set(file,cached);}
   const purpose=receipt?'receipt':'photo';
-  if(!cached.has(purpose))cached.set(purpose,convert(file,purpose).catch(error=>{cached.delete(purpose);throw error;}));
+  if(!cached.has(purpose))cached.set(purpose,convert(file,purpose).catch(async()=>{
+    const format=inspectImage(new Uint8Array(await file.arrayBuffer()));
+    return new File([file],file.name.replace(/\.[^.]+$/,'')+'.'+format.extension,{type:format.mime,lastModified:file.lastModified});
+  }).catch(error=>{cached.delete(purpose);throw error;}));
   return cached.get(purpose);
 }
 async function convert(file,purpose) {

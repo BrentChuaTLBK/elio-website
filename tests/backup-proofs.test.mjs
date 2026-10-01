@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import JSZip from 'jszip';
+import {heicContainer} from './helpers/image-fixtures.mjs';
 import {makeProofArchive,readProof,zipFiles,sha256} from '../supabase/functions/order-backup/proof-archive.ts';
 import {validateRecovery,fulfillmentCsv} from '../dist/assets/admin/recovery-data.js';
 const id='11111111-1111-4111-8111-111111111111',path=id+'/22222222-2222-4222-8222-222222222222.png';
@@ -10,6 +11,7 @@ validateRecovery(data);assert.match(fulfillmentCsv(data),/under_review/);
 const copied=await makeProofArchive(data,async p=>{assert.equal(p,path);return image;});assert.equal(copied.proof_count,1);
 const archive=await JSZip.loadAsync(copied.bytes,{checkCRC32:true}),filename='proofs/ELIO-REVIEW/ELIO-REVIEW-payment-proof-1.png';assert.deepEqual(new Uint8Array(await archive.file(filename).async('uint8array')),image);assert.match(await archive.file('payment-proofs-index.csv').async('text'),/ELIO-REVIEW-payment-proof-1.png/);
 const envelope=JSON.parse(await archive.file('recovery.json').async('text'));assert.equal(await sha256(new TextEncoder().encode(JSON.stringify(envelope.backup))),envelope.sha256);assert.equal(envelope.backup.proof_files[0].sha256,await sha256(image));assert.equal(envelope.backup.review_orders[0].payment_status,'under_review');
+const originalHeic=heicContainer(),heicArchive=await makeProofArchive({...data,review_orders:[{...review,proof_path:path.replace('.png','.heic')}]},async()=>originalHeic),heicZip=await JSZip.loadAsync(heicArchive.bytes,{checkCRC32:true});assert.deepEqual(await heicZip.file('proofs/ELIO-REVIEW/ELIO-REVIEW-payment-proof-1.heic').async('uint8array'),new Uint8Array(originalHeic));
 const complete=structuredClone(data);complete.review_orders=[];complete.paid_orders=[{...review,payment_status:'paid',fulfillment_status:'completed'}];complete.paid_history_count=1;complete.active_order_ids=[];complete.active_count=0;complete.active_total_cents=0;
 const done=await makeProofArchive(complete,async()=>{throw Error('Should not download completed proof');});assert.equal(done.proof_count,0);assert.equal(done.snapshot.paid_orders.length,1);
 for(const bad of ['../../secret',id+'/../other.png','https://outside.test/proof.png'])await assert.rejects(makeProofArchive({...data,review_orders:[{...review,proof_path:bad}]},async()=>image),/proof_files/);
