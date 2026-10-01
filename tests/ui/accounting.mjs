@@ -115,7 +115,7 @@ try{
    const file=join(output,download.suggestedFilename());await download.saveAs(file);
    const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(await readFile(file));assert.equal(workbook.worksheets.length,8);assert.equal(workbook.getWorksheet('Summary').getCell('D12').value.result,2249.75);
    assert.equal(workbook.getWorksheet('Ingredients').getCell('D12').value,'Supplier');assert.equal(workbook.getWorksheet('Ingredients').getCell('D13').value,'Alice <Baker>');assert.equal(workbook.getWorksheet('Ingredients').getCell('E13').value,'Bank Transfer');
-   await page.locator('[data-accounting=add]').click();await form.locator('[name=category_id]').selectOption('cakes');await form.locator('[name=payment_method]').selectOption('cash');
+   await page.locator('[data-accounting=add]').click();await pickDate(form,'entry_date','2026-09-25');await form.locator('[name=category_id]').selectOption('cakes');await form.locator('[name=payment_method]').selectOption('cash');
    assert.equal(await form.locator('[name=client_name]').evaluate(el=>el.closest('label').textContent),'Client name · optional');
    await form.locator('[name=kind]').selectOption('expense');assert.equal(await form.locator('[name=client_name]').evaluate(el=>el.closest('label').textContent),'Supplier · optional');
    const previousSaves=calls.filter(c=>c.action==='accounting_save_entry').length;
