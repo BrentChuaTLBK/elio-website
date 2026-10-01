@@ -166,6 +166,12 @@ function showDialog(title, content) {
 }
 async function closeDialog() { if(!await canLeaveOrderEditor())return;orderEditBaseline=null;editDraft=null; if(catalogOrderController && !catalogOrderController.canLeave())return;catalogOrderController?.destroy();catalogOrderController=null;clearPhotoDrag(); modal.close(); modalReturnFocus?.focus?.(); }
 modal.addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
+// A native close request can be non-cancelable after browser activation is
+// consumed. Route editor Escape through the draft guard before native closing.
+modal.addEventListener('keydown',event=>{
+  if(event.key!=='Escape'||event.defaultPrevented||event.isComposing||!$('#dialog-body [data-form="order-edit"],#dialog-body [data-form="order-contact"]'))return;
+  event.preventDefault();event.stopPropagation();closeDialog();
+});
 $('#dialog-close').addEventListener('click', closeDialog);
 
 const newsletterAdmin = createNewsletterAdmin({products:()=>state.products,connected:()=>state.connected,owner:()=>state.role==='owner',showDialog,closeDialog});
