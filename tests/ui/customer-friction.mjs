@@ -14,7 +14,7 @@ function fixture(capacity=30){
  const collection={flavors,categories:[{id:'classic',name:'Classic'}],menus:[{month:date.slice(0,7)+'-01',published:true,flavor_ids:flavors.map(f=>f.id)}],current_month:date.slice(0,7)+'-01',next_month:addDays(date,32).slice(0,7)+'-01'};
  return {catalog,collection,session:null,orderError:null,orderGate:null,collectionGate:null,calls:[]};
 }
-const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 async function make({width=390,capacity=30,session=null,holdCollection=false}={}){
  const data=fixture(capacity);data.session=session;
  if(holdCollection)data.collectionGate=new Promise(r=>data.releaseCollection=r);

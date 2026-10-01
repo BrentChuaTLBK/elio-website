@@ -14,7 +14,7 @@ function fixture(){
  const inventory=[{product_id:'vanilla',date,capacity:60,remaining:60,reserved:0,available:true,configured:true}];
  return {session:session('owner-a'),settings,flavors,product,order,otherOrder:{...structuredClone(order),id:'order2',reference:'ELIO-OTHER'},catalog:{settings,flavors,products:[product],categories:[],inventory,zones:[]},inventory,menus:[month,nextMonth].map(m=>({month:m+'-01',flavor_ids:['vanilla'],published:true})),calls:[],discount:10500,expiredPromo:false,bootstrapError:null,readError:null,mutationError:null,failAfterMutation:false,gates:new Map(),role:'owner'};
 }
-const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 let currentTest;
 async function make(width=1440){
  const data=fixture(),context=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block',reducedMotion:'reduce'}),errors=[];
