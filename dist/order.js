@@ -11,7 +11,13 @@
     : `<span class="product-photo product-placeholder" aria-label="${escape(flavor.name)} — photograph coming soon"><span class="placeholder-brand" aria-hidden="true">ELIO</span><span class="placeholder-name" aria-hidden="true">${escape(flavor.name)}</span><span class="placeholder-note" aria-hidden="true">Photo coming soon</span></span>`;
   const availability = (flavor) => !isAvailable(flavor) ? '<p class="availability-label">Currently unavailable</p>' : '';
   const products = document.querySelector('#order-products');
-  products.innerHTML = catalog.map((flavor) => `<article class="shop-flavor-card" data-flavor="${escape(flavor.id)}"><a href="#flavor-${escape(flavor.id)}" aria-label="View ${escape(flavor.name)} flavor details${!isAvailable(flavor) ? ' — currently unavailable' : ''}">${photo(flavor)}<h3>${escape(flavor.name)}</h3>${availability(flavor)}</a></article>`).join('');
+  const renderSlide = (flavor, index, copy = false) => `<article class="shop-flavor-card flavor-slide" data-flavor="${escape(flavor.id)}" data-flavor-index="${index}"${copy ? ' data-carousel-copy aria-hidden="true"' : ` role="group" aria-roledescription="slide" aria-label="${escape(flavor.name)}, ${index + 1} of ${catalog.length}"`}><a href="#flavor-${escape(flavor.id)}"${copy ? ' tabindex="-1"' : ''} aria-label="View ${escape(flavor.name)} flavor details${!isAvailable(flavor) ? ' — currently unavailable' : ''}">${photo(flavor)}<h3>${escape(flavor.name)}</h3>${availability(flavor)}</a></article>`;
+  const { mountFlavorCarousel } = await import('./assets/shop/flavor-carousel.js?v=1');
+  const { slides, goToFlavor } = mountFlavorCarousel({
+    track: products, carousel: document.querySelector('.shop-flavor-carousel'), catalog, renderSlide,
+    carouselStatus: document.querySelector('#order-carousel-status'),
+    emptyMessage: window.ELIO_CONTENT.collectionLoaded ? 'More little discoveries to come.' : 'Our flavors couldn’t load just now. Please try again shortly.',
+  });
   const dialog = document.querySelector('#order-flavor-dialog');
   const content = document.querySelector('#order-flavor-content');
   let trigger = null;
@@ -19,7 +25,14 @@
     const flavor = catalog.find((item) => `#flavor-${item.id}` === location.hash);
     if (location.hash === '#your-bag') (document.querySelector('#cart') || document.querySelector('#your-basket'))?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     if (!flavor) {
-      if (dialog.open) { dialog.close(); if (trigger?.isConnected) trigger.focus({ preventScroll: true }); }
+      if (dialog.open) {
+        dialog.close();
+        if (trigger?.isConnected) {
+          const slide = trigger.closest('.flavor-slide');
+          if (slide) goToFlavor(Number(slide.dataset.flavorIndex), false);
+          trigger.focus({ preventScroll: true });
+        }
+      }
       return;
     }
     content.innerHTML = `<div class="${hasPhoto(flavor) ? 'detail-layout' : ''}">${hasPhoto(flavor) ? photo(flavor) : ''}<div class="dialog-body${hasPhoto(flavor) ? '' : ' simple-dialog'}"><p class="eyebrow">The collection</p><h2 id="dialog-title" tabindex="-1">${escape(flavor.name)}</h2>${availability(flavor)}<p class="detail-line">${escape(flavor.line)}</p><p class="detail-description">${escape(flavor.description)}</p>${flavorMetaHtml(flavor, escape)}<p class="order-detail-availability">Browse the shop for boxes, current prices, and availability for your selected date.</p></div></div>`;
@@ -31,7 +44,12 @@
     const link = event.target.closest('a[href^="#flavor-"],a[href="#your-bag"]');
     if (!link || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     event.preventDefault();
-    trigger = link;
+    const copy = link.closest('[data-carousel-copy]');
+    if (copy) {
+      const index = Number(copy.dataset.flavorIndex);
+      goToFlavor(index, false);
+      trigger = slides[index].querySelector('a');
+    } else trigger = link;
     history.pushState(null, '', link.getAttribute('href'));
     syncDialog();
   });

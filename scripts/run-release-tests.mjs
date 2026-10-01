@@ -5,7 +5,7 @@ const root=resolve(import.meta.dirname,'..');
 const env={...process.env,PLAYWRIGHT_PACKAGE_ROOT:process.env.PLAYWRIGHT_PACKAGE_ROOT||join(root,'node_modules'),PGLITE_PACKAGE_ROOT:process.env.PGLITE_PACKAGE_ROOT||join(root,'tests/backend')};
 env.EXCELJS_TEST_PATH=process.env.EXCELJS_TEST_PATH||join(root,'node_modules/exceljs/dist/exceljs.min.js');
 const out=join(root,'test-results/release');await mkdir(out,{recursive:true});
-const ui=['shop-loading','flavor-loading','flavor-list','checkout','customer-friction','checkout-admin-progress','backup-and-edit','account-and-conversions','vouchers','voucher-density','pos-feedback','payment-options','receipt-progress','order-calendar','maintenance-admin-status','maintenance-and-print','slip-sizing','accounting','affiliates','marketing-insights','site-analytics'];
+const ui=['shop-loading','flavor-loading','flavor-list','flavor-carousel','checkout','customer-friction','checkout-admin-progress','backup-and-edit','account-and-conversions','vouchers','voucher-density','pos-feedback','payment-options','receipt-progress','order-calendar','maintenance-admin-status','maintenance-and-print','slip-sizing','accounting','affiliates','marketing-insights','site-analytics'];
 const suites=['scripts/check.mjs','tests/backend/run.mjs',...(await readdir(join(root,'tests'))).filter(n=>n.endsWith('.test.mjs')).sort().map(n=>'tests/'+n),...ui.map(n=>'tests/ui/'+n+'.mjs')];
 const results=[];
 for(const file of suites){
