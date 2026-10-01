@@ -2,10 +2,24 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFile,mkdir} from 'node:fs/promises';
 import {resolve,join,extname,sep} from 'node:path';
+import {createServer} from 'node:http';
 const require=createRequire(import.meta.url),{chromium}=require(join(process.env.PLAYWRIGHT_PACKAGE_ROOT,'playwright'));
-const root=resolve(import.meta.dirname,'../../dist'),origin='https://maintenance.test',output=resolve(root,'../test-results/maintenance');await mkdir(output,{recursive:true});
+const root=resolve(import.meta.dirname,'../../dist'),output=resolve(root,'../test-results/maintenance');await mkdir(output,{recursive:true});
 const source=await readFile(join(root,'assets/admin/client.js'),'utf8'),helpers=source.slice(source.indexOf('export function money('));
 const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2'};
+// Redirected popup requests can bypass Playwright routing in Headless Shell.
+// Use an actual local HTTP redirect and document, as the deployed site does.
+const printRequests=[],server=createServer(async(req,res)=>{
+ const u=new URL(req.url,'http://127.0.0.1');
+ if(req.method!=='GET'){res.writeHead(405);res.end();return;}
+ if(u.pathname==='/assets/admin/order-print.html'){printRequests.push(u.pathname);res.writeHead(307,{location:'/assets/admin/order-print'+u.search});res.end();return;}
+ if(u.pathname==='/assets/admin/order-print')printRequests.push(u.pathname);
+ const file=resolve(root,'.'+(u.pathname==='/assets/admin/order-print'?u.pathname+'.html':u.pathname));
+ if(!file.startsWith(root+sep)){res.writeHead(404);res.end();return;}
+ try{const body=await readFile(file);res.writeHead(200,{'content-type':mime[extname(file)]||'application/octet-stream'});res.end(body);}catch{res.writeHead(404);res.end();}
+});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const origin=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 const order={reference:'ELIO-PRINTTEST',buyer:{name:'Test customer',phone:'09170000000',social_platform:'na'},method:'pickup',fulfillment_date:'2026-09-30',fulfillment_status:'confirmed',payment_status:'paid',items:[{name:'The Signature Trio',quantity:1,unit_price_cents:90000,line_total_cents:90000,selection_labels:['Vanilla × 1','Chocolate × 1','Matcha × 1']}],subtotal_cents:90000,discount_cents:4500,delivery_cents:0,total_cents:85500,pickup_address:'Test kitchen',pickup_hours:'10 AM–6 PM',private_notes:'NEVER PRINT THIS'};
 try{
@@ -14,7 +28,8 @@ try{
   const emailAlert={id:'email-test',event_type:'order_review_required',status:'skipped',attempts:1,last_error:'Order no longer needs payment review.',reviewed_at:null};
   let pickupOrder={...order,id:'pickup-test',revision:1,fulfillment_date:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila'}).format(new Date()),fulfillment_status:'ready_for_pickup',buyer:{...order.buyer,email:'pickup@example.test'}};
   const state=()=>({active,uploads_paused:active&&settings.pause_uploads,announce:settings.announce,message:settings.message,starts_at:settings.starts_at,ends_at:settings.ends_at,server_time:new Date().toISOString()});
-  const ctx=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'});
+  const ctx=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'}),printFailures=[];
+  ctx.on('requestfailed',request=>{if(request.url().includes('order-print'))printFailures.push({url:request.url(),error:request.failure()?.errorText});});
   await ctx.route('**/*',async route=>{
    const u=new URL(route.request().url());if(u.origin!==origin)return route.abort();
    if(u.pathname==='/assets/admin/client.js')return route.fulfill({contentType:'text/javascript',body:`export const configured=true,ready=Promise.resolve(),auth={getSession:async()=>({data:{session:{user:{id:'owner'}}}}),onAuthStateChange:()=>{}};export async function api(action,payload={}){const r=await fetch('/api',{method:'POST',body:JSON.stringify({action,payload})});const d=await r.json();if(!r.ok)throw Error(d.error);return d;};export async function affiliateReceipt(){};export async function affiliatePayout(){};export async function newsletterRequest(){};export async function upload(){};export async function calendarConnection(){return {}} export async function websiteVisitorStats(){};${helpers}`});
@@ -33,8 +48,8 @@ try{
    }
    if(['/index.html','/order.html'].includes(u.pathname))return route.fulfill({contentType:'text/html',body:'<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/assets/site-maintenance.css"><script type="module" src="/assets/site-maintenance.js"></script></head><body><header>ELIO</header><main><h1>Storefront</h1></main></body></html>'});
    if(u.pathname==='/print-harness.html')return route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><button id="single">Print pickup</button><button id="batch">Print both</button><p id="error"></p><script type="module">import {printOrderSlips} from '/assets/admin/order-slips.js';const order=${JSON.stringify(order)};document.querySelector('#single').onclick=()=>printOrderSlips(order).catch(e=>document.querySelector('#error').textContent=e.message);document.querySelector('#batch').onclick=()=>printOrderSlips(async()=>[order,{...order,reference:'ELIO-DELIVERY',method:'delivery',recipient:{name:'Test recipient',phone:'09170000001'},address:{line1:'Test address',locality:'Quezon City'},delivery_cents:10000,total_cents:95500}]).catch(e=>document.querySelector('#error').textContent=e.message);</script>`});
-   if(u.pathname==='/assets/admin/order-print.html')return route.fulfill({status:307,headers:{location:'/assets/admin/order-print'+u.search},body:''});
-   const file=resolve(root,'.'+(u.pathname==='/assets/admin/order-print'?u.pathname+'.html':u.pathname));if(!file.startsWith(root+sep))return route.abort();
+   if(['/assets/admin/order-print.html','/assets/admin/order-print'].includes(u.pathname))return route.continue();
+   const file=resolve(root,'.'+u.pathname);if(!file.startsWith(root+sep))return route.abort();
    try{return route.fulfill({contentType:mime[extname(file)]||'application/octet-stream',body:await readFile(file)});}catch{return route.fulfill({status:404,body:''});}
   });
   const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/manage.html');
@@ -74,8 +89,10 @@ try{
   active=false;await page.reload();await page.getByText('Planned maintenance',{exact:true}).waitFor();assert.equal(await page.locator('#site-maintenance-screen').isVisible(),false);
   await page.goto(origin+'/print-harness.html');
   for(const kind of ['single','batch']){
+   const requestStart=printRequests.length;
    const next=page.waitForEvent('popup');await page.locator('#'+kind).click();const print=await next;print.on('pageerror',e=>errors.push(e.message));
-   await print.locator('.print-slips:not([disabled])').waitFor({timeout:15000}).catch(async e=>{throw Error(`${e.message}; preview: ${await print.locator('[role=status]').textContent()}; launcher: ${await page.locator('#error').textContent()}; errors: ${errors.join(', ')}`);});assert.match(print.url(),/order-print\?v=/);assert.equal(await print.locator('.slip').count(),kind==='single'?1:2);
+   await print.locator('.print-slips:not([disabled])').waitFor({timeout:15000}).catch(async e=>{throw Error(`${e.message}; URL: ${print.url()}; preview: ${await print.locator('[role=status]').textContent({timeout:1000}).catch(()=>'(not loaded)')}; launcher: ${await page.locator('#error').textContent()}; errors: ${errors.join(', ')}; requests: ${JSON.stringify(printFailures)}`);});assert.match(print.url(),/order-print\?v=/);assert.equal(await print.locator('.slip').count(),kind==='single'?1:2);
+   assert.deepEqual(printRequests.slice(requestStart),['/assets/admin/order-print.html','/assets/admin/order-print'],'Preview follows the actual HTTP redirect');
    assert.match(await print.locator('#slips').textContent(),/The Signature Trio/);assert(!((await print.locator('#slips').textContent()).includes('NEVER PRINT THIS')));
    assert.equal(await print.locator('.slip-price,.slip-payment,.slip-total').count(),0);
    assert.doesNotMatch(await print.locator('#slips').textContent(),/₱|PHP|Payment breakdown|Subtotal|Discount|Order total|(?:Pickup|Delivery) fee/i);
@@ -88,4 +105,4 @@ try{
   }
   assert.deepEqual(errors,[]);await ctx.close();console.log(`PASS maintenance controls, storefront, existing order access, pickup/delivery and batch printing ${width}px`);
  }
-}finally{await browser.close();}
+}finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
