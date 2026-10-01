@@ -64,6 +64,13 @@ const consumeCloseActivation=page=>page.evaluate(()=>{
  const watcher=new CloseWatcher();watcher.addEventListener('cancel',event=>event.preventDefault());watcher.requestClose();watcher.destroy();
 });
 try{
+ {
+  const t=await make(),{page,data}=t;Object.assign(data.order,{payment_status:'paid',fulfillment_status:'confirmed',paid_amount_cents:105000});await admin(t);await openOrder(page);
+  await page.evaluate(()=>{const request=window.requestAnimationFrame,queued=[];window.requestAnimationFrame=callback=>{queued.push(callback);return queued.length;};window.finishDelayedFrame=()=>{window.requestAnimationFrame=request;queued.splice(0).forEach(callback=>callback(performance.now()));};});
+  await editOrder(page);await page.locator('[name=buyer_phone]').fill('09178889999');await page.evaluate(()=>window.finishDelayedFrame());
+  assert.equal(await page.locator('[name=buyer_phone]').evaluate(el=>document.activeElement===el),true,'Delayed dialog autofocus must preserve the field already being edited');
+  await page.locator('#save-order-edit').click();await page.getByRole('heading',{name:'ELIO-SAMPLE',exact:true}).waitFor();assert.equal(data.order.buyer.phone,'09178889999');await finish(t,'delayed dialog autofocus preserves ongoing input and saves the edited value');
+ }
  for(const width of [390,1440]){
   const t=await make(width),{page,data}=t;await openCustomer(t);await chooseReceipt(page);await page.evaluate(()=>window.originalProof=document.querySelector('[name=proof]'));
   await refreshCustomer(page);assert.equal(await page.evaluate(()=>window.originalProof===document.querySelector('[name=proof]')),true);assert.equal(await page.locator('[name=payment_reference]').inputValue(),'SAMPLE-REF');

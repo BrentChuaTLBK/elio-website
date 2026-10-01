@@ -163,7 +163,11 @@ function showDialog(title, content) {
   $('#dialog-body').innerHTML = content;
   if (!modal.open) modal.showModal();
   modal.scrollTop = 0;
-  requestAnimationFrame(() => $('input:not([type=hidden]), select, textarea, button', $('#dialog-body'))?.focus());
+  const body = $('#dialog-body'), firstControl = $('input:not([type=hidden]), select, textarea, button', body), initialFocus = document.activeElement;
+  requestAnimationFrame(() => {
+    // A delayed frame must not move focus after someone has started editing.
+    if (modal.open && firstControl?.isConnected && document.activeElement === initialFocus && !body.contains(document.activeElement)) firstControl.focus();
+  });
 }
 async function closeDialog() { if($('[data-form=product][data-busy=true]'))return; if(!await canLeaveOrderEditor())return;orderEditBaseline=null;editDraft=null; if(catalogOrderController && !catalogOrderController.canLeave())return;catalogOrderController?.destroy();catalogOrderController=null;clearPhotoDrag(); modal.close(); modalReturnFocus?.focus?.(); }
 modal.addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
