@@ -14,6 +14,15 @@ export function bindReceiptUpload(form,{upload,validatePhoto,orderId,token,readO
  const display=stage=>{status.innerHTML=receiptProgress(stage);button.textContent=stage==='checking'?'Checking upload…':stage==='preparing'?'Preparing receipt…':'Uploading receipt…';};
  const showError=(title,message)=>{status.innerHTML='';errorBox.className='notice danger receipt-upload-error';errorBox.innerHTML=`<strong>${escape(title)}</strong><p>${escape(message)}</p>`;};
  const changed=order=>order&&(order.payment_status!=='awaiting_payment'||['cancelled','expired','refunded'].includes(order.fulfillment_status)||order.refund_label||order.uploads_paused);
+ const checkSelection=()=>{
+  if(pending||accepted)return;
+  errorBox.textContent='';errorBox.className='';
+  const file=form.elements.proof.files[0];if(!file)return;
+  try{validatePhoto(file);}catch(error){showError('Choose a receipt image.',error.message);}
+ };
+ // Assign the handler so moving the same input during a refresh cannot stack listeners.
+ form.elements.proof.onchange=checkSelection;
+ if(form.elements.proof.files.length)checkSelection();
  form.onsubmit=async event=>{
   event.preventDefault();if(pending||accepted||!canStart())return;
   const file=form.elements.proof.files[0],reference=form.elements.payment_reference.value.trim();

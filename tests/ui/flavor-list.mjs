@@ -23,7 +23,8 @@ try{
   });
   const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));
   let revision=0;
-  const loaded=async hash=>{await page.goto(origin+'/flavors.html?fixture='+(++revision)+(hash||''));await page.waitForFunction(()=>document.querySelector('.flavor-result-summary')?.textContent.length>0);await page.evaluate(()=>document.fonts.ready)};
+  // These are independent catalog/layout fixtures. Persistence has its own browser coverage.
+  const loaded=async hash=>{if(revision)await page.evaluate(()=>sessionStorage.removeItem('elio-flavor-browse-v1'));await page.goto(origin+'/flavors.html?fixture='+(++revision)+(hash||''));await page.waitForFunction(()=>document.querySelector('.flavor-result-summary')?.textContent.length>0);await page.evaluate(()=>document.fonts.ready)};
   const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await loaded();assert.equal(await page.locator('#monthly-title').textContent(),'September 2026');assert.equal(await page.locator('#next-month-title').textContent(),'October 2026');assert.equal(await page.locator('#monthly-label').textContent(),'This month’s favorites');
   assert.equal(await page.locator('#monthly-flavors .flavor-tile:visible').count(),4);assert.equal(await page.locator('#next-month-flavors .flavor-tile:visible').count(),4);

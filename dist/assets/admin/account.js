@@ -1,5 +1,7 @@
 import { auth, ready, initializationError, authLink, api, escapeHtml as esc, money, formatDate } from './client.js';
 import { config } from './config.js';
+import {clearAdminOrderView} from './progress-state.js';
+import {accountReturn,temporaryOrderReadFailure} from './account-return.js';
 
 const form = document.querySelector('#account-form');
 const status = document.querySelector('#account-status');
@@ -16,14 +18,16 @@ const newsletterRetry = document.querySelector('#account-newsletter-retry');
 const googleButton = document.querySelector('#google-signin');
 const googleLabel = googleButton.innerHTML;
 const staffDestination = new URLSearchParams(location.search).get('next') === 'pos.html' ? 'pos.html' : 'manage.html';
-const destination = customer ? 'account.html' : staffDestination;
+let returnStorage;try{returnStorage=window.sessionStorage;}catch{}
+const customerReturn=accountReturn({customer,search:location.search,received:authLink.received,storage:returnStorage});
+const destination = customer ? customerReturn.destination : staffDestination;
 const callback = new URL(customer ? 'account.html' : staffDestination==='pos.html' ? 'admin-account.html?next=pos.html' : 'admin-account.html', location.href).href;
 let mode = 'signin';
 let busy = false;
 let googleAvailable = false;
 let resendAfter = 0;
 let retryNewsletter;
-let accountSession=null,ordersRequest=0;
+let accountSession=null,ordersRequest=0,loadedOrdersUserId=null;
 const oauthNewsletterKey = 'elio-newsletter-oauth-consent-v1';
 
 function newsletterMessage(text, error = false) {
@@ -107,18 +111,21 @@ let voucherController=null;
 async function loadOrders() {
   const section = document.querySelector('#account-orders');
   if (!section) return;
-  const request=++ordersRequest;
+  const request=++ordersRequest,userId=accountSession?.user.id;
+  const previousCards=loadedOrdersUserId===userId?section.querySelector('.account-orders-grid')?.outerHTML:'';
   const title='<div class="account-orders-heading"><div><h2>Your orders</h2><p>Keep track of your boxes, from payment to pickup or delivery.</p></div><button class="button button-secondary" type="button" data-orders-refresh>Refresh</button></div>';
   const guestNote='<p class="account-guest-note">Ordered as a guest? Use the order link in your confirmation email.</p>';
   section.setAttribute('aria-busy','true');
-  section.innerHTML = title.replace('data-orders-refresh>','data-orders-refresh disabled>')+'<p class="notice" role="status">Loading your orders…</p>';
+  section.innerHTML = title.replace('data-orders-refresh>','data-orders-refresh disabled>')+(previousCards||'')+'<p class="notice" role="status">'+(previousCards?'Refreshing your orders…':'Loading your orders…')+'</p>';
   try {
     const orders = await api('my_orders');
-    if(request!==ordersRequest||!accountSession)return;
+    if(request!==ordersRequest||!userId||accountSession?.user.id!==userId)return;
+    loadedOrdersUserId=userId;
     section.innerHTML = title+(orders.length ? '<div class="account-orders-grid">'+orders.map(order => `<a class="account-order" href="order.html#order=${encodeURIComponent(order.id)}"><div class="account-order-top"><strong>${esc(order.reference)}</strong><span class="account-order-status">${esc(String(order.payment_status).replaceAll('_', ' '))}</span></div><div class="account-order-summary"><span><span class="account-order-method">${esc(order.method)}</span><br>${esc(formatDate(order.fulfillment_date))}</span><strong>${esc(money(order.total_cents))}</strong></div><span class="account-order-open">View order <span aria-hidden="true">→</span></span></a>`).join('')+'</div>' : '<div class="account-orders-empty"><span class="account-empty-mark" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 32 32" fill="none"><path d="M6 11h20l2 16H4l2-16Z" stroke="currentColor" stroke-width="1.3"/><path d="M11 12V9a5 5 0 0 1 10 0v3M12 20h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><h3>Your next sweet moment starts here</h3><p>Your orders will appear here when you place them while signed in.</p><a class="button button-secondary" href="order.html">Find your next favorite</a></div>')+guestNote;
-  } catch {
-    if(request!==ordersRequest||!accountSession)return;
-    section.innerHTML = title+'<p class="notice danger" role="alert">We couldn’t load your orders. Use Refresh to try again; your saved orders are unchanged.</p>';
+  } catch (error) {
+    if(request!==ordersRequest||!userId||accountSession?.user.id!==userId)return;
+    const retain=previousCards&&temporaryOrderReadFailure(error);if(!retain)loadedOrdersUserId=null;
+    section.innerHTML = title+(retain?previousCards:'')+'<p class="notice danger" role="alert">'+(retain?'We couldn’t refresh your orders. Showing the last loaded details. Use Refresh to try again.':'We couldn’t load your orders. Use Refresh to try again; your saved orders are unchanged.')+'</p>';
   } finally { if(request===ordersRequest)section.setAttribute('aria-busy','false'); }
 }
 document.querySelector('#account-orders')?.addEventListener('click',e=>{if(e.target.closest('[data-orders-refresh]'))loadOrders();});
@@ -255,6 +262,7 @@ confirmPassword.addEventListener('input', validateConfirmation);
 document.querySelector('#account-signout').addEventListener('click', async () => {
   const { error } = await auth.signOut();
   if (error) { message(error.message, true); return; }
+  try{clearAdminOrderView(window.sessionStorage);}catch{}
   location.reload();
 });
 
@@ -268,6 +276,7 @@ googleButton.addEventListener('click', async () => {
     if (initializationError) throw initializationError;
     if (!auth) throw new Error('Elio account service is unavailable.');
     if (customer) {
+      customerReturn.remember();
       try {
         sessionStorage.removeItem(oauthNewsletterKey);
         if (mode === 'signup' && newsletterChoice?.checked && !newsletterChoice.disabled) sessionStorage.setItem(oauthNewsletterKey, JSON.stringify({ provider: 'google', callback, createdAt: Date.now() }));
@@ -299,6 +308,7 @@ form.addEventListener('submit', async event => {
     const email = form.email.value.trim();
     const password = form.password.value;
     let result;
+    if(customer&&['signup','resend','reset'].includes(mode))customerReturn.remember();
     if (mode === 'signup') {
       const wantsNewsletter = customer && newsletterChoice?.checked && !newsletterChoice.disabled;
       const options = { emailRedirectTo: callback };
@@ -306,7 +316,7 @@ form.addEventListener('submit', async event => {
       result = await auth.signUp({ email, password, options });
       if (result.error) throw result.error;
       if (wantsNewsletter) await saveAccountNewsletter(email, result.data?.session);
-      if (result.data?.session) { location.assign(destination); return; }
+      if (result.data?.session) { if(customer)customerReturn.clear();location.assign(destination); return; }
       form.password.value = '';
       confirmPassword.value = '';
       startResendCooldown();
@@ -323,12 +333,12 @@ form.addEventListener('submit', async event => {
     } else if (mode === 'recovery') {
       result = await auth.updateUser({ password });
       if (result.error) throw result.error;
-      location.assign(destination);
+      if(customer)customerReturn.clear();location.assign(destination);
     } else {
       result = await auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
       if (customer) await activateNewsletter(result.data?.session);
-      location.assign(destination);
+      if(customer)customerReturn.clear();location.assign(destination);
     }
   } catch (error) {
     message(error.message || 'Unable to complete the request.', true);
@@ -345,6 +355,10 @@ else if (auth) {
     message(params.get('error_description') || 'The sign-in link could not be used. Please try again.', true);
   } else if (authLink.recovery && data.session) setMode('recovery');
   else if (authLink.recovery || authLink.type === 'recovery') message('This password reset link is incomplete or no longer valid. Request a new reset link.', true);
+  else if (data.session && customer && customerReturn.toShop) {
+    const handled=await finishOAuthNewsletterConsent(data.session);if(!handled)await activateNewsletter(data.session);
+    customerReturn.clear();location.replace(destination);
+  }
   else if (data.session) {
     accountSession=data.session;
     heading.textContent = 'Your Elio account.';
@@ -384,4 +398,4 @@ else if (auth) {
     }
   }
 }
-auth?.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){accountSession=null;ordersRequest++;voucherController?.destroy();voucherController=null;document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();message('You have signed out. Sign in again to view your account.');}});
+auth?.onAuthStateChange((event,next)=>{if(accountSession&&next?.user?.id&&next.user.id!==accountSession.user.id){accountSession=null;loadedOrdersUserId=null;ordersRequest++;voucherController?.destroy();document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();location.reload();return;}if(event==='SIGNED_OUT'){try{clearAdminOrderView(window.sessionStorage);}catch{}accountSession=null;loadedOrdersUserId=null;ordersRequest++;voucherController?.destroy();voucherController=null;document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();message('You have signed out. Sign in again to view your account.');}});

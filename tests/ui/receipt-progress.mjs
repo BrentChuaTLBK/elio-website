@@ -40,7 +40,10 @@ try{
  const choose=async(data=bytes,name='receipt.png',mimeType='image/png')=>{await page.locator('[name=proof]').setInputFiles({name,mimeType,buffer:Buffer.from(data)});await page.locator('[name=payment_reference]').fill('SAMPLE-REF');};
  const submit=()=>page.locator('#proof-form [type=submit]').click(),received=()=>page.getByRole('heading',{name:'Your payment is under review',exact:true}).waitFor();
  // Hold real worker preparation and the request separately. The visible timer expires meanwhile.
- displayExpiry=true;await page.locator('#refresh-order').click();await page.locator('#proof-form').waitFor();await choose();await page.evaluate(()=>window.__holdPreparation=true);const request=hold();await submit();await page.getByText('Preparing your receipt…',{exact:true}).waitFor();
+ // Select first, then refresh: the real input now survives the read. Wait for
+ // that read to settle and submit immediately so scrolling cannot consume the
+ // deliberately short deadline before this in-flight-expiry scenario starts.
+ await choose();await page.evaluate(()=>window.__holdPreparation=true);const request=hold();displayExpiry=true;await page.locator('#refresh-order').click();await page.waitForFunction(()=>document.querySelector('#refresh-order')?.disabled===false);await page.locator('#proof-form').evaluate(form=>form.requestSubmit());await page.getByText('Preparing your receipt…',{exact:true}).waitFor();
  assert.equal(await page.locator('#proof-form input:enabled').count(),0);assert(await page.locator('#refresh-order').isDisabled());await page.locator('#proof-form').evaluate(f=>f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true})));assert.equal(calls.filter(c=>c==='upload').length,0);
  const reads=calls.filter(c=>c==='get_order').length;await page.waitForTimeout(2500);assert.equal(calls.filter(c=>c==='get_order').length,reads);assert(await page.locator('#proof-form').isVisible());
  await page.evaluate(()=>window.__continuePreparation());await request.started;await page.getByText('Uploading your receipt…',{exact:true}).waitFor();

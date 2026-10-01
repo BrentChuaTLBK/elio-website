@@ -1,3 +1,5 @@
+import {adminOrderView,inventoryMonthDrafts} from './progress-state.js';
+import {temporaryOrderReadFailure} from './account-return.js';
 import {mountBackup} from './backup.js';
 import {mountMarketingInsights} from './marketing-insights.js';
 import {renderAttention,loadAttentionCalendar} from './needs-attention.js';
@@ -52,6 +54,10 @@ const PAYMENT = ['awaiting_payment', 'under_review', 'paid', 'rejected', 'cancel
 const FULFILLMENT = ['pending_confirmation', 'confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'completed', 'refunded', 'cancelled', 'expired'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const state = { view: 'overview', role: null, connected: false, products: [], categories: [], inventory: [], promos: [], zones: [], orders: [], settings: {}, staff: [], filters: { search: '', payment: '', fulfillment: '', date: '', method: '', refund: '', upcoming: false }, inventoryDates: [manilaDate()], inventoryDrafts: {} };
+let staffUserId=null,bootstrapRequest=0,orderEditBaseline=null;
+let progressStorage;try{progressStorage=window.sessionStorage;}catch{}
+const orderView=adminOrderView(progressStorage),monthDrafts=inventoryMonthDrafts();
+const rememberOrderView=()=>{if(state.connected)orderView.save(staffUserId,state.view,state.filters);};
 state.inventoryMonth = manilaDate().slice(0,7);
 state.quantityMode = 'replace';
 state.lineupDrafts = {};
@@ -158,7 +164,7 @@ function showDialog(title, content) {
   modal.scrollTop = 0;
   requestAnimationFrame(() => $('input:not([type=hidden]), select, textarea, button', $('#dialog-body'))?.focus());
 }
-function closeDialog() { if(catalogOrderController && !catalogOrderController.canLeave())return;catalogOrderController?.destroy();catalogOrderController=null;clearPhotoDrag(); modal.close(); modalReturnFocus?.focus?.(); }
+async function closeDialog() { if(!await canLeaveOrderEditor())return;orderEditBaseline=null;editDraft=null; if(catalogOrderController && !catalogOrderController.canLeave())return;catalogOrderController?.destroy();catalogOrderController=null;clearPhotoDrag(); modal.close(); modalReturnFocus?.focus?.(); }
 modal.addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 $('#dialog-close').addEventListener('click', closeDialog);
 
@@ -167,7 +173,11 @@ const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,ow
 
 async function refresh() {
   if (!configured) return;
+  const request=++bootstrapRequest,userId=staffUserId;
   const result = await api('admin_bootstrap');
+  if(request!==bootstrapRequest||userId!==staffUserId)return;
+  if(!['owner','staff'].includes(result.role))throw new Error('Staff access is required.');
+  if(!state.connected&&!location.hash&&!new URL(location.href).searchParams.has('order')){const saved=orderView.restore(staffUserId);if(saved){state.view=saved.view;state.filters=saved.filters;}}
   if(!state.connected && ['#accounting','#affiliates','#maintenance','#website-photos','#backup','#marketing'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
   if(!state.connected && /^#calendar(?:\?|$)/.test(location.hash))state.view='calendar';
   Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
@@ -181,6 +191,7 @@ async function refresh() {
   render();
 }
 function render() {
+  rememberOrderView();
   const marketingNav=$('[data-view="marketing"]');if(marketingNav)marketingNav.hidden=!state.connected||state.role!=='owner';
   if(state.view==='marketing' && state.connected && owner() && $('#marketing-insights-manager'))return;
   marketingController?.destroy();marketingController=null;
@@ -546,6 +557,7 @@ async function openOrder(id) {
   try { activeOrder = await api('get_order', { order_id: id }); renderOrderDialog(); } catch (error) { showDialog('Unable to open order', `<p class="notice danger">${esc(error.message)}</p>`); }
 }
 function renderOrderDialog() {
+  orderEditBaseline=null;editDraft=null;
   const o = activeOrder;
   const canProgress = o.payment_status === 'paid' && isActiveFulfillment(o);
   const statuses = ['confirmed', 'preparing', o.method === 'pickup' ? 'ready_for_pickup' : 'out_for_delivery', 'completed'];
@@ -577,6 +589,7 @@ function contactDialog() {
   const o = activeOrder;
   showDialog(`Contact details · ${o.reference}`, `<form data-form="order-contact">${formError}<p class="notice">This order is closed or completed. You can correct contact information and add notes while preserving its items, fulfillment details, and totals.</p><h3>Buyer details</h3><div class="field-row three">${input('buyer_name', 'Name', o.buyer.name, 'text', 'required')}${input('buyer_email', 'Email', o.buyer.email, 'email', 'required')}${input('buyer_phone', 'Contact number', o.buyer.phone, 'tel', 'required')}</div>${['direct','in_person'].includes(o.order_source)?input('social_platform','Social platform · optional',o.buyer.social_platform||'')+input('social_username','Username / profile · optional',o.buyer.social_username||''):socialFields(o.buyer)}${o.method === 'delivery' ? `<h3>Recipient details</h3><div class="field-row">${input('recipient_name', 'Recipient name', o.recipient?.name, 'text', 'required')}${input('recipient_phone', 'Recipient contact number', o.recipient?.phone, 'tel', 'required')}</div>` : ''}${textarea('instructions', 'Recorded fulfillment instructions', o.instructions || '')}${textarea('reason', 'Reason for correction · optional', '', 'Leave blank to record N/A.', 'maxlength="4000"')}<div class="dialog-actions"><button type="button" class="button button-secondary" data-action="back-order">Back</button><button class="button" type="submit">Save contact correction</button></div></form>`);
   if(['direct','in_person'].includes(o.order_source))document.querySelectorAll('[data-form=order-contact] [required]').forEach(el=>el.required=false);
+  rememberOrderEditor();
 }
 function configKey(item) {
   const sorted = Object.fromEntries(Object.entries(item.selections || {}).sort(([a], [b]) => a.localeCompare(b)).map(([key, values]) => [key, Object.fromEntries(Object.entries(values).filter(([, n]) => Number(n) > 0).sort(([a], [b]) => a.localeCompare(b)))]));
@@ -611,7 +624,7 @@ function captureEdit() {
 }
 function startEditOrder() {
   editDraft = clone({ fulfillment_date: activeOrder.fulfillment_date, method: activeOrder.method, buyer: activeOrder.buyer || {}, recipient: activeOrder.recipient || {}, address: activeOrder.address || {}, instructions: activeOrder.instructions || '', delivery_cents: activeOrder.delivery_cents || 0, items: activeOrder.items.map(item => ({ product_id: item.product_id, quantity: item.quantity, selections: item.selections || {}, preserve_configuration: true })), reason: '' });
-  renderEditOrder();
+  renderEditOrder();rememberOrderEditor();
 }
 function editItemMarkup(item, index) {
   const product = state.products.find(p => p.id === item.product_id);
@@ -666,6 +679,22 @@ function updateEditPreview() {
   $('#edit-totals').innerHTML = totals({ ...activeOrder, subtotal_cents: subtotal, discount_cents: discount, delivery_cents: fee, total_cents: subtotal - discount + fee });
 }
 
+function orderEditorSnapshot(){
+  const form=$('#dialog-body [data-form="order-edit"],#dialog-body [data-form="order-contact"]');
+  if(!form||!modal.open||!activeOrder)return null;
+  let snapshot;
+  if(form.dataset.form==='order-edit'){captureEdit();snapshot=stable({changes:editChanges(),reason:editDraft.reason});}
+  else snapshot=stable([...form.elements].filter(el=>el.name&&!['submit','button'].includes(el.type)).map(el=>[el.name,el.type==='checkbox'?el.checked:el.value]));
+  return {form,id:activeOrder.id,type:form.dataset.form,snapshot};
+}
+function rememberOrderEditor(){const current=orderEditorSnapshot();orderEditBaseline=current?{id:current.id,type:current.type,snapshot:current.snapshot}:null;}
+async function canLeaveOrderEditor(){
+  const current=orderEditorSnapshot();if(!current)return true;
+  if(current.form.dataset.busy==='true'){toast('Please wait for the order to finish saving.');return false;}
+  if(!orderEditBaseline||current.id!==orderEditBaseline.id||current.type!==orderEditBaseline.type||current.snapshot===orderEditBaseline.snapshot)return true;
+  const discard=await confirmDialog('Your changes have not been saved. Discard them?',{title:'Unsaved order changes',confirmLabel:'Discard changes',cancelLabel:'Keep editing',parentDialog:modal});
+  return discard&&current.form.isConnected&&activeOrder?.id===current.id;
+}
 function stable(value) {
   if (Array.isArray(value)) return JSON.stringify(value.map(v => JSON.parse(stable(v))));
   if (value && typeof value === 'object') return JSON.stringify(Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined && v !== null && v !== '').sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => [key, JSON.parse(stable(val))])));
@@ -681,11 +710,19 @@ function orderMutationPayload(extra = {}) {
   return { order_id: activeOrder.id, revision: activeOrder.revision, idempotency_key: uid(), ...extra };
 }
 async function updateActive(action, payload) {
+  const userId=staffUserId,originForm=$('#dialog-body form'),orderId=payload.order_id;
   const result = await api(action, payload);
-  activeOrder = result;
-  await refresh();
-  renderOrderDialog();
-  toast(action === 'send_pickup_reminder' ? 'Pickup reminder queued. Check Email delivery for its status.' : 'Order updated.');
+  if(userId!==staffUserId)return;
+  const index=state.orders.findIndex(order=>order.id===result.id);if(index>=0)state.orders[index]=result;
+  const sameOrder=activeOrder?.id===orderId;
+  if(sameOrder)activeOrder=result;
+  if(sameOrder&&modal.open&&(!originForm||originForm.isConnected))renderOrderDialog();
+  const savedView=sameOrder?$('#print-order'):null;
+  const success=action==='send_pickup_reminder'?'Pickup reminder queued. Check Email delivery for its status.':'Order updated.';
+  try{await refresh();if(userId===staffUserId)toast(success);}
+  catch{if(userId!==staffUserId)return;const message=action==='send_pickup_reminder'?'Pickup reminder queued. The dashboard could not refresh. Refresh orders when your connection returns.':'Order saved. The dashboard could not refresh. Refresh orders when your connection returns.';
+    if(savedView?.isConnected&&modal.open)savedView.insertAdjacentHTML('beforebegin',`<p class="notice" role="status">${esc(message)}</p>`);else toast(message);}
+
 }
 async function loadTeam() {
   if (!state.connected) return;
@@ -710,7 +747,7 @@ async function onAction(button) {
       updateInventoryProducts(); break;
     }
     case 'unlimit-quantity': state.inventoryDrafts[id] = ''; updateInventoryProducts(); $(`[data-quantity-id="${CSS.escape(id)}"]`)?.focus(); break;
-    case 'reset-quantities': state.inventoryDrafts = {}; updateInventoryProducts(); break;
+    case 'reset-quantities': monthDrafts.clear(state.inventoryMonth);state.inventoryDrafts = {}; updateInventoryProducts(); break;
     case 'close-dialog': closeDialog(); break;
     case 'refresh': await Promise.all([refresh(), visitorPoller.refresh()]); toast('Dashboard refreshed.'); break;
     case 'upcoming': state.filters.upcoming = true; state.view = 'orders'; render(); break;
@@ -761,7 +798,7 @@ async function onAction(button) {
     case 'delete-promo': deletePromoDialog(id); break;
     case 'load-team': await loadTeam(); break;
     case 'open-order': await openOrder(id); break;
-    case 'back-order': renderOrderDialog(); break;
+    case 'back-order': if(await canLeaveOrderEditor())renderOrderDialog(); break;
     case 'payment-approve': orderActionDialog('approve_payment'); break;
     case 'payment-reject': orderActionDialog('reject_payment'); break;
     case 'cancel-order': orderActionDialog('cancel_order'); break;
@@ -859,7 +896,7 @@ document.addEventListener('input', event => {
     const orders = filteredOrders();
     $('#order-table').innerHTML = orderTable(orders);
     $('#order-count').textContent = `${orders.length} orders`;
-    syncOrderPrintSelection();
+    syncOrderPrintSelection();rememberOrderView();
   }
   if (target.hasAttribute('data-edit-value') && editDraft) { captureEdit(); updateEditPreview(); }
 });
@@ -884,7 +921,12 @@ document.addEventListener('change', async event => {
     }
     if (target.id === 'quantity-mode') {state.quantityMode=target.value;return;}
     if (target.id === 'inventory-month') {
-      state.inventoryMonth=target.value;state.inventoryDates=[];state.inventoryDrafts={};render();return;
+      if(state.inventorySaving){target.value=state.inventoryMonth;return;}
+      monthDrafts.remember(state.inventoryMonth,{dates:state.inventoryDates,drafts:state.inventoryDrafts,mode:state.quantityMode});
+      state.inventoryMonth=target.value;
+      const saved=monthDrafts.restore(state.inventoryMonth,{today:manilaDate(),productIds:stockProducts().filter(p=>!p.deleted_at).map(p=>p.id),months:menuMonths(state,manilaDate()).map(month=>month.slice(0,7))});
+      state.inventoryDates=saved.dates;state.inventoryDrafts=saved.drafts;state.quantityMode=saved.mode;render();
+      if(saved.adjusted)toast('Your quantity draft was adjusted for the current dates and monthly lineup. Review it before saving.');return;
     }
     if (target.id === 'select-print-orders') {
       filteredOrders().forEach(order => target.checked ? state.printSelection.add(order.id) : state.printSelection.delete(order.id));
@@ -1074,15 +1116,19 @@ async function submitForm(form) {
     case 'inventory': {
       const rows = quantitySaveRows(stockProducts(), state.inventory, state.inventoryDates, state.inventoryDrafts, manilaDate(), state.quantityMode);
       const dateCount = state.inventoryDates.length;
-      if (!rows.length) { state.inventoryDrafts = {}; state.inventoryDates = []; render(); toast('Quantities are already up to date.'); break; }
-      const controls = [...$$('input, button, textarea', form), ...$$('[data-view]')].filter(control => !control.disabled);
+      if (!rows.length) { monthDrafts.clear(state.inventoryMonth);state.inventoryDrafts = {}; state.inventoryDates = []; render(); toast('Quantities are already up to date.'); break; }
+      const savingMonth=state.inventoryMonth,savingUser=staffUserId;state.inventorySaving=true;
+      const controls = [...form.elements, ...$$('[data-view],#inventory-month,[data-action="inventory-whole-month"],[data-action="inventory-range"],[name="quantity_from"],[name="quantity_to"]')].filter(control => !control.disabled);
       controls.forEach(control => { control.disabled = true; });
       try {
-        state.inventory = await api('save_inventory', { rows, mode:state.quantityMode });
+        const inventory = await api('save_inventory', { rows, mode:state.quantityMode });
+        if(savingUser!==staffUserId)return;
+        state.inventory=inventory;
+        monthDrafts.clear(savingMonth);
         state.inventoryDrafts = {};
         state.inventoryDates = [];
         render(); toast(`Quantities saved for ${dateCount} selected date${dateCount === 1 ? '' : 's'}.`);
-      } finally { controls.forEach(control => { control.disabled = false; }); }
+      } finally { state.inventorySaving=false;controls.forEach(control => { control.disabled = false; }); }
       break;
     }
     case 'settings': {
@@ -1189,15 +1235,21 @@ async function init() {
     const { data, error } = await auth.getSession();
     if (error) throw error;
     if (!data.session) {
+      orderView.clear();
       $('#shop-status').textContent = 'Staff sign-in required';
       $('#workspace').innerHTML = heading('Welcome to the kitchen', 'Sign in with your authorized owner or staff account.') + `<section class="panel">${empty('Your dashboard is private', 'Only an owner or authorized staff member can access shop administration.', '<a class="button" href="admin-account.html?next=manage.html">Sign in to manage the shop</a>')}</section>`;
       $('#admin-nav').hidden = true;
       return;
     }
+    staffUserId=data.session.user.id;
+    auth.onAuthStateChange((event,next) => {
+      if(event==='SIGNED_OUT'||next?.user?.id&&next.user.id!==staffUserId){orderView.clear();monthDrafts.reset();staffUserId=null;bootstrapRequest++;state.connected=false;state.orders=[];state.inventoryDrafts={};state.inventoryDates=[];activeOrder=null;editDraft=null;orderEditBaseline=null;visitorPoller.reset();modal.close();$('#workspace').replaceChildren();location.replace('admin-account.html?next=manage.html');}
+    });
     await refresh();
+    if(!state.connected||!staffUserId)return;
     const linkedOrder=new URL(location.href).searchParams.get('order');if(linkedOrder)await openOrder(linkedOrder);
-    auth.onAuthStateChange(event => { if (event === 'SIGNED_OUT') { state.connected = false; visitorPoller.reset(); location.replace('admin-account.html?next=manage.html'); } });
   } catch (error) {
+    if(!staffUserId||!temporaryOrderReadFailure(error))orderView.clear();
     $('#shop-status').textContent = 'Dashboard unavailable';
     $('#admin-nav').hidden = true;
     $('#workspace').innerHTML = heading('Dashboard access', 'Your shop information is protected.') + `<section class="panel"><p class="notice danger">${esc(error.message)}</p><p class="muted">Sign in using an authorized team account.</p><div class="row-actions"><a class="button" href="admin-account.html?next=manage.html">Open account</a></div></section>`;

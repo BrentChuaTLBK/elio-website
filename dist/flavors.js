@@ -58,6 +58,9 @@
   const search = document.querySelector('#flavor-search');
   let currentCategory = 'all';
   let currentView = ['#other-flavors', '#collection-panel'].includes(location.hash) ? 'collection' : 'monthly';
+  const browseKey='elio-flavor-browse-v1';
+  if(!location.hash)try{const saved=JSON.parse(sessionStorage.getItem(browseKey)||'null');if(saved&&Number.isFinite(saved.at)&&Date.now()>=saved.at&&Date.now()-saved.at<86400000){currentView=['monthly','collection'].includes(saved.view)?saved.view:'monthly';currentCategory=categories.some(c=>c.id===saved.category)?saved.category:'all';search.value=typeof saved.query==='string'?saved.query.slice(0,250):'';}}catch{}
+  function saveBrowse(){try{sessionStorage.setItem(browseKey,JSON.stringify({at:Date.now(),view:currentView,category:currentCategory,query:search.value.slice(0,250)}));}catch{}}
   function filterCatalog(category, announce = true) {
     currentCategory = category;
     const query = normalize(search.value.trim());
@@ -81,6 +84,7 @@
     const menus = sections.filter(section => section.view === 'monthly' && section.shown).length;
     const summary = `${visibleFlavors.size} ${visibleFlavors.size === 1 ? 'flavor' : 'flavors'}`;
     document.querySelector('.flavor-result-summary').textContent = currentView === 'monthly' && menus ? `${menus} ${menus === 1 ? 'menu' : 'menus'} · ${summary}` : summary;
+    if(announce)saveBrowse();
     if (announce) document.querySelector('#filter-status').textContent = `${summary} shown in ${currentView === 'monthly' ? 'the monthly selections' : 'the full collection'}.`;
   }
   filters.addEventListener('click', event => { const button = event.target.closest('[data-category]'); if (button) filterCatalog(button.dataset.category); });
@@ -110,6 +114,7 @@
     const tile = section.tiles.get(flavor.id);
     tile.scrollIntoView({ block: 'start', behavior: 'instant' });
     tile.focus({ preventScroll: true });
+    saveBrowse();
   }
   window.addEventListener('hashchange', followFlavorLink);
   window.addEventListener('popstate', followFlavorLink);
