@@ -43,3 +43,6 @@
 .promo-remove{font-size:11px;padding:7px 12px}
 @media(max-width:480px){.promo-code-controls{grid-template-columns:1fr}.promo-code-controls .button{width:100%}}
 
+/* Use the site controls for numeric entry without native browser arrows. */
+input[type=number]{appearance:textfield;-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}

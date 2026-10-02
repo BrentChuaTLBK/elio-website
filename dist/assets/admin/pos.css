@@ -28,3 +28,7 @@
 
 /* Pending event content stays visible, with its actions temporarily disabled. */
 .pos-event-loading .panel{opacity:.5}.pos-progress{font-size:12px;margin-top:14px}
+
+/* Use the site controls for numeric entry without native browser arrows. */
+input[type=number]{appearance:textfield;-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}

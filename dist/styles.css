@@ -125,4 +125,6 @@ dialog{border:1px solid var(--line);padding:0;background:var(--ivory);color:var(
 @media(max-width:360px){.elio-experience{padding:0 18px}.trio-story-copy{padding:25px 20px}.trio-story-copy h2{font-size:32px}.thoughtful-gift-copy{padding-left:20px;padding-right:20px}.thoughtful-gift-copy h2{font-size:31px}.elio-moments-heading h2{font-size:27px}.elio-moments-grid{gap:6px}.elio-moments-grid figcaption{font-size:10px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
 
-
+/* Use the site controls for numeric entry without native browser arrows. */
+input[type=number]{appearance:textfield;-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}
