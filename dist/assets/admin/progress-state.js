@@ -12,14 +12,14 @@ export function adminOrderView(storage,{now=()=>Date.now()}={}) {
  const clear=()=>clearAdminOrderView(storage);
  return {
   clear,
-  save(userId,view,filters){
+  save(userId,view,filters,taskView='all'){
    if(!userId||view!=='orders'){clear();return;}
-   try{storage?.setItem(ordersKey,JSON.stringify({userId,view:'orders',at:now(),filters:orderFilters(filters)}));}catch{}
+   try{storage?.setItem(ordersKey,JSON.stringify({userId,view:'orders',at:now(),filters:orderFilters(filters),...(['review','today'].includes(taskView)?{taskView}:{})}));}catch{}
   },
   restore(userId){
    try{const saved=JSON.parse(storage?.getItem(ordersKey)||'null');
     if(!userId||saved?.userId!==userId||saved.view!=='orders'||!Number.isFinite(saved.at)||now()<saved.at||now()-saved.at>=ordersTtl){clear();return null;}
-    return {view:'orders',filters:orderFilters(saved.filters)};
+    return {view:'orders',filters:orderFilters(saved.filters),...(['review','today'].includes(saved.taskView)?{taskView:saved.taskView}:{})};
    }catch{clear();return null;}
   }
  };

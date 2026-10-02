@@ -349,7 +349,8 @@ form.addEventListener('submit', async event => {
   } finally { busy = false; updateControls(); }
 });
 
-await Promise.all([ready, updateGoogleAvailability()]);
+void updateGoogleAvailability();
+await ready;
 if (initializationError) message(initializationError.message, true);
 else if (auth) {
   const { data, error } = await auth.getSession();
