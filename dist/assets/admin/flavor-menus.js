@@ -20,7 +20,7 @@ function renderHeadings(state, months, esc, disabled) {
     ['next', 'Next month’s heading', 'Coming Next Month', months[1]],
     ['collection', 'Full collection heading', 'The full collection.', ''],
   ];
-  return `<section class="panel flavor-headings"><h2>Website headings</h2><p class="muted">Edit the section headings on your flavor collection page. The month and year are added automatically and roll forward each month.</p><form data-form="flavor-headings"><div class="form-error" role="alert"></div><div class="flavor-heading-fields">${fields.map(([key,label,fallback,month]) => {
+  return `<section class="panel flavor-headings"><h2>Website headings</h2><p class="muted">Edit the section headings on your flavor collection page. The month and year are added automatically and roll forward each month.</p><form data-form="flavor-headings" data-edit-revision="${state.headingDraftRevision ?? (Number(state.settings?.edit_revision) || 0)}"><div class="form-error" role="alert"></div><div class="flavor-heading-fields">${fields.map(([key,label,fallback,month]) => {
     const value = state.headingDraft?.[key] ?? headings[key] ?? fallback;
     return `<label class="field">${label}<input type="text" name="${key}" value="${esc(value)}" required maxlength="80" data-heading-month="${month}" ${disabled}><small data-heading-preview>${esc(value)}${month ? ` — ${esc(monthLabel(month))}` : ''}</small></label>`;
   }).join('')}</div><button class="button button-secondary" type="submit" ${disabled}>Save headings</button></form></section>`;

@@ -14,8 +14,10 @@ export default async function({db,check,state}) {
   assert.deepEqual(after.flavor_menus.headings,publicData.headings);
   assert.deepEqual(after.flavor_menus.menus,before.flavor_menus.menus);
   assert.deepEqual(after.inventory,before.inventory);
-  const {flavor_headings,...settings}=after.settings;
-  assert.deepEqual(settings,before.settings);
+  const {flavor_headings,edit_revision,...settings}=after.settings;
+  const {edit_revision:previousRevision=0,...previousSettings}=before.settings;
+  assert.deepEqual(settings,previousSettings);
+  assert.equal(edit_revision,previousRevision+1);
   assert.equal(publicData.owner_email,undefined);
   assert.equal(publicData.settings,undefined);
   assert.equal(publicData.current_month,before.flavor_menus.current_month);

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { currentEditPayload } from './catalog-edit-fixtures.mjs';
 
 export async function makeHarness(db) {
   const ids = { owner: randomUUID(), staff: randomUUID(), customer: randomUUID(), stranger: randomUUID(), unverified: randomUUID() };
@@ -20,9 +21,10 @@ export async function makeHarness(db) {
       await db.exec("select set_config('request.jwt.claim.sub', '', false), set_config('request.jwt.claim.role', '', false), set_config('request.jwt.claims', '{}', false)");
     }
   }
-  const api = (action, payload = {}, user = null, token = null) => as(user, async () => (
+  const rawApi = (action, payload = {}, user = null, token = null) => as(user, async () => (
     await db.query('select public.shop_api($1, $2::jsonb, $3) as result', [action, JSON.stringify(payload), token])
   ).rows[0].result);
+  const api = async (action, payload = {}, user = null, token = null) => rawApi(action, await currentEditPayload(db, action, payload), user, token);
   const service = (action, payload = {}) => as(null, async () => (
     await db.query('select public.shop_service($1, $2::jsonb) as result', [action, JSON.stringify(payload)])
   ).rows[0].result, 'service_role');
@@ -78,5 +80,5 @@ export async function makeHarness(db) {
   const remaining = (product, date) => scalar('select elio.capacity_remaining($1::uuid, $2::date)', [product.id, date]);
   const allocations = (id) => db.query('select product_id::text, date::text, quantity, state from elio.allocations where order_id=$1 order by product_id,date', [id]).then(r => r.rows);
 
-  return { ids, as, api, service, scalar, day, item, checkout, product, plan, inventory, fixture, order, action, proof, remaining, allocations };
+  return { ids, as, api, rawApi, service, scalar, day, item, checkout, product, plan, inventory, fixture, order, action, proof, remaining, allocations };
 }
