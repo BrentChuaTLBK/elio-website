@@ -1,5 +1,6 @@
 import { api, auth, ready, configured, newsletterRequest } from '../admin/client.js';
 import { newsletterOffer, newsletterOfferTerms } from './newsletter-offer.js';
+import {resumeNewsletterActivation} from './newsletter-activation.js';
 
 const popupKey = 'elio-newsletter-popup-v1';
 const startedAt = Date.now();
@@ -61,10 +62,10 @@ export function getNewsletterSettings(refresh = false) {
 
 export function rememberNewsletterOptIn() { rememberPopup('submitted');refreshPopup(); }
 
-export async function activateAccountNewsletter() {
-  const result = await newsletterRequest({ action: 'activate_account' });
+export async function activateAccountNewsletter(signal) {
+  const result = await newsletterRequest({ action: 'activate_account' }, signal ? { signal } : {});
   if (result?.status === 'subscribed') rememberNewsletterOptIn();
-  await getNewsletterSettings(true);
+  void getNewsletterSettings(true);
   return result;
 }
 
@@ -216,6 +217,7 @@ if (document.querySelector('[data-newsletter-form]') || document.body.hasAttribu
 
 // Defer API calls outside the Auth callback so the SDK can release its session lock.
 ready.then(() => {
+  if(configured&&auth&&document.body.dataset.accountContext!=='staff')resumeNewsletterActivation({auth,activate:activateAccountNewsletter});
   if (configured && auth?.onAuthStateChange) auth.onAuthStateChange(() => {
     activeSettings = null;
     setTimeout(() => getNewsletterSettings(true), 0);

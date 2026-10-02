@@ -2,6 +2,7 @@ import { auth, ready, initializationError, authLink, api, escapeHtml as esc, mon
 import { config } from './config.js';
 import {clearAdminOrderView} from './progress-state.js';
 import {accountReturn,temporaryOrderReadFailure} from './account-return.js';
+import {queueNewsletterActivation,clearNewsletterActivation} from '../shop/newsletter-activation.js';
 
 const form = document.querySelector('#account-form');
 const status = document.querySelector('#account-status');
@@ -73,7 +74,7 @@ async function saveOAuthNewsletterConsent(session) {
     const result = await auth.updateUser({ data: { newsletter_opt_in: true, newsletter_consent_version: 'elio-newsletter-v1' } });
     if (result.error) throw result.error;
     (await newsletterModule).rememberNewsletterOptIn();
-    await activateNewsletter({ ...session, user: { ...session.user, user_metadata: { ...session.user.user_metadata, newsletter_opt_in: true } } });
+    queueNewsletterActivation(session);
   } catch {
     retryNewsletter = () => saveOAuthNewsletterConsent(session);
     newsletterMessage('Your Google sign-in succeeded, but we couldn’t save your newsletter choice. You can retry here.', true);
@@ -154,6 +155,7 @@ preferences?.addEventListener('submit',async e=>{
  try{
   const settings=await api('newsletter_account_preference',{subscribed:preferences.elements.subscribed.checked});
   if(accountSession?.user.id!==id)return;
+  if(!preferences.elements.subscribed.checked)clearNewsletterActivation(id);
   showEmailPreference(settings);voucherController?.refresh();const newsletter=await newsletterModule;newsletter.rememberNewsletterOptIn();if(settings.own_status==='subscribed')await newsletter.rememberNewsletterEmail(accountSession.user.email);else await newsletter.forgetNewsletterEmail(accountSession.user.email);
  }catch(error){if(accountSession?.user.id===id){document.querySelector('#email-preference-status').textContent=error.message||'Your preference could not be saved. Please try again.';button.disabled=false;preferences.elements.subscribed.disabled=false;}}
 });
@@ -260,8 +262,10 @@ function validateConfirmation() {
 form.password.addEventListener('input', validateConfirmation);
 confirmPassword.addEventListener('input', validateConfirmation);
 document.querySelector('#account-signout').addEventListener('click', async () => {
+  const userId=accountSession?.user.id;
   const { error } = await auth.signOut();
   if (error) { message(error.message, true); return; }
+  clearNewsletterActivation(userId);
   try{clearAdminOrderView(window.sessionStorage);}catch{}
   location.reload();
 });
@@ -337,7 +341,7 @@ form.addEventListener('submit', async event => {
     } else {
       result = await auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
-      if (customer) await activateNewsletter(result.data?.session);
+      if (customer) queueNewsletterActivation(result.data?.session);
       if(customer)customerReturn.clear();location.assign(destination);
     }
   } catch (error) {
@@ -356,7 +360,7 @@ else if (auth) {
   } else if (authLink.recovery && data.session) setMode('recovery');
   else if (authLink.recovery || authLink.type === 'recovery') message('This password reset link is incomplete or no longer valid. Request a new reset link.', true);
   else if (data.session && customer && customerReturn.toShop) {
-    const handled=await finishOAuthNewsletterConsent(data.session);if(!handled)await activateNewsletter(data.session);
+    const handled=await finishOAuthNewsletterConsent(data.session);if(!handled)queueNewsletterActivation(data.session);
     customerReturn.clear();location.replace(destination);
   }
   else if (data.session) {
@@ -378,7 +382,8 @@ else if (auth) {
       document.querySelector('#account-verification').textContent=data.session.user.email_confirmed_at?'Email verified':'Email not verified';
       loadOrders();
       import('./vouchers.js?v=compact-wallet-1').then(({mountVouchers})=>{if(accountSession?.user.id===data.session.user.id)voucherController=mountVouchers(document.querySelector('#account-vouchers'));});
-      finishOAuthNewsletterConsent(data.session).then(async handled=>{if(!handled)await activateNewsletter(data.session);await loadEmailPreference();voucherController?.refresh();});
+      void loadEmailPreference();
+      finishOAuthNewsletterConsent(data.session).then(async handled=>{if(!handled)await activateNewsletter(data.session);if(accountSession?.user.id===data.session.user.id){void loadEmailPreference();voucherController?.refresh();}});
     }
     const dashboardLink = document.querySelector('#staff-dashboard');
     const affiliateLink = document.querySelector('#affiliate-dashboard');

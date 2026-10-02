@@ -16,6 +16,17 @@ export function mergeBasketItems(items,maximum=Infinity) {
 function recipe(product,line) {
   return product?.kind==='set'?product.flavor_contents||[]:Object.entries(line.selections?.flavors||{}).filter(([,count])=>Number(count)>0).map(([id,quantity])=>({...product?.option_groups?.find(g=>g.id==='flavors')?.choices.find(f=>f.id===id),id,quantity:Number(quantity)}));
 }
+// Reserve the basket's shared flavor demand before offering choices for a new box.
+export function flavorPickerLimit(items,products,flavor,quantity,inventory,date) {
+  const id=flavor.product_id||flavor.id;
+  let used=0;
+  for(const line of items)for(const part of recipe(products.find(p=>p.id===line.product_id),line)){
+    if((part.product_id||part.id)===id)used+=Number(part.quantity)*Number(line.quantity);
+  }
+  const remaining=Math.max(0,flavorStock(flavor,date,inventory)-used);
+  const boxes=Number.isInteger(Number(quantity))&&Number(quantity)>0?Number(quantity):1;
+  return {remaining,maximum:Math.floor(remaining/boxes)};
+}
 // Capacity is shared across every basket line using the same flavor.
 export function basketIncreaseLimit(items,index,products,inventory,date) {
   const line=items[index],product=products.find(p=>p.id===line?.product_id);

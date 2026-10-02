@@ -1,6 +1,6 @@
 import {acceptsReceipt} from './receipt-refresh.js';
 import {temporaryOrderReadFailure} from '../admin/account-return.js';
-import {basketLineKey,mergeBasketItems,basketIncreaseLimit,productDrafts} from './basket-interactions.js';
+import {basketLineKey,mergeBasketItems,basketIncreaseLimit,flavorPickerLimit,productDrafts} from './basket-interactions.js';
 import {productNavigation} from './product-navigation.js';
 import {responsiveImage} from '../responsive-images.js';
 import {checkoutFailure} from './checkout-recovery.js';
@@ -27,6 +27,7 @@ let state={items:[],fulfillment_date:'',method:'pickup',buyer:{},recipient:{},ad
 try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||'null');if(saved&&Date.now()-saved.saved_at<86400000&&Array.isArray(saved.items))state={...state,...saved}}catch{}
 state.method='pickup';state.fulfillment_date='';
 let catalog={products:[],categories:[],settings:{},zones:[],inventory:[]},category='all',query='',session=null,quote=null,busy=false,refreshTimer=null,customerCalendar=null;
+let removedBasketItem=null,undoTimer=null;
 let orderReadId=0,orderRefreshing=false,displayedOrder=null,scheduleReceipt=null;
 const orderAccessKey=()=>{const p=new URLSearchParams(location.hash.slice(1));return JSON.stringify([p.get('order'),p.get('token'),session?.user?.id||'']);};
 let promoRequest=0,promoPending=false,promoQuote=null,promoKey='',promoMessage='',promoTone='';
@@ -101,10 +102,25 @@ function renderProducts(){
  grid.querySelectorAll('[data-product]').forEach(b=>b.onclick=()=>productRoutes.open(b.dataset.product));
 }
 
-function renderCart(focus){customerCalendar?.update({value:state.fulfillment_date,settings:catalog.settings,method:state.method,allowSameDay:sameDayEligible()});updateFulfillment();const count=state.items.reduce((s,l)=>s+l.quantity,0),errors=issues(),limits=state.items.map((_,i)=>basketIncreaseLimit(state.items,i,catalog.products,catalog.inventory,state.fulfillment_date));$('#cart').innerHTML=`<div class="cart-head"><h2 class="no-margin">Your basket</h2><span class="cart-count">${count}</span></div><div class="basket-plan"><strong>${state.fulfillment_date?`${formatDate(state.fulfillment_date)} · ${statusLabel(state.method)}`:"Choose your fulfillment date"}</strong><button type="button" id="basket-change-date" class="button-quiet">${state.fulfillment_date?"Change date":"Choose date"}</button></div>${!count?`<div class="empty-state"><div class="empty-icon">${icon}</div><h3>A little room for something sweet</h3><p style="font-size:11px">Pick a treat from the menu<br>and make it yours.</p></div>`:state.items.map((line,i)=>`<div class="cart-line"><div><h3>${esc(lineProduct(line)?.name||line.name||'Unavailable item')}</h3>${lineProduct(line)?.pickup_only===true?'<span class="badge pickup-only-badge">Pickup only</span>':''}<div class="cart-options">${esc(lineProduct(line)?selectionLabels(lineProduct(line),line.selections).join('\n'):'Please remove this item.')}</div><div style="margin-top:9px"><div class="quantity-control"><button data-qty="${i}" data-delta="-1" ${line.quantity<=1?'disabled':''} aria-label="Decrease ${esc(line.name||'item')} quantity">−</button><span>${line.quantity}</span><button data-qty="${i}" data-delta="1" ${limits[i].message?`disabled aria-describedby="basket-quantity-limit-${i}"`:""} aria-label="Increase ${esc(line.name||'item')} quantity">+</button></div><button data-remove="${i}" class="remove-line">Remove</button></div>${limits[i].message?`<div id="basket-quantity-limit-${i}" class="notice" role="status" style="margin-top:10px">${esc(limits[i].message)}</div>`:""}</div><span class="line-price">${money(linePrice(line)*line.quantity)}</span></div>`).join('')}
+function renderCart(focus){customerCalendar?.update({value:state.fulfillment_date,settings:catalog.settings,method:state.method,allowSameDay:sameDayEligible()});updateFulfillment();const count=state.items.reduce((s,l)=>s+l.quantity,0),errors=issues(),limits=state.items.map((_,i)=>basketIncreaseLimit(state.items,i,catalog.products,catalog.inventory,state.fulfillment_date));$('#cart').innerHTML=`${removedBasketItem?'<div id="basket-undo" class="notice" role="status">'+esc(removedBasketItem.line.name||'Box')+' removed. <button type="button" id="undo-remove" class="button-quiet">Undo</button><span id="undo-error"></span></div>':''}<div class="cart-head"><h2 class="no-margin">Your basket</h2><span class="cart-count">${count}</span></div><div class="basket-plan"><strong>${state.fulfillment_date?`${formatDate(state.fulfillment_date)} · ${statusLabel(state.method)}`:"Choose your fulfillment date"}</strong><button type="button" id="basket-change-date" class="button-quiet">${state.fulfillment_date?"Change date":"Choose date"}</button></div>${!count?`<div class="empty-state"><div class="empty-icon">${icon}</div><h3>A little room for something sweet</h3><p style="font-size:11px">Pick a treat from the menu<br>and make it yours.</p></div>`:state.items.map((line,i)=>`<div class="cart-line"><div><h3>${esc(lineProduct(line)?.name||line.name||'Unavailable item')}</h3>${lineProduct(line)?.pickup_only===true?'<span class="badge pickup-only-badge">Pickup only</span>':''}<div class="cart-options">${esc(lineProduct(line)?selectionLabels(lineProduct(line),line.selections).join('\n'):'Please remove this item.')}</div><div style="margin-top:9px"><div class="quantity-control"><button data-qty="${i}" data-delta="-1" ${line.quantity<=1?'disabled':''} aria-label="Decrease ${esc(line.name||'item')} quantity">−</button><span>${line.quantity}</span><button data-qty="${i}" data-delta="1" ${limits[i].message?`disabled aria-describedby="basket-quantity-limit-${i}"`:""} aria-label="Increase ${esc(line.name||'item')} quantity">+</button></div><button data-remove="${i}" class="remove-line">Remove</button></div>${limits[i].message?`<div id="basket-quantity-limit-${i}" class="notice" role="status" style="margin-top:10px">${esc(limits[i].message)}</div>`:""}</div><span class="line-price">${money(linePrice(line)*line.quantity)}</span></div>`).join('')}
   ${errors.length?`<div class="notice danger" style="margin-top:16px">${[...new Set(errors)].map(esc).join('<br>')}</div>`:''}${count?amountLines():''}<button id="checkout-button" class="button block" ${!count||!state.fulfillment_date||catalog.settings.paused||errors.length||(!configured&&!demo)?'disabled':''}>${demo?'Preview checkout':'Continue to checkout'} <span aria-hidden="true">→</span></button><p class="cart-footnote">${count&&state.fulfillment_date?`${formatDate(state.fulfillment_date)} · ${statusLabel(state.method)}`:'Select your date before checkout'}<br>Full payment · Confirmed after manual review</p>`;
   document.querySelectorAll('[data-qty]').forEach(b=>b.onclick=()=>{const index=Number(b.dataset.qty),line=state.items[index],delta=Number(b.dataset.delta);if(delta>0&&basketIncreaseLimit(state.items,index,catalog.products,catalog.inventory,state.fulfillment_date).message)return;const key=basketLineKey(line);line.quantity=Math.max(1,line.quantity+delta);quote=null;persist();renderCart({key,delta});});
-  document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{const index=Number(b.dataset.remove);state.items.splice(index,1);quote=null;persist();renderCart();const next=$('[data-remove="'+Math.min(index,state.items.length-1)+'"]')||$('#product-grid [data-product]');next?.focus({preventScroll:true});});
+  document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{
+    const index=Number(b.dataset.remove);removedBasketItem={line:structuredClone(state.items[index]),index};
+    clearTimeout(undoTimer);undoTimer=setTimeout(()=>{removedBasketItem=null;$('#basket-undo')?.remove();},30000);
+    state.items.splice(index,1);quote=null;persist();renderCart();$('#undo-remove')?.focus({preventScroll:true});
+  });
+  if($('#undo-remove'))$('#undo-remove').onclick=()=>{
+    if(!removedBasketItem)return;
+    try{
+      const {line,index}=removedBasketItem,p=lineProduct(line);if(!p)throw new Error('This box is no longer available.');
+      const available=displayAvailability(p);if(!available.available)throw new Error(available.reason);
+      const restored=state.items.slice();restored.splice(Math.min(index,restored.length),0,{...line,unit_price_cents:selectionPrice(p,line.selections)});
+      const merged=mergeBasketItems(restored,999),errors=basketStockIssues(merged,catalog.products,catalog.inventory,state.fulfillment_date);
+      if(errors.length)throw new Error(errors[0]);
+      state.items=merged;quote=null;removedBasketItem=null;clearTimeout(undoTimer);persist();renderCart({key:basketLineKey(line),delta:1});toast('Your box and flavor choices are back.');
+    }catch(error){$('#undo-error').textContent=' '+error.message;}
+  };
   $('#basket-change-date').onclick=()=>{$('.fulfillment-bar')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});$('.customer-calendar-trigger')?.focus({preventScroll:true});};
   $('#checkout-button').onclick=()=>{if(!state.fulfillment_date){$('.customer-calendar-trigger')?.focus();toast('Choose a fulfillment date to continue.');return}openCheckout()};
   const mobile=$('#mobile-cart');mobile.hidden=!count;mobile.innerHTML=`<span>${count} ${count===1?'treat':'treats'} · View basket</span><span>${money(subtotal())}</span>`;mobile.onclick=()=>$('#cart').scrollIntoView({behavior:'smooth',block:'start'});
@@ -116,6 +132,7 @@ function openProduct(id){
   const draft=productDraftStore.read(p,state.fulfillment_date,catalog.inventory),selected=draft?.selected||Object.fromEntries((p.option_groups||[]).map(g=>[g.id,{}]));
   dialog.innerHTML=`<div class="modal-head"><span class="eyebrow">${demo?'Sample product':'Made just for you'}</span><button class="close-button" aria-label="Close product">×</button></div><div class="modal-content"><div class="product-dialog-layout"><div>${p.photos?.length?`<img id="detail-photo" class="product-dialog-image" src="${safeImage(p.photos[0])}" alt="${esc(p.name)}"><div class="photo-thumbs">${p.photos.map((photo,i)=>`<button data-photo="${i}" aria-label="View photo ${i+1}"><img src="${safeImage(photo)}" alt=""></button>`).join('')}</div>`:placeholder()}<div class="help-card"><strong>Freshly made, with a little notice</strong>${p.lead_days} full production day${p.lead_days===1?'':'s'} required.<br>Earliest available: ${esc(earliestFor(p))}.<br>Minimum order: ${p.min_quantity} unit${p.min_quantity===1?'':'s'}.</div></div><div><h2 id="product-title">${esc(p.name)}</h2>${allowsSameDay(p)?'<div class="notice">Same-day orders are available before our order cutoff, subject to stock and pickup or delivery availability. Every product in your basket must be eligible for same-day orders.</div>':''}${p.pickup_only===true?'<div class="notice">This product is available for pickup only. Orders containing it must be collected from the kitchen.</div>':''}<p class="muted product-description">${esc(p.description)}</p>${insideBox(p,catalog.flavors)}<div class="product-price" id="detail-price">${money(p.price_cents)}</div>${(p.option_groups||[]).map((g,gi)=>`<fieldset class="option-group"><legend>${esc(g.label)} <small class="muted">· Choose ${g.required_count}</small></legend>${g.choices.filter(c=>c.active!==false&&flavorStock(c,state.fulfillment_date,catalog.inventory)>0).map(c=>`<div class="option-choice">${g.required_count===1?`<label><input type="radio" name="group-${gi}" data-group="${esc(g.id)}" data-choice="${esc(c.id)}" value="1"> ${esc(c.label)}</label>`:`<label for="choice-${esc(g.id)}-${esc(c.id)}">${esc(c.label)}</label>`}<span class="option-choice-controls"><small>${c.surcharge_cents?'+'+money(c.surcharge_cents):money(0)}</small>${g.required_count!==1?`<span class="option-stepper"><button type="button" data-option-delta="-1" aria-label="Decrease ${esc(c.label)} quantity" disabled>&minus;</button><input id="choice-${esc(g.id)}-${esc(c.id)}" class="option-count" type="number" inputmode="numeric" min="0" max="${g.required_count}" value="0" step="1" data-group="${esc(g.id)}" data-choice="${esc(c.id)}" aria-label="${esc(c.label)} quantity"><button type="button" data-option-delta="1" aria-label="Increase ${esc(c.label)} quantity">+</button></span>`:''}</span></div>`).join('')}<div class="muted" data-group-count="${esc(g.id)}" aria-live="polite" aria-atomic="true" style="font-size:11px;margin-top:8px">0 of ${g.required_count} selected</div></fieldset>`).join('')}<div class="notice ${a.available?'':'danger'}" style="margin-top:20px">${!a.available||state.fulfillment_date?esc(a.reason):'Choose your fulfillment date in the menu to check availability.'}</div><div id="product-error" role="alert"></div><div class="product-dialog-bottom"><label class="field no-margin" style="width:max-content">Quantity<input id="product-quantity" type="number" min="1" max="999" step="1" value="1"></label><button id="add-to-cart" class="button" ${!a.available||catalog.settings.paused?'disabled':''}>Add to basket · ${money(p.price_cents)}</button></div>${boxDetails(p)}</div></div></div>`;
   dialog.querySelector('.close-button').onclick=()=>productRoutes.close();dialog.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>$('#detail-photo').src=p.photos[+b.dataset.photo]);
+  const choiceLimit=choice=>flavorPickerLimit(state.items,catalog.products,choice,Number($('#product-quantity').value),catalog.inventory,state.fulfillment_date).maximum;
   function refresh(){
     productDraftStore.save(p.id,selected,Number($('#product-quantity').value));
     let price=Number(p.price_cents);
@@ -127,13 +144,24 @@ function openProduct(id){
         total+' of '+g.required_count+' selected'+(remaining===0&&g.required_count!==1?' · Reduce a quantity to choose another option.':'');
       dialog.querySelectorAll('.option-count[data-group="'+CSS.escape(g.id)+'"]').forEach(input=>{
         const count=selected[g.id][input.dataset.choice]||0;
-        input.max=String(count+remaining);
+        const choice=g.choices.find(c=>c.id===input.dataset.choice),stockLimit=choiceLimit(choice);
+        input.max=String(Math.min(count+remaining,stockLimit));
         input.disabled=remaining===0&&count===0;
         const stepper=input.closest('.option-stepper');
-        stepper.querySelector('[data-option-delta="1"]').disabled=remaining===0;
+        stepper.querySelector('[data-option-delta="1"]').disabled=remaining===0||count>=stockLimit;
         stepper.querySelector('[data-option-delta="-1"]').disabled=count===0;
+        const row=input.closest('.option-choice');let notice=row.querySelector('[data-flavor-stock]');
+        if(!notice){notice=document.createElement('small');notice.dataset.flavorStock='';notice.id='flavor-stock-'+g.id+'-'+choice.id;notice.className='muted';notice.setAttribute('role','status');notice.style.cssText='display:block;flex-basis:100%;font-size:11px;line-height:1.6;padding-top:6px';row.style.flexWrap='wrap';row.append(notice);}
+        const limited=stockLimit<g.required_count;
+        notice.textContent=limited?choice.label+': '+stockLimit+' available per box for this quantity and date. Choose another flavor or date for more.':'';
+        notice.hidden=!limited;
+        for(const control of [input,stepper.querySelector('[data-option-delta="1"]')]){if(limited)control.setAttribute('aria-describedby',notice.id);else control.removeAttribute('aria-describedby');}
       });
     }
+    const stockErrors=basketStockIssues([...state.items,{product_id:p.id,quantity:Number($('#product-quantity').value)||1,selections:selected}],catalog.products,catalog.inventory,state.fulfillment_date),error=$('#product-error');
+    if(stockErrors.length){error.className='notice danger';error.textContent=stockErrors[0];error.dataset.stock='true';}
+    else if(error.dataset.stock){error.textContent='';error.className='';delete error.dataset.stock;}
+    $('#add-to-cart').disabled=!a.available||catalog.settings.paused||stockErrors.length>0;
     $('#detail-price').textContent=money(price);
     $('#add-to-cart').textContent='Add to basket · '+money(price*Number($('#product-quantity').value||1));
   }
@@ -144,7 +172,7 @@ function openProduct(id){
       // Count the other flavors so typing, pasting and stepping share the same cap.
       const others=Object.entries(selected[group.id]).reduce((sum,[id,count])=>sum+(id===choice?0:count),0);
       const value=Number(input.value);
-      const count=Math.min(Math.max(0,group.required_count-others),Math.max(0,Number.isFinite(value)?Math.trunc(value):0));
+      const count=Math.min(Math.min(Math.max(0,group.required_count-others),choiceLimit(group.choices.find(c=>c.id===choice))),Math.max(0,Number.isFinite(value)?Math.trunc(value):0));
       selected[group.id][choice]=count;
       if(input.value!=='')input.value=String(count);
     }
@@ -254,7 +282,20 @@ function checkoutError(message){const el=$('#checkout-error');el.className='noti
 function renderReview(){
   const dialog=$('#checkout-dialog');dialog.innerHTML=`<div class="modal-head"><div><span class="eyebrow">${demo?'Design preview only':'Please check everything'}</span><h2 id="checkout-title">Ready for a little sweetness?</h2></div><button class="close-button" aria-label="Close review">×</button></div><div class="modal-content"><div class="checkout-grid"><div><div class="notice">${demo?'This is a sample review. No order will be saved and no email will be sent.':'Your stock and any promo use are reserved only when you submit this order.'}</div><h3>${formatDate(state.fulfillment_date)} · ${statusLabel(state.method)}</h3>${reviewWindow(state.method,catalog.settings,esc)}<p>${esc(state.buyer.name)}<br>${esc(state.buyer.email)} · ${esc(state.buyer.phone)}</p>${state.method==='delivery'?`<p><strong>Recipient:</strong> ${esc(state.recipient.name)} · ${esc(state.recipient.phone)}<br>${esc([state.address.line1,state.address.line2,state.address.locality,state.address.postal_code].filter(Boolean).join(', '))}</p>${zoneDescription(quote.delivery_zone_description)}`:`<p class="pickup-text">${esc(catalog.settings.pickup_address||'')}</p>`}${quote.items.map(l=>`<div class="cart-line"><div><strong>${l.quantity} × ${esc(l.name)}</strong><div class="cart-options">${esc(labelsText(l.selection_labels?.length?l.selection_labels:(l.flavor_contents||[]).map(f=>({label:f.name,quantity:f.quantity}))))}</div></div><strong>${money(l.line_total_cents??l.unit_price_cents*l.quantity)}</strong></div>`).join('')}${state.instructions?`<p style="margin-top:18px">Note: ${esc(state.instructions)}</p>`:''}</div><aside class="checkout-aside"><h3>Your final total</h3>${amountLines(quote)}${state.promo_code?`<p class="notice success promo-status"><strong>${esc(state.promo_code)} applied</strong><br>${quote.discount_cents>0?`You saved ${money(quote.discount_cents)}.`:'This code gives no discount on this basket.'}</p>`:''}${reviewPayment()}</aside></div><div id="checkout-error" role="alert"></div><div class="dialog-actions"><button class="button-quiet" id="edit-checkout">Edit details</button><button class="button" id="place-order" ${demo?'disabled':''}>Place order · ${money(quote.total_cents)}</button></div>${demo?'<p class="muted" style="font-size:12px;margin-top:16px">Once the backend is configured, this step will save the order, reserve the selected date’s quantities, and display your manual payment details.</p>':''}</div>`;
   dialog.querySelector('.close-button').onclick=()=>dialog.close();$('#edit-checkout').onclick=openCheckout;
-  $('#place-order').onclick=async()=>{if(busy||demo)return;busy=true;$('#place-order').disabled=true;$('#place-order').textContent='Saving your order…';try{const expected_quote=Object.fromEntries(['items','subtotal_cents','discount_cents','delivery_cents','total_cents','delivery_zone_name','delivery_zone_description'].filter(k=>Object.hasOwn(quote,k)).map(k=>[k,quote[k]]));const order=await api('create_order',{...payload(),expected_quote});state.items=[];state.promo_code='';state.idempotency_key=crypto.randomUUID();persist();dialog.close();window.dispatchEvent(new Event('elio-private-order'));location.hash=`order=${encodeURIComponent(order.id)}${order.access_token?'&token='+encodeURIComponent(order.access_token):''}`;await renderOrder(order)}catch(e){const recovery=checkoutFailure(e);checkoutError(recovery.message);$('#place-order').disabled=false;$('#place-order').textContent=recovery.button}finally{busy=false}};
+  let needsReview=false;
+  const refreshReview=async()=>{
+    const snapshot=JSON.stringify(payload()),userId=session?.user?.id,oldQuote=quote,controls=[...dialog.querySelectorAll('button')];
+    busy=true;controls.forEach(button=>button.disabled=true);$('#place-order').textContent='Checking the latest total…';
+    try{
+      const checked=await api('quote',payload());
+      if(!dialog.open||!controls[0]?.isConnected)return;
+      if(snapshot!==JSON.stringify(payload())||userId!==session?.user?.id)throw new Error('Your details changed while we checked the order. Please review again.');
+      quote=checked;if(state.promo_code)rememberPromoQuote(checked);renderReview();
+      const notice=$('#checkout-error');notice.className='notice';notice.textContent=oldQuote.total_cents!==checked.total_cents?'The total changed from '+money(oldQuote.total_cents)+' to '+money(checked.total_cents)+'. Please review it before placing your order.':'Availability and your total were rechecked. Please review before placing your order.';notice.scrollIntoView({block:'nearest'});
+    }catch(error){if(dialog.open&&controls[0]?.isConnected)checkoutError(error.message);}
+    finally{busy=false;if(controls[0]?.isConnected){controls.forEach(button=>button.disabled=false);$('#place-order').textContent='Review updated total';}}
+  };
+  $('#place-order').onclick=async()=>{if(busy||demo)return;if(needsReview)return refreshReview();busy=true;$('#place-order').disabled=true;$('#place-order').textContent='Saving your order…';try{const expected_quote=Object.fromEntries(['items','subtotal_cents','discount_cents','delivery_cents','total_cents','delivery_zone_name','delivery_zone_description'].filter(k=>Object.hasOwn(quote,k)).map(k=>[k,quote[k]]));const order=await api('create_order',{...payload(),expected_quote});state.items=[];removedBasketItem=null;clearTimeout(undoTimer);state.promo_code='';state.idempotency_key=crypto.randomUUID();persist();dialog.close();window.dispatchEvent(new Event('elio-private-order'));location.hash=`order=${encodeURIComponent(order.id)}${order.access_token?'&token='+encodeURIComponent(order.access_token):''}`;await renderOrder(order)}catch(e){const recovery=checkoutFailure(e);needsReview=recovery.reviewAgain===true;checkoutError(recovery.message);$('#place-order').disabled=false;$('#place-order').textContent=recovery.button}finally{busy=false}};
   const title=$('#checkout-title');title.tabIndex=-1;title.focus({preventScroll:true});dialog.scrollTop=0;
 }
 async function renderOrder(provided=null){
@@ -265,12 +306,13 @@ async function renderOrder(provided=null){
   const accessKey=orderAccessKey();if(!provided&&orderRefreshing&&displayedOrder?.key===accessKey)return;
   const request=++orderReadId,isCurrent=()=>request===orderReadId&&accessKey===orderAccessKey();
   const previousOrder=displayedOrder,previousForm=$('#proof-form');
+  const preserveDetails=previousOrder?.key===accessKey&&previousOrder.order.id===id&&!!$('#refresh-order');
   const preserve=previousOrder?.key===accessKey&&previousForm?.dataset.orderId===id&&acceptsReceipt(previousOrder.order);
   const proof=preserve?previousForm.elements.proof:null,reference=preserve?previousForm.elements.payment_reference:null;
   const oldRefresh=$('#refresh-order'),oldSubmit=preserve?previousForm.querySelector('[type=submit]'):null,submitDisabled=oldSubmit?.disabled;
   const previousSchedule=scheduleReceipt;
   orderRefreshing=!provided;
-  if(!provided&&preserve){if(oldRefresh){oldRefresh.disabled=true;oldRefresh.textContent='Refreshing…';}if(oldSubmit)oldSubmit.disabled=true;}
+  if(!provided&&(preserve||preserveDetails)){if(oldRefresh){oldRefresh.disabled=true;oldRefresh.textContent='Refreshing…';}if(oldSubmit)oldSubmit.disabled=true;}
   else if(!provided)app.innerHTML='<div class="loading" role="status">Opening your order…</div>';
   try{const order=provided||await api('get_order',{order_id:id},token);if(!isCurrent())return;displayedOrder={key:accessKey,order};scheduleReceipt=null;const s=catalog.settings;const refunded=fulfillmentStatus(order)==='refunded';const active=!refunded&&!['cancelled','expired'].includes(order.fulfillment_status);const proofPaused=active&&order.uploads_paused===true;const canProof=acceptsReceipt(order);
     app.innerHTML=`<a href="order.html" class="muted" style="font-size:12px">← Back to the menu</a><div class="order-title" style="margin-top:25px"><div><span class="eyebrow">Your order with Elio Basque Cheesecake</span><h1>${esc(order.reference)}</h1><button class="button-quiet no-print" id="copy-order-reference" type="button">Copy order ID</button><p class="muted" style="font-size:12px">Use this order ID in your courier’s booking notes.</p><p class="muted" style="font-size:12px">Placed ${datetime(order.created_at)}</p><div class="order-statuses"><span class="badge ${order.payment_status==='paid'?'success':''}">${statusLabel(order.payment_status)}</span><span class="badge">${statusLabel(fulfillmentStatus(order))}</span></div></div><div class="no-print"><button class="button-quiet" id="refresh-order">Refresh status</button></div></div><div id="order-refresh-status" role="status" hidden></div>
@@ -294,6 +336,9 @@ async function renderOrder(provided=null){
       const notice=$('#order-refresh-status');notice.hidden=false;notice.className='notice danger';notice.textContent='We couldn’t refresh the order. Your selected receipt and reference are still here. Try Refresh status again.';
       previousSchedule?.();return;
     }
+    if(preserveDetails&&temporaryOrderReadFailure(e)){
+      const notice=$('#order-refresh-status');notice.hidden=false;notice.className='notice danger';notice.textContent='We couldn’t refresh your order. These are the last loaded details. Try Refresh status again.';return;
+    }
     displayedOrder=null;scheduleReceipt=null;app.innerHTML=`<div class="panel empty-state"><h1>We couldn’t open that order</h1><p>${esc(e.message)}</p><p>Use the complete secure link in your email, or sign in to the account used for this order.</p><a href="account.html?next=order.html" class="button-secondary">My account</a> <a href="mailto:elio.cheesecakes@gmail.com" class="button-quiet">Contact the kitchen</a></div>`}
   finally{if(isCurrent()){orderRefreshing=false;if(oldRefresh?.isConnected){oldRefresh.disabled=false;oldRefresh.textContent='Refresh status';}if(oldSubmit?.isConnected)oldSubmit.disabled=submitDisabled;}}
 }
@@ -309,7 +354,7 @@ async function init(){
   state.items=mergeBasketItems(state.items,999);state.method='pickup';state.fulfillment_date=firstAvailableDate(state.items,catalog.products,catalog.settings,catalog.inventory);persist();
   if(new URLSearchParams(location.hash.slice(1)).has('order'))await renderOrder();
   else {renderShop();productRoutes.restore();if(['#your-bag','#your-basket'].includes(location.hash))$('#cart')?.scrollIntoView({block:'start'});}
- }catch(e){app.innerHTML=`<div class="panel empty-state"><h2>The menu is taking a little longer</h2><p>${esc(e.message)}</p><button class="button" id="retry-menu">Try again</button></div>`;$('#retry-menu').onclick=init;}
+ }catch(e){app.innerHTML=`<div class="panel empty-state"><h2>The menu is taking a little longer</h2><p>${esc(e.message)}</p><button class="button" id="retry-menu">Try again</button></div>`;$('#retry-menu').onclick=()=>location.reload();}
  finally{app.removeAttribute('aria-busy');}
 }
 window.addEventListener('hashchange',()=>{if(location.hash.includes('order='))renderOrder();else if(location.hash==='#your-bag'||location.hash==='#your-basket')$('#cart')?.scrollIntoView({behavior:'smooth'});else if(document.body.classList.contains('viewing-order'))renderShop()});

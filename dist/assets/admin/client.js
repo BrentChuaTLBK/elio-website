@@ -112,8 +112,8 @@ export async function signedProofUrl(orderId) {
   return edge('proof-url', { order_id: orderId });
 }
 
-export async function newsletterRequest(payload) {
-  return edge('newsletter', payload);
+export async function newsletterRequest(payload, options = {}) {
+  return edge('newsletter', payload, options);
 }
 
 export async function affiliateReceipt(id) {
