@@ -11,6 +11,13 @@
 .accounting-calendar .calendar-day:disabled{opacity:.35;cursor:not-allowed}
 .accounting-datetime-field{min-width:0}.accounting-datetime-field>.accounting-date-field{margin-bottom:8px}.accounting-datetime-time{display:grid;grid-template-columns:1fr 1fr;gap:10px}.accounting-datetime-time .field{min-width:0;margin-bottom:0}
 
+.accounting-range-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.accounting-range-actions .button{min-height:44px}
+.manage-page .accounting-range-actions [aria-pressed="true"]{background:var(--caramel);color:white;border-color:var(--caramel)}
+.accounting-range-note{grid-column:1/-1;margin:0;line-height:1.6;font-size:11px;color:var(--muted)}
+.accounting-range-note[hidden]{display:none}
+.accounting-entry-form [data-entry-status]{margin:12px 0 0;line-height:1.6}
+
 /* Consistent report surfaces, ruled tables and aligned amounts. */
 #accounting-manager{max-width:1400px;margin-inline:auto}
 #accounting-manager .panel{padding:24px}

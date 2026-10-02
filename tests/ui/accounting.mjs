@@ -44,7 +44,9 @@ try{
     else if(action==='get_order')response=payload.order_id===pickup.id?pickup:order;
     else if(action==='calendar_list')response={connection:{connected:false},orders:[]};
     else if(action==='accounting_report'){
-     const all=[...entries,...(cost?.amount_cents!=null?[{id:order.id,category_id:'cost',kind:'expense',entry_date:cost.cost_date,amount_cents:cost.amount_cents,note:cost.note,source:'Delivery cost',order_id:order.id,reference:order.reference}]:[])].filter(e=>e.entry_date>=payload.start&&e.entry_date<=payload.end&&(!excludeOrder||e.order_id!==order.id));
+     const eligible=[...entries,...(cost?.amount_cents!=null?[{id:order.id,category_id:'cost',kind:'expense',entry_date:cost.cost_date,amount_cents:cost.amount_cents,note:cost.note,source:'Delivery cost',order_id:order.id,reference:order.reference}]:[])].filter(e=>!excludeOrder||e.order_id!==order.id);
+     if(payload.all_time){const dates=eligible.map(e=>e.entry_date).sort();payload.start=dates[0]||'2026-10-02';payload.end=dates.at(-1)||payload.start;}
+     const all=eligible.filter(e=>e.entry_date>=payload.start&&e.entry_date<=payload.end);
      response={...payload,report_version:2,categories,entries:all,summary:categories.filter(c=>!c.archived).map(c=>({...c,sales_cents:all.filter(e=>e.category_id===c.id&&e.kind==='sale').reduce((n,e)=>n+e.amount_cents,0),expense_cents:all.filter(e=>e.category_id===c.id&&e.kind==='expense').reduce((n,e)=>n+e.amount_cents,0),entry_count:all.filter(e=>e.category_id===c.id).length})),deliveries:excludeOrder?[]:[{order_id:order.id,reference:order.reference,approval_date:'2026-09-24',status:order.fulfillment_status,fee_cents:15000,cost_cents:cost?.amount_cents??null,cost_date:cost?.cost_date||null}],legacy_count:0};
     }else if(action==='accounting_save_category'){await new Promise(r=>setTimeout(r,50));response={...payload,revision:payload.revision+1};const old=categories.findIndex(c=>c.id===payload.id);if(old>=0)categories[old]=response;else categories.push(response);}
     else if(action==='accounting_save_entry'){await new Promise(r=>setTimeout(r,50));response={...payload,source:'Manual',revision:payload.revision+1};const old=entries.findIndex(e=>e.id===payload.id);if(old>=0)entries[old]=response;else entries.push(response);}
@@ -94,6 +96,7 @@ try{
    assert.notEqual(await form.locator('[name=category_id]').inputValue(),'__new');assert.equal(await page.evaluate(()=>document.activeElement.name),'amount');
    assert.ok(Math.abs((await page.evaluate(()=>scrollY))-entryScroll)<3,'Saving preserves scroll position');
    assert.equal(calls.filter(c=>c.action==='accounting_save_entry').length,1,'Duplicate save blocked');
+   await page.locator('.accounting-editor').screenshot({path:join(output,`entry-saved-${width}.png`)});
    const entryRow=page.locator('.accounting-records tr').filter({hasText:'Flour and butter'});
    await entryRow.getByText('Supplier: Alice <Baker>',{exact:true}).waitFor();assert.equal(await entryRow.locator('baker').count(),0,'Supplier name remains plain text');
    assert.equal(await form.locator('[name=client_name]').evaluate(el=>el.closest('label').textContent),'Supplier · optional');
@@ -124,7 +127,29 @@ try{
    const removeEntry=page.locator(`[data-accounting=delete][data-id="${repeats[0].payload.id}"]`),removeCount=calls.filter(c=>c.action==='accounting_delete_entry').length;
    await removeEntry.click();const removePrompt=page.getByRole('dialog',{name:'Remove accounting entry?',exact:true});await removePrompt.getByRole('button',{name:'Keep entry',exact:true}).click();await removePrompt.waitFor({state:'hidden'});assert.equal(calls.filter(c=>c.action==='accounting_delete_entry').length,removeCount,'Cancel never deletes an entry');assert.equal(await removeEntry.count(),1);
    await removeEntry.click();await removePrompt.getByRole('button',{name:'Remove entry',exact:true}).click();await removeEntry.waitFor({state:'detached'});assert.equal(calls.filter(c=>c.action==='accounting_delete_entry').length,removeCount+1,'Approval deletes once');
-   await pickDate(page.locator('.accounting-filters'),'month','2024-02');assert.equal(await page.locator('.accounting-filters [name=end]').inputValue(),'2024-02-29');
+   // The full range is resolved again after refresh, saving, and exporting.
+   entries.push({id:'first-entry',category_id:'cakes',kind:'sale',entry_date:'2001-02-03',amount_cents:1000,source:'Manual',revision:1,note:'First entry fixture'},
+     {id:'latest-entry',category_id:'cakes',kind:'sale',entry_date:'2034-11-12',amount_cents:2000,source:'Manual',revision:1,note:'Latest entry fixture'});
+   const timeframe=page.locator('.accounting-filters'),allTime=page.getByRole('button',{name:'All time',exact:true});
+   await allTime.click();await page.waitForFunction(()=>document.querySelector('[data-accounting=all-time]').getAttribute('aria-pressed')==='true');
+   assert.equal(await timeframe.locator('[name=start]').inputValue(),'2001-02-03');assert.equal(await timeframe.locator('[name=end]').inputValue(),'2034-11-12');
+   assert.equal(await timeframe.locator('.accounting-range-note').isVisible(),true);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'All time controls fit the page');
+   await timeframe.screenshot({path:join(output,`all-time-${width}.png`)});
+   entries.push({id:'later-entry',category_id:'cakes',kind:'sale',entry_date:'2040-01-02',amount_cents:3000,source:'Manual',revision:1,note:'Added by another session'});
+   await page.locator('[data-accounting=refresh]').click();await page.waitForFunction(()=>document.querySelector('.accounting-filters [name=end]').value==='2040-01-02');
+   await page.locator('[data-accounting=add]').click();await pickDate(form,'entry_date','2050-01-03');await form.locator('[name=category_id]').selectOption('cakes');await form.locator('[name=amount]').fill('10.00');await form.locator('[type=submit]').click();
+   await page.waitForFunction(()=>document.querySelector('.accounting-filters [name=end]').value==='2050-01-03');
+   entries.push({id:'export-latest',category_id:'cakes',kind:'sale',entry_date:'2051-01-04',amount_cents:4000,source:'Manual',revision:1,note:'Added just before export'});
+   const allDownloadPromise=page.waitForEvent('download');await page.locator('[data-accounting=export]').click();const allDownload=await allDownloadPromise,allFile=join(output,allDownload.suggestedFilename());await allDownload.saveAs(allFile);
+   const allWorkbook=new ExcelJS.Workbook();await allWorkbook.xlsx.load(await readFile(allFile));
+   assert.match(allWorkbook.getWorksheet('Summary').getCell('A2').value,/^All time · 2001-02-03 to 2051-01-04/);
+   assert.equal(await timeframe.locator('[name=end]').inputValue(),'2051-01-04');
+   await pickDate(timeframe,'month','2024-02');assert.equal(await timeframe.locator('[name=end]').inputValue(),'2024-02-29');await timeframe.locator('[type=submit]').click();
+   await page.waitForFunction(()=>document.querySelector('[data-accounting=all-time]').getAttribute('aria-pressed')==='false');
+   assert.equal(await timeframe.locator('.accounting-range-note').isHidden(),true);
+   assert.equal(calls.filter(c=>c.action==='accounting_report').at(-1).payload.all_time,undefined,'Custom month leaves All time');
+   entries.length=0;cost=null;await allTime.click();await page.getByText('All time · No entries yet.',{exact:true}).waitFor();
    await pickDate(page.locator('.accounting-filters'),'start','2026-09-26');await pickDate(page.locator('.accounting-filters'),'end','2026-09-25');await page.locator('.accounting-filters [type=submit]').click();await page.getByText('The end date must be on or after the start date.',{exact:true}).waitFor();
    await navigateDashboard(page,'orders');await page.locator('[data-action=open-order][data-id=pickup]').click();await page.locator('#admin-dialog').waitFor();
    assert.equal(await page.locator('.delivery-accounting').count(),0,'Pickup orders have no delivery accounting section');

@@ -14,12 +14,24 @@ export function mountAccounting(root, {api, role, connected, money, escapeHtml: 
   const selection = (name,label,options) => `<label class="field">${label}<select name="${name}">${options}</select></label>`;
   const error = '<p class="form-error" role="alert"></p>';
   root.innerHTML=`<div class="view-heading"><div><span class="eyebrow">Elio Basque Cheesecake</span><h1>Accounting</h1><p>Sales, expenses and delivery costs, together in one place.</p></div><div class="row-actions"><button class="button button-secondary" data-accounting="refresh">Refresh</button><button class="button button-secondary" data-accounting="export" disabled>Export to Excel</button><button class="button" data-accounting="add" disabled>Add entry</button></div></div>
-    <form class="panel accounting-filters">${field('month','Choose a month',filters.start.slice(0,7),'month')}${field('start','From date',filters.start,'date','required')}${field('end','Through date',filters.end,'date','required')}<button class="button" type="submit">Apply timeframe</button>${error}</form>
+    <form class="panel accounting-filters">${field('month','Choose a month',filters.start.slice(0,7),'month')}${field('start','From date',filters.start,'date','required')}${field('end','Through date',filters.end,'date','required')}<div class="accounting-range-actions"><button class="button button-secondary" type="button" data-accounting="all-time" aria-pressed="false" disabled>All time</button><button class="button" type="submit">Apply timeframe</button></div><p class="accounting-range-note" role="status" hidden></p>${error}</form>
     <p class="help-text accounting-scope">Only paid, confirmed orders and orders being prepared or already fulfilled are included. Cancelled and refunded orders are excluded entirely, including discounts and delivery costs. All dates use Manila time.</p>
     <p class="notice accounting-message" role="status" hidden></p><section class="panel accounting-editor" hidden></section>
     <div class="accounting-report"><p>Loading accounting…</p></div>
     <section class="panel accounting-categories"><details><summary>Manage categories</summary><p class="help-text">Use the same category for sales and expenses. Choose the type when you add an entry. Automatic website categories are managed by the system.</p><div class="accounting-category-form"></div></details></section>`;
   function message(text,bad=false) { const box=$('.accounting-message');box.hidden=!text;box.textContent=text;box.classList.toggle('danger',bad); }
+  const reportRange = () => filters.all_time ? {all_time:true,report_version:2} : {start:filters.start,end:filters.end,report_version:2};
+  function showRange(result) {
+    const form=$('.accounting-filters'),allTime=result.all_time===true,note=$('.accounting-range-note');
+    filters.start=result.start;filters.end=result.end;filters.all_time=allTime;
+    for(const name of ['start','end'])setAccountingDate(form,name,result[name]);
+    setAccountingDate(form,'month',result.start.slice(0,7));
+    if(allTime)form.querySelector('[name=month]').closest('.accounting-date-picker').querySelector('[data-date-label]').textContent='All time';
+    $('[data-accounting=all-time]').setAttribute('aria-pressed',String(allTime));
+    note.hidden=!allTime;
+    const dateLabel=name=>form.querySelector('[name='+name+']').closest('.accounting-date-picker').querySelector('[data-date-label]').textContent;
+    note.textContent=allTime?(result.entries.length?`All time · ${dateLabel('start')} to ${dateLabel('end')} · First entry through latest entry.`:'All time · No entries yet.') : '';
+  }
   function summarySection(kind,title) {
     const key=kind==='sale'?'sales_cents':'expense_cents',rows=report.summary.filter(c=>Number(c[key])!==0),sum=rows.reduce((n,c)=>n+Number(c[key]),0);
     return `<section class="panel"><h2>${title}</h2><dl class="accounting-breakdown">${rows.map(c=>`<div><dt>${esc(c.name)}</dt><dd>${money(c[key])}</dd></div>`).join('')||'<div class="accounting-empty"><dt>No entries in this timeframe.</dt><dd></dd></div>'}<div class="accounting-subtotal"><dt>Total ${kind==='sale'?'sales / income':'expenses'}</dt><dd>${money(sum)}</dd></div></dl></section>`;
@@ -64,14 +76,14 @@ export function mountAccounting(root, {api, role, connected, money, escapeHtml: 
   }
   function syncNewCategory() {const form=$('.accounting-entry-form');if(!form)return;const on=form.elements.category_id.value==='__new';$('.accounting-new-category').hidden=!on;form.elements.new_category.required=on;}
   async function load() {
-    const request=++loadId;const range={...filters};
+    const request=++loadId;const range=reportRange();
     $('[data-accounting=export]').disabled=true;
     try {
-      const result=await api('accounting_report',{...range,report_version:2});
+      const result=await api('accounting_report',range);
       if(result.report_version!==2)throw Error('The shared-category database update is still being installed. Please try again shortly.');
       if(request!==loadId||!root.isConnected)return;
-      report=result;renderReport();renderCategories();
-      $('[data-accounting=export]').disabled=false;$('[data-accounting=add]').disabled=false;
+      report=result;showRange(result);renderReport();renderCategories();
+      $('[data-accounting=export]').disabled=false;$('[data-accounting=add]').disabled=false;$('[data-accounting=all-time]').disabled=false;
     } catch(e) {if(request===loadId&&root.isConnected){report=null;$('.accounting-report').innerHTML='<p class="notice">Accounting could not load. Please refresh to try again.</p>';message(e.message,true);}}
   }
   root.addEventListener('change',e=>{
@@ -91,7 +103,7 @@ export function mountAccounting(root, {api, role, connected, money, escapeHtml: 
       const f=new FormData(form);
       if(form.classList.contains('accounting-filters')) {
         if(!isCalendarDate(f.get('start'))||!isCalendarDate(f.get('end'))||f.get('start')>f.get('end'))throw Error('The end date must be on or after the start date.');
-        filters.start=f.get('start');filters.end=f.get('end');page=0;message('');await load();
+        filters.start=f.get('start');filters.end=f.get('end');filters.all_time=false;page=0;message('');await load();
       } else if(form.classList.contains('accounting-category-editor')) {
         await api('accounting_save_category',{id:categoryDraft.id,revision:categoryDraft.revision,name:f.get('name'),archived:f.has('archived')});
         root.dataset.dirty='false';await load();message('Category saved.');if(draft)updateCategoryOptions(draft.category_id);
@@ -130,14 +142,15 @@ export function mountAccounting(root, {api, role, connected, money, escapeHtml: 
     if(action==='previous'||action==='next'){page+=action==='next'?1:-1;renderReport();return;}
     root.dataset.busy='true';button.disabled=true;
     try{
+      if(action==='all-time'){filters.all_time=true;page=0;message('');await load();}
       if(action==='refresh'){message('');await load();}
       if(action==='export'&&report){
         // Recheck order eligibility immediately before export, using the loaded
         // timeframe rather than any unapplied date-picker edits.
-        const fresh=await api('accounting_report',{start:report.start,end:report.end,report_version:2});
+        const fresh=await api('accounting_report',report.all_time?{all_time:true,report_version:2}:{start:report.start,end:report.end,report_version:2});
         if(fresh.report_version!==2)throw Error('The shared-category database update is still being installed. Please try again shortly.');
         if(!root.isConnected)return;
-        report=fresh;renderReport();await exportAccounting(structuredClone(fresh));message('Excel file downloaded.');
+        report=fresh;showRange(fresh);renderReport();await exportAccounting(structuredClone(fresh));message('Excel file downloaded.');
       }
       if(action==='order')await openOrder(button.dataset.id);
       if(action==='delete'){
