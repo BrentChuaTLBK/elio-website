@@ -2,10 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="robots" content="index, follow">
+  <script id="elio-private-indexing">// Run in the head before customer data can render. Private links share public
+// HTML, but their order/authentication fragments must never become search pages.
+(() => {
+  'use strict';
+  const publicParameters = new Set(['product', 'collection', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_id', 'utm_content', 'utm_term']);
+  let privateVisit = false;
+  function protectPrivateVisit(force = false) {
+    const url = new URL(location.href);
+    privateVisit ||= force || [...url.searchParams.keys()].some(key => !publicParameters.has(key)) || (url.hash !== '' && !/^#[a-z][a-z0-9-]*$/i.test(url.hash));
+    if (!privateVisit) return;
+    const robots = document.querySelector('meta[name="robots"]') || document.head.appendChild(document.createElement('meta'));
+    robots.name = 'robots';
+    robots.content = 'noindex, nofollow';
+  }
+  protectPrivateVisit();
+  addEventListener('hashchange', () => protectPrivateVisit());
+  addEventListener('popstate', () => protectPrivateVisit());
+  addEventListener('elio-private-order', () => protectPrivateVisit(true));
+})();</script>
   <link rel="stylesheet" href="basket.css">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#3d251c">
-  <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
   <meta name="description" content="Good things come in threes. Explore Elio's square Basque cheesecake boxes, discover your flavors, and build a trio of your own. Choose pickup or delivery and an available date.">
   <title>Shop — Elio Basque Cheesecake</title>
@@ -31,6 +50,7 @@
 <link rel="stylesheet" href="assets/site-analytics.css"><script type="module" src="assets/site-analytics.js"></script>
   <link rel="stylesheet" href="assets/storefront-footer.css?v=1">
   <script type="module" src="assets/website-photos.js?v=1"></script>
+<link rel="canonical" href="https://eliocheesecakes.com/order">
 </head>
 <body class="shop-page" data-newsletter-popup>
   <a class="skip-link" href="#main">Skip to content</a>

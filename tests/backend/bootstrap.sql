@@ -15,6 +15,16 @@ create table auth.users (
   raw_user_meta_data jsonb not null default '{}',
   created_at timestamptz not null default now()
 );
+-- Auth host surfaces used by server-enforced owner MFA. No real secrets or
+-- production identities are present in these isolated fixtures.
+create table auth.mfa_factors (
+ id uuid primary key,user_id uuid not null references auth.users(id),
+ factor_type text not null default 'totp',status text not null default 'unverified'
+);
+create table auth.sessions (
+ id uuid primary key,user_id uuid not null references auth.users(id),
+ factor_id uuid references auth.mfa_factors(id),aal text not null default 'aal1',not_after timestamptz
+);
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;

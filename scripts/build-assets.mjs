@@ -34,6 +34,8 @@ for(const file of files.filter(f=>f.endsWith('.html'))){let html=await readFile(
 await writeFile(join(out,'_headers'),`/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=86400
+  Content-Security-Policy: object-src 'none'; base-uri 'self'; frame-ancestors 'self'
   Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://esm.sh https://cdn.jsdelivr.net https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://esm.sh https://cdn.jsdelivr.net https://*.google-analytics.com https://*.analytics.google.com https://cloudflareinsights.com; worker-src 'self' blob:; frame-src https://accounts.google.com; form-action 'self'
 /_immutable/*
   Cache-Control: public, max-age=31536000, immutable
@@ -41,6 +43,16 @@ await writeFile(join(out,'_headers'),`/*
   Cache-Control: no-store
 /assets/responsive-image-map.js
   Cache-Control: no-cache
+/manage*
+  X-Robots-Tag: noindex, nofollow
+/account*
+  X-Robots-Tag: noindex, nofollow
+/pos*
+  X-Robots-Tag: noindex, nofollow
+/newsletter*
+  X-Robots-Tag: noindex, nofollow
+/assets/admin/*
+  X-Robots-Tag: noindex, nofollow
 `);
 await mkdir(join(root,'test-results/asset-build'),{recursive:true});await writeFile(join(root,'test-results/asset-build/manifest.json'),JSON.stringify({mapping:Object.fromEntries(mapping),variants},null,2));
 console.log(`Built ${mapping.size} versioned media/styles and ${Object.keys(variants).length} responsive photo sets. JavaScript/configuration and all APIs remain fresh.`);

@@ -1,7 +1,8 @@
 import {env} from '../_shared/http.ts';
 import {backupSheetRequests,decodeRecoveryRows} from './sheets.js';
-import {BackupError} from './errors.ts';
-import {makeProofArchive,sha256} from './proof-archive.ts';
+import {BackupError,googleError} from './errors.ts';
+import {proofArchiveStream,readProof} from './proof-archive.ts';
+import {uploadResumable} from './resumable.ts';
 export {BackupError,backupError} from './errors.ts';
 
 const encode=(value:Uint8Array)=>btoa(String.fromCharCode(...value)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -11,7 +12,7 @@ export function spreadsheetId(value:unknown) {
  const id=value.startsWith('https://docs.google.com/spreadsheets/d/')?value.split('/')[5]:value;
  if(!/^[A-Za-z0-9_-]{20,150}$/.test(id))throw new BackupError('configuration');return id;
 }
-export function createGoogleSheets({getEnv=env,request=fetch,now=()=>Date.now()}={}) {
+export function createGoogleSheets({getEnv=env,request=fetch,now=()=>Date.now(),download=readProof}={}) {
  let cached:{secret:string,value:string,until:number}|null=null;
  function account(){
   const secret=getEnv('GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON')||getEnv('GA_SERVICE_ACCOUNT_JSON');
@@ -34,46 +35,65 @@ export function createGoogleSheets({getEnv=env,request=fetch,now=()=>Date.now()}
   const data=await response.json().catch(()=>null);
   if(!response.ok){
    if(response.status===401)cached=null;
-   const disabled=data?.error?.details?.some((d:any)=>d.reason==='SERVICE_DISABLED')||data?.error?.errors?.some((d:any)=>d.reason==='accessNotConfigured');
-   throw new BackupError(disabled?'api_disabled':response.status===429?'quota':[401,403,404].includes(response.status)?'access':'network');
+   throw new BackupError(googleError(response.status,data));
   }
   if(!data)throw new BackupError('network');return data;
  }
- async function driveFile(id:string,bytes?:Uint8Array){
+ async function driveFile(id:string){
   spreadsheetId(id);
-  const path=bytes?`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media&fields=id,size,sha256Checksum`:`https://www.googleapis.com/drive/v3/files/${id}?fields=id,mimeType,parents,size,sha256Checksum,capabilities(canEdit)`;
-  const response=await request(path,{method:bytes?'PATCH':'GET',headers:{Authorization:`Bearer ${await token()}`,...(bytes?{'Content-Type':'application/zip'}:{})},...(bytes?{body:bytes}:{}),redirect:'error',signal:AbortSignal.timeout(45000)});
+  const path=`https://www.googleapis.com/drive/v3/files/${id}?fields=id,mimeType,parents,size,sha256Checksum,headRevisionId,capabilities(canEdit)`;
+  const response=await request(path,{method:'GET',headers:{Authorization:`Bearer ${await token()}`},redirect:'error',signal:AbortSignal.timeout(15000)});
   const data=await response.json().catch(()=>null);
-  if(!response.ok){const disabled=data?.error?.details?.some((d:any)=>d.reason==='SERVICE_DISABLED')||data?.error?.errors?.some((d:any)=>d.reason==='accessNotConfigured');throw new BackupError(disabled?'api_disabled':response.status===429?'quota':[401,403,404].includes(response.status)?'access':'network');}
+  if(!response.ok)throw new BackupError(googleError(response.status,data));
   if(!data||data.id!==id)throw new BackupError('readback');return data;
+ }
+ async function revision(id:string,version:string,remove=false){
+  spreadsheetId(id);if(!/^[A-Za-z0-9_-]{1,200}$/.test(version))throw new BackupError('readback');
+  const response=await request(`https://www.googleapis.com/drive/v3/files/${id}/revisions/${version}${remove?'':'?fields=id,keepForever'}`,{method:remove?'DELETE':'PATCH',headers:{Authorization:`Bearer ${await token()}`,'Content-Type':'application/json'},...(remove?{}:{body:JSON.stringify({keepForever:true})}),redirect:'error',signal:AbortSignal.timeout(15000)});
+  if(!response.ok)throw new BackupError(googleError(response.status,await response.json().catch(()=>null)));
+  if(!remove){const result=await response.json();if(result.id!==version||result.keepForever!==true)throw new BackupError('readback');}
  }
  return {
   info(){try{const a=account();return {configured:true,service_account_email:a.client_email,cloud_project:a.project_id};}catch{return {configured:false};}},
   async verify(id:string){const data=await call(id);for(const name of ['Orders','Items','Affiliates','Recovery','History'])if(!data.sheets?.some((s:any)=>s.properties?.title===name))throw new BackupError('configuration');return data;},
-  async write(id:string,snapshot:any,archiveIds:string[]=[]){
+  async cleanup(proof:any){if(proof.retired_revision)await revision(proof.proof_archive_id,proof.retired_revision,true);},
+  async write(id:string,snapshot:any,archiveIds:string[]=[],{checkpoint=async()=>{},archiveRevisions={}}:{checkpoint?:()=>Promise<void>,archiveRevisions?:Record<string,string>}={}){
+   const started=now();const guard=async()=>{if(now()-started>150000)throw new BackupError('timeout');await checkpoint();};
    if(archiveIds.length!==2||new Set(archiveIds).size!==2)throw new BackupError('configuration');archiveIds.forEach(spreadsheetId);
    const meta=await call(id);
    const ranges='/values:batchGet?ranges=Recovery!A6:F40005&ranges=History!A6:F40005&valueRenderOption=UNFORMATTED_VALUE';
    const previous=await call(id,'GET',undefined,ranges);
    let earlier:any=null;const previousRows=previous.valueRanges?.[0]?.values||[];
    if(previousRows.length){try{earlier=await decodeRecoveryRows(previousRows);}catch{throw new BackupError('readback');}}
+   const retained:Record<string,string>={...archiveRevisions};
+   if(earlier?.proof_archive){
+    const old=earlier.proof_archive;if(!archiveIds.includes(old.file_id))throw new BackupError('configuration');
+    const current=await driveFile(old.file_id);
+    // Pin the exact verified revision before touching the alternate file. A
+    // delayed request from an expired worker cannot erase these saved bytes.
+    const version=old.revision_id||current.headRevisionId;
+    if(!old.revision_id&&(current.sha256Checksum!==old.sha256||Number(current.size)!==old.bytes))throw new BackupError('readback');
+    await guard();await revision(old.file_id,version);retained[old.file_id]=version;
+   }
    const target=archiveIds.find(file=>file!==earlier?.proof_archive?.file_id)!;
    // Only these two privately configured file IDs can be overwritten. Google
    // omits parents when the account has file access but no folder access.
    // Do not require broader folder permission to update the approved files.
    const targetMeta=await driveFile(target);if(targetMeta.mimeType!=='application/zip'||!targetMeta.capabilities?.canEdit||(targetMeta.parents&&!targetMeta.parents.includes('1Sh49xlV0ScTwUrH6UC_5EMNehTHBoSIh')))throw new BackupError('configuration');
-   const archive=await makeProofArchive(snapshot),checksum=await sha256(archive.bytes);
-   await driveFile(target,archive.bytes);
-   const stored=await driveFile(target);if(stored.sha256Checksum!==checksum||Number(stored.size)!==archive.bytes.length)throw new BackupError('readback');
-   snapshot={...archive.snapshot,proof_archive:{file_id:target,sha256:checksum,bytes:archive.bytes.length,proof_count:archive.proof_count,generated_at:snapshot.generated_at}};
+   const streamed=proofArchiveStream(snapshot,download,{checkpoint:guard});
+   await uploadResumable({id:target,stream:streamed.stream,request,authorization:async()=>`Bearer ${await token()}`,checkpoint:guard});
+   const archive=streamed.result,stored=await driveFile(target);if(stored.sha256Checksum!==archive.sha256||Number(stored.size)!==archive.bytes||!stored.headRevisionId)throw new BackupError('readback');
+   await guard();await revision(target,stored.headRevisionId);
+   const retired=retained[target];retained[target]=stored.headRevisionId;
+   snapshot={...archive.snapshot,proof_archive:{format_version:2,file_id:target,revision_id:stored.headRevisionId,sha256:archive.sha256,bytes:archive.bytes,proof_count:archive.proof_count,part_count:archive.part_count,generated_at:snapshot.generated_at}};
    let requests;
    try{requests=await backupSheetRequests(snapshot,meta.sheets||[],previous.valueRanges?.[0]?.values||[],previous.valueRanges?.[1]?.values||[]);}catch(e){throw new BackupError(e instanceof Error && e.message.includes('too large')?'too_large':'configuration');}
-   const result=await call(id,'POST',{requests});
+   await guard();const result=await call(id,'POST',{requests});
    if(result.spreadsheetId!==id||!Array.isArray(result.replies)||result.replies.length!==requests.length)throw new BackupError('network');
    const readback=await call(id,'GET',undefined,'/values/Recovery!A6:F40005?valueRenderOption=UNFORMATTED_VALUE');
    let recovered;try{recovered=await decodeRecoveryRows(readback.values||[]);}catch{throw new BackupError('readback');}
    if(JSON.stringify(recovered)!==JSON.stringify(snapshot))throw new BackupError('readback');
-   return {proof_archive_id:target,proof_count:archive.proof_count};
+   return {proof_archive_id:target,proof_count:archive.proof_count,proof_archive_revisions:retained,...(retired&&retired!==stored.headRevisionId?{retired_revision:retired}:{})};
   }
  };
 }

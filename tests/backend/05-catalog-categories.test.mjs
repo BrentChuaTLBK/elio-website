@@ -40,7 +40,7 @@ export default async function({db,check,state}) {
   const req=await request();
   for(const user of [null,ids.customer,ids.staff,ids.unverified])await assert.rejects(()=>api('reorder_catalog',req,user),/owner|Authorized|verified/i);
   await db.query("insert into elio.staff(user_id,role) values($1,'owner')",[ids.unverified]);
-  await assert.rejects(()=>api('reorder_catalog',req,ids.unverified),/verified owner/);
+  await assert.rejects(()=>api('reorder_catalog',req,ids.unverified),/verified owner|authenticator/);
   await db.query('delete from elio.staff where user_id=$1',[ids.unverified]);
   const partial=structuredClone(req);partial.groups=partial.groups.filter(g=>g.category_id!==best.id);partial.groups[0].ids.reverse();
   await assert.rejects(()=>api('reorder_catalog',partial,ids.owner),/every category/);assert.deepEqual((await request()).expected,req.expected);

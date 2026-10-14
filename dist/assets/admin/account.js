@@ -29,7 +29,37 @@ let googleAvailable = false;
 let resendAfter = 0;
 let retryNewsletter;
 let accountSession=null,ordersRequest=0,loadedOrdersUserId=null;
+let ownerMfaController=null;
 const oauthNewsletterKey = 'elio-newsletter-oauth-consent-v1';
+
+async function showOwnerVerification(access,onVerified=()=>location.assign(destination)){
+  const {data,error}=await auth.getSession();if(error||!data?.session)throw Error('Sign in again to verify your owner account.');
+  accountSession=data.session;
+  for(const id of ['account-form','account-tabs','account-recovery','account-back','account-provider','signed-in'])document.getElementById(id).hidden=true;
+  heading.textContent=access.mfa_enrolled?'Verify your identity.':'Protect your owner account.';
+  intro.hidden=true;message('');
+  let panel=document.getElementById('owner-mfa');if(!panel){panel=document.createElement('div');panel.id='owner-mfa';heading.parentElement.append(panel);}
+  ownerMfaController?.destroy();
+  const {mountOwnerMfa}=await import('./owner-mfa.js');
+  ownerMfaController=mountOwnerMfa(panel,{auth,api,onVerified});
+  await ownerMfaController.ready;
+}
+
+function showPasswordRecovery(){
+  ownerMfaController?.destroy();ownerMfaController=null;
+  form.hidden=false;intro.hidden=false;heading.hidden=false;setMode('recovery');
+}
+async function requireRecoveryVerification(){
+  const access=await api('account_access');
+  if(access?.mfa_required!==true)return false;
+  form.password.value='';confirmPassword.value='';
+  await showOwnerVerification(access,showPasswordRecovery);return true;
+}
+
+async function finishSignIn(){
+  if(!customer){const access=await api('account_access');if(access?.mfa_required===true){await showOwnerVerification(access);return;}}
+  if(customer)customerReturn.clear();location.assign(destination);
+}
 
 function newsletterMessage(text, error = false) {
   if (!newsletterResult) return;
@@ -139,7 +169,7 @@ function showEmailPreference(settings){
  preferences.elements.subscribed.disabled=!verified||suppressed;
  preferences.querySelector('[type=submit]').disabled=!verified||suppressed;
  document.querySelector('#email-preference-retry').hidden=true;
- document.querySelector('#email-preference-offer').textContent=`Optional. New subscribers receive ${settings.discount_percent}% OFF by email. Receive Elio news, special offers, and exclusive promo codes. Unsubscribe anytime.`;
+ document.querySelector('#email-preference-offer').textContent='Optional. Receive Elio news and subscriber-only offers by email. Unsubscribe anytime.';
  document.querySelector('#email-preference-status').textContent=!verified?'Verify your account email before changing this preference.':suppressed?'Newsletter delivery is paused for this address. Contact Elio for help.':settings.own_status==='subscribed'?'You’re subscribed to the Elio Newsletter.':'You’re not subscribed to the Elio Newsletter.';
 }
 async function loadEmailPreference(){
@@ -320,7 +350,7 @@ form.addEventListener('submit', async event => {
       result = await auth.signUp({ email, password, options });
       if (result.error) throw result.error;
       if (wantsNewsletter) await saveAccountNewsletter(email, result.data?.session);
-      if (result.data?.session) { if(customer)customerReturn.clear();location.assign(destination); return; }
+      if (result.data?.session) { await finishSignIn(); return; }
       form.password.value = '';
       confirmPassword.value = '';
       startResendCooldown();
@@ -335,14 +365,15 @@ form.addEventListener('submit', async event => {
       if (result.error) throw result.error;
       message('If an account exists for that email, a reset link will be sent.');
     } else if (mode === 'recovery') {
+      if(await requireRecoveryVerification())return;
       result = await auth.updateUser({ password });
       if (result.error) throw result.error;
-      if(customer)customerReturn.clear();location.assign(destination);
+      await finishSignIn();
     } else {
       result = await auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
       if (customer) queueNewsletterActivation(result.data?.session);
-      if(customer)customerReturn.clear();location.assign(destination);
+      await finishSignIn();
     }
   } catch (error) {
     message(error.message || 'Unable to complete the request.', true);
@@ -358,7 +389,10 @@ else if (auth) {
   else if (authLink.failed) {
     const params = new URLSearchParams(location.hash.slice(1));
     message(params.get('error_description') || 'The sign-in link could not be used. Please try again.', true);
-  } else if (authLink.recovery && data.session) setMode('recovery');
+  } else if (authLink.recovery && data.session) {
+    showPasswordRecovery();
+    try{await requireRecoveryVerification();}catch(error){message(error.message||'Your account access could not be verified. Please try again.',true);}
+  }
   else if (authLink.recovery || authLink.type === 'recovery') message('This password reset link is incomplete or no longer valid. Request a new reset link.', true);
   else if (data.session && customer && customerReturn.toShop) {
     const handled=await finishOAuthNewsletterConsent(data.session);if(!handled)queueNewsletterActivation(data.session);
@@ -395,6 +429,11 @@ else if (auth) {
       try {
         const access = await api('account_access');
         dashboardLink.hidden = !['owner', 'staff'].includes(access?.role);
+        if(access?.mfa_required===true){
+          dashboardLink.href='admin-account.html?next='+staffDestination;
+          dashboardLink.textContent='Verify owner access';
+          if(!customer)await showOwnerVerification(access);
+        }
         if(!customer&&staffDestination==='pos.html'&&!dashboardLink.hidden){dashboardLink.href='pos.html';dashboardLink.textContent='Open POS';}
       } catch {
         // An unavailable role lookup must not expose team navigation or block
@@ -404,4 +443,15 @@ else if (auth) {
     }
   }
 }
-auth?.onAuthStateChange((event,next)=>{if(accountSession&&next?.user?.id&&next.user.id!==accountSession.user.id){accountSession=null;loadedOrdersUserId=null;ordersRequest++;voucherController?.destroy();document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();location.reload();return;}if(event==='SIGNED_OUT'){try{clearAdminOrderView(window.sessionStorage);}catch{}accountSession=null;loadedOrdersUserId=null;ordersRequest++;voucherController?.destroy();voucherController=null;document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();message('You have signed out. Sign in again to view your account.');}});
+auth?.onAuthStateChange((event,next)=>{
+ if(accountSession&&next?.user?.id&&next.user.id!==accountSession.user.id){
+  ownerMfaController?.destroy();ownerMfaController=null;accountSession=null;loadedOrdersUserId=null;ordersRequest++;voucherController?.destroy();document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();location.reload();return;
+ }
+ if(event==='SIGNED_OUT'){
+  try{clearAdminOrderView(window.sessionStorage);}catch{}
+  const wasVerifying=Boolean(ownerMfaController);ownerMfaController?.destroy();ownerMfaController=null;
+  accountSession=null;loadedOrdersUserId=null;ordersRequest++;voucherController?.destroy();voucherController=null;document.querySelector('#signed-in').hidden=true;document.querySelector('#account-orders')?.replaceChildren();
+  if(wasVerifying){form.hidden=false;intro.hidden=false;document.querySelector('#account-tabs').hidden=false;setMode('signin');}
+  message('You have signed out. Sign in again to view your account.');
+ }
+});

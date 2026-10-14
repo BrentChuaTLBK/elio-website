@@ -1,6 +1,8 @@
 // Display helpers only. PostgreSQL revalidates all customer checkout rules.
+const manilaDateFormatter = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'});
+const manilaTimeFormatter = new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
 export function dateInManila(value = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(value));
+  const parts = manilaDateFormatter.formatToParts(new Date(value));
   return ['year','month','day'].map(k=>parts.find(p=>p.type===k).value).join('-');
 }
 export function addDays(date,n) {const d=new Date(`${date}T00:00:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
@@ -8,7 +10,7 @@ export function dayOfWeek(date){return new Date(`${date}T00:00:00Z`).getUTCDay()
 export function allowsSameDay(product){return product?.allow_same_day===true&&Number(product.lead_days)===0}
 export function sameDayOpen(settings,now=new Date()){
   if(!settings.cutoff_time)return true;
-  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(now).split(':').map(Number);
+  const parts=manilaTimeFormatter.format(now).split(':').map(Number);
   const cutoff=String(settings.cutoff_time).split(':').map(Number);
   return parts[0]*3600+parts[1]*60+parts[2]+now.getMilliseconds()/1000 < cutoff[0]*3600+cutoff[1]*60+(cutoff[2]||0);
 }

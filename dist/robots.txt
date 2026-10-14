@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /manage
+Disallow: /account
+Disallow: /pos
+Disallow: /api/
+Disallow: /assets/admin/order-print
+Sitemap: https://eliocheesecakes.com/sitemap.xml

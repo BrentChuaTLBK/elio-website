@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import JSZip from 'jszip';
+import {makePartitionedProofArchive,makeProofArchive,proofArchiveStream,zipFiles,MAX_PROOF_BYTES,MAX_ARCHIVE_BYTES,MAX_RECOVERY_BYTES} from '../dist/assets/admin/proof-archive.js';
+import {readRecoveryArchive} from '../dist/assets/admin/recovery-archive-reader.js';
+import {recoveryEnvelope} from '../dist/assets/admin/recovery-data.js';
+
+const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222'];
+const orders=ids.map((id,i)=>({id,reference:'ELIO-PART-'+i,payment_status:'under_review',fulfillment_status:'pending_confirmation',proof_path:id+'/receipt.png',total_cents:10000,items:[{quantity:1,name:'Trio',unit_price_cents:10000,selection_labels:[]}]}));
+const data={source:'elio-paid-order-recovery',schema_version:1,generated_at:'2026-10-03T00:00:00Z',paid_orders:[],review_orders:orders,paid_history_count:0,active_order_ids:ids,active_count:2,active_total_cents:20000,payments:[],allocations:[],products:[],inventory:[],affiliates:[],affiliate_codes:[],affiliate_orders:[],affiliate_order_details:[],affiliate_ledger:[],affiliate_payouts:[]};
+const fixture=size=>{const bytes=new Uint8Array(size);bytes.set([137,80,78,71,13,10,26,10]);return bytes;};
+let reads=0,checks=0;const started=performance.now(),cpu=process.cpuUsage();
+const archive=await makePartitionedProofArchive(data,async()=>{reads++;return fixture(MAX_PROOF_BYTES);},{checkpoint:async()=>checks++});
+assert.equal(reads,2);assert.equal(checks,2);assert.equal(archive.part_count,2);assert(archive.blob.size>MAX_ARCHIVE_BYTES);assert.equal(archive.bytes,archive.blob.size);
+assert.equal(createHash('sha256').update(new Uint8Array(await archive.blob.arrayBuffer())).digest('hex'),archive.sha256);
+const outer=await JSZip.loadAsync(await archive.blob.arrayBuffer(),{checkCRC32:true}),manifest=JSON.parse(await outer.file('manifest.json').async('text'));
+assert.equal(manifest.parts.length,2);for(const p of manifest.parts){assert(p.bytes<=MAX_ARCHIVE_BYTES);const bytes=await outer.file(p.file).async('uint8array');assert.equal(createHash('sha256').update(bytes).digest('hex'),p.sha256);const inner=await JSZip.loadAsync(bytes,{checkCRC32:true});assert.equal(Object.values(inner.files).filter(f=>!f.dir).length,1);}
+const restored=await readRecoveryArchive(archive.blob);assert.equal(restored.format_version,2);assert.deepEqual(restored.proofs.map(p=>p.path),orders.map(o=>o.proof_path));assert(restored.proofs.every(p=>p.blob.size===MAX_PROOF_BYTES));assert.deepEqual(restored.snapshot.review_orders,data.review_orders);
+const damaged=new Uint8Array(await archive.blob.arrayBuffer());damaged[300]^=1;await assert.rejects(readRecoveryArchive(damaged),/readback/);
+const small=await makeProofArchive(data,async()=>fixture(64)),legacy=await readRecoveryArchive(small.bytes);assert.equal(legacy.format_version,1);assert.equal(legacy.proofs.length,2);
+const text=new TextEncoder();
+const oldFiles=[...small.snapshot.proof_files.map(p=>({name:p.file,bytes:fixture(64)})),{name:'recovery.json',bytes:text.encode(JSON.stringify(await recoveryEnvelope({...small.snapshot,proof_files:[]})))}];
+await assert.rejects(readRecoveryArchive(zipFiles(oldFiles)),/readback/);
+await assert.rejects(readRecoveryArchive(new Blob([new Uint8Array(MAX_RECOVERY_BYTES+1)])),/readback/);
+const compressed=small.bytes.slice();new DataView(compressed.buffer).setUint16(8,8,true);await assert.rejects(readRecoveryArchive(compressed),/readback/);
+const invalidPart={...manifest,parts:Array.from({length:17},(_,i)=>({...manifest.parts[0],file:`proof-parts/part-${String(i+1).padStart(4,'0')}.zip`}))};
+await assert.rejects(readRecoveryArchive(zipFiles([{name:'recovery.json',bytes:await outer.file('recovery.json').async('uint8array')},{name:'manifest.json',bytes:text.encode(JSON.stringify(invalidPart))}])),/readback/);
+const hugeJSON=new Uint8Array(8*1024*1024+1);await assert.rejects(readRecoveryArchive(zipFiles([{name:'recovery.json',bytes:hugeJSON}])),/readback/);
+const limited=proofArchiveStream(data,async()=>fixture(1024*1024),{maximum:2*1024*1024});await assert.rejects(async()=>{for await(const bytes of limited.stream)void bytes;},/too_large/);
+let checkpoint=0;const lost=proofArchiveStream(data,async()=>fixture(64),{checkpoint:async()=>{if(++checkpoint===2)throw Error('lease expired');}});await assert.rejects(async()=>{for await(const bytes of lost.stream)void bytes;},/lease expired/);assert.equal(lost.result.sha256,undefined);
+const usage=process.cpuUsage(cpu);console.log(JSON.stringify({test:'partitioned-backup',bytes:archive.bytes,parts:archive.part_count,elapsed_ms:Math.round(performance.now()-started),cpu_ms:Math.round((usage.user+usage.system)/1000)}));
+console.log('PASS 40 MiB aggregate proof recovery, bounded parts, independent ZIP CRC/SHA checks, v1 compatibility, corrupt bytes, total size guard and interrupted manifest publication.');

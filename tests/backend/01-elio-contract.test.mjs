@@ -17,13 +17,13 @@ export default async function({db,check,state}) {
   await rejects(()=>as(null,()=>db.query("select public.shop_service('maintenance')")),/permission denied/);
  })();
  await check('Account navigation exposes only the current database-assigned role',async()=>{
-  assert.deepEqual(await api('account_access'),{role:null});
-  assert.deepEqual(await api('account_access',{},ids.customer),{role:null});
-  assert.deepEqual(await api('account_access',{},ids.owner),{role:'owner'});
-  assert.deepEqual(await api('account_access',{},ids.staff),{role:'staff'});
+  assert.deepEqual(await api('account_access'),{role:null,mfa_required:false,mfa_enrolled:false});
+  assert.deepEqual(await api('account_access',{},ids.customer),{role:null,mfa_required:false,mfa_enrolled:false});
+  assert.deepEqual(await api('account_access',{},ids.owner),{role:'owner',mfa_required:false,mfa_enrolled:true});
+  assert.deepEqual(await api('account_access',{},ids.staff),{role:'staff',mfa_required:false,mfa_enrolled:false});
   await db.query("update auth.users set raw_user_meta_data=jsonb_build_object('role','owner') where id=$1",[ids.customer]);
   try {
-   assert.deepEqual(await api('account_access',{user_id:ids.owner,role:'owner'},ids.customer),{role:null});
+   assert.deepEqual(await api('account_access',{user_id:ids.owner,role:'owner'},ids.customer),{role:null,mfa_required:false,mfa_enrolled:false});
   } finally { await db.query("update auth.users set raw_user_meta_data='{}'::jsonb where id=$1",[ids.customer]); }
  })();
  await check('Only owners can change settings, prices, promotions, and team access',async()=>{
@@ -129,7 +129,7 @@ export default async function({db,check,state}) {
  await check('Team access protects the last owner and removes staff privileges immediately',async()=>{
   await rejects(()=>api('save_staff',{email:'owner@example.test',role:'none'},ids.owner),/owner/i);
   await api('save_staff',{email:'staff@example.test',role:'none'},ids.owner);
-  assert.deepEqual(await api('account_access',{},ids.staff),{role:null});
+  assert.deepEqual(await api('account_access',{},ids.staff),{role:null,mfa_required:false,mfa_enrolled:false});
   await rejects(()=>api('admin_bootstrap',{},ids.staff),/Authorized/);
  })();
  await check('Paid-active analytics excludes cancelled orders and refund labels',async()=>{
@@ -141,18 +141,25 @@ export default async function({db,check,state}) {
   const exposed=await db.query("select proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and prosecdef");assert.equal(exposed.rows.length,0);
  })();
  await check('Only the designated verified email can claim the first owner role',async()=>{
+  const factor=randomUUID(),session=randomUUID();
   try{
    await db.exec("delete from elio.staff; insert into elio.pending_owners(email) values ('unverified@example.test')");
+   assert.equal((await api('account_access',{},ids.unverified)).role,null);
    await rejects(()=>api('admin_bootstrap',{},ids.unverified),/Authorized/);
    await db.exec("delete from elio.pending_owners; insert into elio.pending_owners(email) values ('customer@example.test'), ('future-owner@example.test')");
    await db.query("update auth.users set raw_user_meta_data='{}'::jsonb||jsonb_build_object('role','owner') where id=$1",[ids.stranger]);
    await rejects(()=>api('admin_bootstrap',{},ids.stranger),/Authorized/);
-   assert.equal((await api('admin_bootstrap',{},ids.customer)).role,'owner');
+   assert.equal((await api('account_access',{},ids.stranger)).role,null);
+   assert.deepEqual(await api('account_access',{},ids.customer),{role:'owner',mfa_required:true,mfa_enrolled:false});
+   await rejects(()=>api('admin_bootstrap',{},ids.customer),/authenticator/);
    assert.equal(await scalar("select count(*) from elio.pending_owners where email='customer@example.test'"),0);
    assert.equal(await scalar("select count(*) from elio.pending_owners where email='future-owner@example.test'"),1);
-   assert.equal((await api('admin_bootstrap',{},ids.customer)).role,'owner');
+   await db.query("insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')",[factor,ids.customer]);
+   await db.query("insert into auth.sessions(id,user_id,factor_id,aal) values($1,$2,$3,'aal2')",[session,ids.customer,factor]);
+   const verified=await as(ids.customer,async()=>(await db.query("select public.shop_api('admin_bootstrap','{}',null) value")).rows[0].value,'authenticated',{aal:'aal2',session_id:session});
+   assert.equal(verified.role,'owner');
    await db.exec("insert into elio.pending_owners(email) values ('stranger@example.test')");
    await rejects(()=>api('admin_bootstrap',{},ids.stranger),/Authorized/);
-  }finally{await db.exec('delete from elio.pending_owners; delete from elio.staff');await db.query("insert into elio.staff(user_id,role) values ($1,'owner')",[ids.owner]);}
+  }finally{await db.query('delete from auth.sessions where id=$1',[session]);await db.query('delete from auth.mfa_factors where id=$1',[factor]);await db.exec('delete from elio.pending_owners; delete from elio.staff');await db.query("insert into elio.staff(user_id,role) values ($1,'owner')",[ids.owner]);}
  })();
 }

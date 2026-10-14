@@ -9,6 +9,7 @@ let calls=[],setup={},record=null,checks=0;const actual=fetch;
 globalThis.fetch=async(url,options={})=>{
  const path=new URL(url).pathname;calls.push({path,options});
  if(path==='/auth/v1/user')return Response.json(setup.expired?{}:{id:user},{status:setup.expired?401:200});
+ if(path==='/rest/v1/rpc/shop_api')return Response.json({role:'owner',mfa_required:false});
  if(path==='/rest/v1/rpc/shop_service'){
   const {p_action:a,p_payload:p}=JSON.parse(options.body);assert.equal(p.user_id,user);
   if(a==='affiliate_proof_read')return setup.denied?Response.json({message:'Receipt not available.'},{status:403}):Response.json({affiliate_id:affiliate,path:setup.badPath?'another-affiliate/private.png':`${affiliate}/${id}/12345678-1234-4234-8234-123456789bbb.png`});

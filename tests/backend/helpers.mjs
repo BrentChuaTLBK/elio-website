@@ -9,10 +9,13 @@ export async function makeHarness(db) {
     ]);
   }
   await db.query("insert into elio.staff (user_id, role) values ($1, 'owner'), ($2, 'staff')", [ids.owner, ids.staff]);
+  const ownerFactor=randomUUID(),ownerSession=randomUUID();
+  await db.query("insert into auth.mfa_factors(id,user_id,status) values($1,$2,'verified')",[ownerFactor,ids.owner]);
+  await db.query("insert into auth.sessions(id,user_id,factor_id,aal) values($1,$2,$3,'aal2')",[ownerSession,ids.owner,ownerFactor]);
 
-  async function as(user, callback, role = user ? 'authenticated' : 'anon') {
+  async function as(user, callback, role = user ? 'authenticated' : 'anon', claims = {}) {
     await db.query("select set_config('request.jwt.claim.sub', $1, false), set_config('request.jwt.claim.role', $2, false), set_config('request.jwt.claims', $3, false)", [
-      user || '', role, JSON.stringify({ sub: user, role }),
+      user || '', role, JSON.stringify({ sub: user, role, ...(user===ids.owner?{aal:'aal2',session_id:ownerSession}:{}), ...claims }),
     ]);
     await db.exec(`set role ${role}`);
     try { return await callback(); }
@@ -80,5 +83,5 @@ export async function makeHarness(db) {
   const remaining = (product, date) => scalar('select elio.capacity_remaining($1::uuid, $2::date)', [product.id, date]);
   const allocations = (id) => db.query('select product_id::text, date::text, quantity, state from elio.allocations where order_id=$1 order by product_id,date', [id]).then(r => r.rows);
 
-  return { ids, as, api, rawApi, service, scalar, day, item, checkout, product, plan, inventory, fixture, order, action, proof, remaining, allocations };
+  return { ids, ownerFactor, ownerSession, as, api, rawApi, service, scalar, day, item, checkout, product, plan, inventory, fixture, order, action, proof, remaining, allocations };
 }

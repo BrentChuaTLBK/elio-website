@@ -294,3 +294,24 @@
 .backup-panel{margin-bottom:20px}
 .backup-panel .row-actions{margin-top:16px;margin-bottom:14px;gap:10px}
 .backup-panel .help-text{margin-top:14px;margin-bottom:14px}
+.editor-draft-bar{position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 18px;padding:10px 12px;background:#fff9ed;border:1px solid #e7d6ba;border-radius:10px;box-shadow:0 3px 12px #5137220d;font-size:13px;color:#65523c}
+.editor-draft-bar .button{min-height:36px;padding:7px 18px;flex-shrink:0}
+.editor-draft-bar [data-draft-status]{line-height:1.35}
+[data-dirty=true]>.editor-draft-bar{border-color:#b68c50;color:#6c471a}
+.regular-promo-filters>.field:first-child{flex:1;min-width:180px}
+.subscriber-lookup{margin-bottom:24px}
+.subscriber-lookup h2{margin-bottom:8px}
+.subscriber-lookup-form{display:flex;gap:12px;align-items:flex-end;margin-top:16px}
+.subscriber-lookup-form .field{flex:1;min-width:0;margin:0}
+.subscriber-lookup-form>.button{flex-shrink:0;margin-bottom:0}
+.subscriber-lookup-result{margin-top:16px;padding-top:16px;border-top:1px solid #e7ddcc}
+.subscriber-lookup-result dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 22px;margin:14px 0 0}
+.subscriber-lookup-result dl>div{min-width:0}
+.subscriber-lookup-result dt{font-size:12px;color:#776954;margin-bottom:3px}
+.subscriber-lookup-result dd{margin:0;overflow-wrap:anywhere}
+.subscriber-lookup-result p{overflow-wrap:anywhere}
+@media(max-width:520px){.subscriber-lookup-form{align-items:stretch;flex-direction:column}.subscriber-lookup-form>.button{align-self:flex-start}.subscriber-lookup-result dl{grid-template-columns:1fr}.regular-promo-filters>.field:first-child{min-width:0;flex-basis:100%}}
+.order-pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.order-pagination p{margin:0}
+.order-pagination + .help-text{margin-top:12px}
+@media(max-width:560px){.order-pagination .row-actions{width:100%;justify-content:space-between}.order-print-actions{flex-wrap:wrap}}

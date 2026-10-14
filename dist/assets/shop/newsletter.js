@@ -35,7 +35,7 @@ function updateOfferCopy(settings) {
   document.querySelectorAll('#newsletter-title strong, .elio-newsletter-offer strong').forEach(node => { node.textContent = `${offer.discount_percent}% OFF`; });
   document.querySelectorAll('.elio-newsletter-terms, [data-newsletter-offer-terms]').forEach(node => { node.textContent = newsletterOfferTerms(settings); });
   const accountNote = document.querySelector('#newsletter-note');
-  if (accountNote) accountNote.textContent = `Join immediately for flavor news, special offers, and exclusive promo codes. New subscribers receive a personal ${offer.discount_percent}% code by email. ${newsletterOfferTerms(settings)}`;
+  if (accountNote) accountNote.textContent = 'Optional. Receive Elio news and subscriber-only offers by email. Unsubscribe anytime.';
 }
 
 export function getNewsletterSettings(refresh = false) {

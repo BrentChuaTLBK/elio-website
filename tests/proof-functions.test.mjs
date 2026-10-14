@@ -15,6 +15,7 @@ globalThis.fetch=async(url,options={})=>{
   const path=new URL(url).pathname;
   calls.push({path,options});
   if(path==='/auth/v1/user')return Response.json(setup.invalidSession?{}:{id:user},{status:setup.invalidSession?401:200});
+  if(path==='/rest/v1/rpc/shop_api')return Response.json({role:'owner',mfa_required:false});
   if(path==='/rest/v1/rpc/shop_service'){
     assert.equal(options.headers.apikey,'test-service-key');
     const {p_action:action,p_payload:p}=JSON.parse(options.body);

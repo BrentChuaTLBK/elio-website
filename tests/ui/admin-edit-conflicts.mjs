@@ -25,9 +25,9 @@ async function make(width){const ctx=await browser.newContext({viewport:{width,h
   if(u.origin!==origin)return route.abort();const path=resolve(root,'.'+u.pathname);if(!path.startsWith(root+sep))return route.abort();try{return route.fulfill({body:await readFile(path),contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.webp':'image/webp','.png':'image/png','.woff2':'font/woff2'})[extname(path)]||'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}});
  const page=await ctx.newPage();page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/manage.html');await page.locator('#admin-nav').waitFor({state:'attached'});return {page,ctx};}
 const last=(action,width)=>calls.filter(c=>c.action===action&&c.width===width).at(-1)?.payload;
-async function reload(page,view){await page.reload();await navigateDashboard(page,view);}
+async function reload(page,view){const accept=dialog=>dialog.accept();page.on('dialog',accept);try{await page.reload();}finally{page.off('dialog',accept);}await navigateDashboard(page,view);}
 async function editBox(page){await navigateDashboard(page,'boxes');await page.locator(`[data-action=edit-product][data-id="${box.id}"]`).click();return page.locator('[data-form=product]');}
-async function close(page){await page.locator('#dialog-close').click();await page.locator('#admin-dialog').waitFor({state:'hidden'});}
+async function close(page){await page.locator('#dialog-close').click();await page.locator('.site-dialog').getByRole('button',{name:'Discard changes',exact:true}).click();await page.locator('#admin-dialog').waitFor({state:'hidden'});}
 async function waitSaved(page){await page.locator('#admin-dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>!document.querySelector('[data-form=product]')?.isConnected||!document.querySelector('#admin-dialog')?.open);}
 try{for(const width of [1440,768,390]){const {page,ctx}=await make(width);
  // Real database save from another editor while this browser holds an old snapshot.

@@ -1,6 +1,7 @@
 import {api,newsletterRequest,upload,escapeHtml as esc,toast} from './client.js';
 import {newsletterTemplates} from './newsletter-templates.js';
 import {PHOTO_ACCEPT} from './photo-upload.js';
+import {createSubscriberLookup} from './subscriber-lookup.js';
 
 const fields=['subject','title','body','image_url','cta_label','cta_url','template'];
 const blank=()=>({subject:'',title:'',body:'',image_url:'',cta_label:'',cta_url:'',template:'spotlight',status:'draft'});
@@ -14,6 +15,7 @@ export function createNewsletterCampaigns({connected,owner,showDialog,closeDialo
  const state={editor:false,data:null,draft:blank(),dirty:false,busy:false,loading:false,error:'',previewMode:'desktop',previewHtml:'',previewKey:'',previewStatus:''};
  let root,loadId=0,previewId=0,previewTimer;
  const editable=()=>connected()&&owner();
+ const subscriberLookup=createSubscriberLookup({allowed:editable});
  const locked=()=>!editable()||state.draft.status!=='draft'||state.busy;
  const report=()=>connected()?state.data:{counts:{subscribed:0},campaigns:[]};
  const count=()=>{const n=report()?.counts?.subscribed;return Number.isInteger(n)?`${n.toLocaleString()} current subscriber${n===1?'':'s'} · Owner only`:'Loading subscriber count…';};
@@ -52,7 +54,8 @@ export function createNewsletterCampaigns({connected,owner,showDialog,closeDialo
   root.innerHTML=`${heading}
    ${!connected()?'<p class="notice">Preview only. Sign in as an owner to save drafts and send newsletters.</p>':''}
    <p class="form-error" role="alert" data-nl-page-error>${esc(state.error)}</p>
-   ${state.editor?editorView():libraryView()}`;
+   ${state.editor?editorView():subscriberLookup.render()+libraryView()}`;
+  if(!state.editor)subscriberLookup.mount(root);
   if(state.editor){const frame=root.querySelector('[data-nl-live-frame]');frame.srcdoc=state.previewHtml||placeholder;schedulePreview();}
  }
  function libraryView(){

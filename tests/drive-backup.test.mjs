@@ -16,5 +16,9 @@ const fixedRows=await backupSheetRequests(fixed,sheets);assert.match(JSON.string
 assert.equal(spreadsheetId('https://docs.google.com/spreadsheets/d/12345678901234567890/edit'),'12345678901234567890');assert.throws(()=>spreadsheetId('https://evil.test/a'));
 let calls=[];const client={info:()=>({configured:false}),write:async()=>{throw Error('network');}};await syncBackup(client,async(action,payload)=>{calls.push({action,payload});return action==='order_backup_begin'?{lease_token:'lease',revision:1,spreadsheet_id:'sheet',snapshot:data}:{};});assert.equal(calls.at(-1).payload.error,'network');
 globalThis.Deno={env:{get:()=>''}};assert.equal((await handle(new Request('https://backup.test',{method:'POST',headers:{'x-worker-token':'bad'},body:'{}'}))).status,401);
+let cleaned=false;const committed={info:()=>({configured:false}),write:async()=>({proof_archive_id:'fixture',retired_revision:'older'}),cleanup:async()=>{cleaned=true;throw Error('Cleanup unavailable');}};
+const dispatch=async action=>action==='order_backup_begin'?{lease_token:'fixture',revision:1,spreadsheet_id:'sheet',snapshot:data}:{};
+assert.equal((await syncBackup(committed,dispatch)).ok,true);assert.equal(cleaned,true);cleaned=false;
+await assert.rejects(syncBackup(committed,async action=>{if(action==='order_backup_finish')throw Error('lease expired');return dispatch(action);}),/lease expired/);assert.equal(cleaned,false);
 assert.deepEqual(createGoogleSheets({getEnv:()=>''}).info(),{configured:false});
 console.log('PASS Google backup atomic batches, paid completion/history, affiliates, checksum, Unicode chunks, failures and authentication');

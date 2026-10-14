@@ -8,9 +8,8 @@ Flavors and Boxes & sets.
 
 Choose a photo, review the preview, add its description and adjust the horizontal
 or vertical crop position. **Save photo** publishes that placement. Uploads
-accept JPEG, PNG, HEIC/HEIF and WebP, up to 20 MB. The existing local worker
-converts them to WebP (maximum 2400-pixel longest edge, 5 MB result). No original
-photo leaves the browser. Saving another page's image is independent.
+accept JPEG, PNG, HEIC/HEIF and WebP, up to 20 MiB (20,971,520 bytes). The local worker
+tries WebP conversion (maximum 2400-pixel longest edge, 5 MiB result). If conversion fails, the validated original may be uploaded with its recognized MIME type and extension, up to 20 MiB. Saving another page's image is independent.
 
 **Restore original** selects the bundled original; **Save photo** publishes the
 restoration. **Reload saved** discards that card's draft and retrieves the latest
@@ -25,10 +24,10 @@ access and direct helper-function execution are revoked. `shop_api` exposes
 write. Both routes run before order housekeeping, so photo requests do not
 expire orders or acquire the global ordering lock. Writes lock only their slot.
 
-The public `website-images` bucket permits new WebP objects up to 5 MB; its
+The public `website-images` bucket permits JPEG, PNG, HEIC/HEIF and WebP objects up to 20 MiB; its
 insert policy requires the current database owner role and the uploader's UUID
 folder. Random new filenames avoid overwrites and stale image caches. Saves
-verify that the object exists in that bucket and is marked as WebP. Old files
+verify that the object exists in that bucket and its MIME type matches its allowlisted extension. Old files
 are retained, keeping previously loaded pages safe. They are not automatically
 deleted when a slot is replaced or restored.
 

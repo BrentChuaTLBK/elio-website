@@ -24,7 +24,7 @@ Elio changes:
 - Unsaved daily quantities mean zero. An explicitly saved blank / No limit means unlimited. Daily quantities shows only the selected month's lineup; all fixed and custom boxes share individual flavor limits. `configured` distinguishes explicit zero from a not-yet-configured date, so bulk fill can preserve saved values.
 - `catalog` accepts optional `fulfillment_date` and returns `stock_available`, `remaining_boxes`, and flavor stock for that date. These are stock indicators; the quote still enforces lead time, closures, pickup/delivery rules, and paused ordering.
 - Customer date selection and server quotes are limited to this month and next month in Asia/Manila. Staff calendars and authorized amendments retain their separate date rules.
-- Owners can upload JPEG/PNG/WebP product photos up to 5 MB in the public `product-images` bucket. An INSERT-only Storage policy checks the current database owner role and their own UUID folder. Removing a photo from a product detaches it; it does not delete the stored object.
+- Owners can upload JPEG/PNG/HEIC/HEIF/WebP product photos up to 20 MiB (20,971,520 bytes) in the public `product-images` bucket. The browser prefers a converted WebP up to 5 MiB and retains a validated original if conversion fails. An INSERT-only Storage policy checks the current database owner role and their own UUID folder. Removing a photo from a product detaches it; it does not delete the stored object.
 
 ## Security
 

@@ -1,3 +1,5 @@
+import {createAdminReads} from './admin-reads.js';
+import {createEditorDraft} from './editor-draft.js';
 import {matchesOrderView,orderNextStep,orderQuickPanel} from './order-dashboard.js';
 import {adminOrderView,inventoryMonthDrafts} from './progress-state.js';
 import {temporaryOrderReadFailure} from './account-return.js';
@@ -69,12 +71,18 @@ state.productionRange = {from:manilaDate(),to:manilaDate()};
 state.productionMode = 'range';
 state.productFilters = { search: '', status: '', category: '' };
 state.promoFilter = '';
+state.promoSearch = '';
 state.accountingFilter = monthRange(manilaDate().slice(0,7));
 state.printSelection = new Set();
 state.orderTaskView='all';state.selectedOrderId=null;let orderOpenRequest=0;
+state.orderPage=0;state.orderPageSize=50;state.orderTotal=0;state.orderPageLoading=false;
+const adminReads=createAdminReads(api);let scopedGeneration=0,scopedPendingKey=null,scopedError=null,orderSearchTimer=null;
 let activeOrder = null;
 let productDraft = null;
 let productCopy = null;
+const catalogDraft=createEditorDraft({confirm:confirmDialog,noun:'item',extra:()=>catalogDraft.form?.dataset.form==='product'?productDraft?.photos||[]:null});
+const settingsDraft=createEditorDraft({confirm:confirmDialog,noun:'shop settings'});
+window.addEventListener('beforeunload',event=>{if(state.connected&&(catalogDraft.dirty()||catalogDraft.busy()||settingsDraft.dirty()||settingsDraft.busy())){event.preventDefault();event.returnValue='';}});
 let clearPhotoDrag = () => {};
 let catalogOrderController = null;
 let affiliatesController = null;
@@ -174,12 +182,12 @@ function showDialog(title, content) {
     if (modal.open && firstControl?.isConnected && document.activeElement === initialFocus && !body.contains(document.activeElement)) firstControl.focus();
   });
 }
-async function closeDialog() { if($('[data-form=product][data-busy=true]'))return; if(!await canLeaveOrderEditor())return;orderEditBaseline=null;editDraft=null; if(catalogOrderController && !catalogOrderController.canLeave())return;catalogOrderController?.destroy();catalogOrderController=null;clearPhotoDrag(); modal.close(); modalReturnFocus?.focus?.(); }
+async function closeDialog() { if(!await catalogDraft.canLeave())return;catalogDraft.clear(); if(!await canLeaveOrderEditor())return;orderEditBaseline=null;editDraft=null; if(catalogOrderController && !catalogOrderController.canLeave())return;catalogOrderController?.destroy();catalogOrderController=null;clearPhotoDrag(); modal.close(); modalReturnFocus?.focus?.(); }
 modal.addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 // A native close request can be non-cancelable after browser activation is
 // consumed. Route editor Escape through the draft guard before native closing.
 modal.addEventListener('keydown',event=>{
-  if(event.key!=='Escape'||event.defaultPrevented||event.isComposing||!$('#dialog-body [data-form="order-edit"],#dialog-body [data-form="order-contact"]'))return;
+  if(event.key!=='Escape'||event.defaultPrevented||event.isComposing||!$('#dialog-body [data-form="order-edit"],#dialog-body [data-form="order-contact"],#dialog-body [data-form="product"],#dialog-body [data-form="flavor-menu-editor"]'))return;
   event.preventDefault();event.stopPropagation();closeDialog();
 });
 $('#dialog-close').addEventListener('click', closeDialog);
@@ -190,21 +198,24 @@ const newsletterOffers = createNewsletterAdmin({connected:()=>state.connected,ow
 async function refresh() {
   if (!configured) return;
   const request=++bootstrapRequest,userId=staffUserId;
-  const result = await api('admin_bootstrap');
+  const result = await api('admin_bootstrap',{scope:'core'});
   if(request!==bootstrapRequest||userId!==staffUserId)return;
   if(!['owner','staff'].includes(result.role))throw new Error('Staff access is required.');
   if(!state.connected&&!location.hash&&!new URL(location.href).searchParams.has('order')){const saved=orderView.restore(staffUserId);if(saved){state.view=saved.view;state.filters=saved.filters;state.orderTaskView=saved.taskView||'all';}}
   if(!state.connected && ['#accounting','#affiliates','#maintenance','#website-photos','#backup','#marketing'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
   if(!state.connected && location.hash==='#orders')state.view='orders';
   if(!state.connected && /^#calendar(?:\?|$)/.test(location.hash))state.view='calendar';
-  Object.assign(state, result, { connected: true, analyticsUpdatedAt: new Date().toISOString() });
+  Object.assign(state, result, { connected: true, scopedReads:result.orders_mode==='scoped', analyticsUpdatedAt: new Date().toISOString() });
+  adminReads.invalidate();scopedGeneration++;scopedPendingKey=null;scopedError=null;
   state.promos = state.promos.filter(promo => !promo.newsletter_managed && !promo.affiliate_managed);
   state.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
   state.categories.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
-  const reviews = state.orders.filter(needsPaymentReview).length;
+  const reviews = state.scopedReads?state.reporting.order_summary.review:state.orders.filter(needsPaymentReview).length;
   $('#review-count').textContent = reviews;
   $('#review-count').hidden = reviews === 0;
   $('#shop-status').textContent = state.settings.paused ? 'New orders paused' : 'Shop accepting orders';
+  if(state.scopedReads&&['orders','analytics','production'].includes(state.view)){const view=state.view,params=scopedParams(view);await adminReads.load(view,params);if(request!==bootstrapRequest||userId!==staffUserId)return;}
+  if(state.scopedReads&&state.view==='orders'&&state.printSelection.size){const valid=new Set((await api('admin_order_ids',orderFilters())).ids);state.printSelection.forEach(id=>{if(!valid.has(id))state.printSelection.delete(id);});}
   render();
 }
 function render() {
@@ -239,10 +250,13 @@ function render() {
   if (newsletterNav) newsletterNav.hidden = state.connected && state.role !== 'owner';
   $$('.sidebar-link').forEach(button => { button.classList.toggle('active', button.dataset.view === state.view); button.setAttribute('aria-current', button.dataset.view === state.view ? 'page' : 'false'); });
   const currentPage=$('#dashboard-current-page');if(currentPage){const active=$('#admin-nav .sidebar-link.active');currentPage.textContent=active?.textContent.trim().replace(/\d+$/, '').trim()||'Overview';}
+  if(!scopedViewReady())return;
   const views = { backup:()=>'<div id="backup-manager"></div>', offers:()=>'<div id="voucher-campaigns-manager"></div>', 'website-photos':()=>'<div id="website-photos-manager"></div>', calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   unmountAnalyticsChart();
   views.marketing=()=>'<div id="marketing-insights-manager"></div>';
+  const heldSettings=state.view==='settings'&&state.connected&&(settingsDraft.dirty()||settingsDraft.busy())?settingsDraft.form:null;
   $('#workspace').innerHTML = setupNotice() + views[state.view]();
+  if(heldSettings)$('[data-form=settings]').replaceWith(heldSettings);
   if(state.view==='overview'&&state.connected)void loadAttentionCalendar($('#workspace'),{api,esc,dateTime});
   if(state.view==='backup')mountBackup($('#backup-manager'),{api,owner:state.connected&&owner(),esc,money});
   if(state.view==='marketing')marketingController=mountMarketingInsights($('#marketing-insights-manager'),{api,owner:state.connected&&owner(),esc,money,today:manilaDate(),openOrder,openAffiliate(id){initialAffiliate=id;state.view='affiliates';render();}});
@@ -253,13 +267,54 @@ function render() {
   if(state.view==='maintenance')maintenanceController=mountMaintenance($('#maintenance-manager'),{owner:state.connected&&state.role==='owner'});
   if(state.view==='accounting')mountAccounting($('#accounting-manager'),{api,role:state.role,connected:state.connected,money,escapeHtml:esc,today:manilaDate(),filters:state.accountingFilter,openOrder});
   if(state.view==='affiliates'){affiliatesController=mountAffiliates($('#affiliates-manager'),{role:state.role,connected:state.connected,initialAffiliate});initialAffiliate=null;}
-  if(state.view==='settings')mountPaymentEditor($('#workspace'),{esc,disabled:Boolean(ownerLocked())});
+  if(state.view==='settings'&&!heldSettings){mountPaymentEditor($('#workspace'),{esc,disabled:Boolean(ownerLocked())});settingsDraft.mount($('[data-form=settings]'),{reset:true});}
+  if(state.view!=='settings'||!state.connected)settingsDraft.clear();
   if(state.view==='faqs')bindFaqView(state,$('#workspace'),render);
   if(state.view==='newsletter')newsletterAdmin.mount($('#workspace'));
   if(state.view==='promos' && owner())newsletterOffers.mount($('#workspace'));
   syncVisitorPolling();
   syncPromoStatuses();if(state.view==='orders')syncOrderPrintSelection();
 }
+function orderFilters(){return {...state.filters,task:state.orderTaskView};}
+function scopedParams(view=state.view){
+ if(view==='orders')return {...orderFilters(),page:state.orderPage,limit:state.orderPageSize};
+ if(view==='analytics'){const filter=state.analyticsFilter;return filter.period==='custom'?{start:filter.start,end:filter.end}:analyticsDateRange(filter.period,manilaDate());}
+ return {...state.productionRange};
+}
+function applyScopedRead(view,value){
+ if(view==='orders'){state.orders=value.orders;state.orderTotal=value.total;state.orderPage=value.page;state.orderPageLoading=false;}
+ else if(view==='analytics')state.analyticsReport=value;
+ else if(view==='production')state.productionReport=value;
+}
+function scopedViewReady(){
+ if(!state.connected||!state.scopedReads||!['orders','analytics','production'].includes(state.view))return true;
+ const view=state.view,params=scopedParams(view),key=adminReads.key(view,params),value=adminReads.peek(view,params);
+ if(value){applyScopedRead(view,value);return true;}
+ const title={orders:'Orders',analytics:'Analytics',production:'Production'}[view];
+ if(scopedError?.key===key){$('#workspace').innerHTML=heading(title,'Your saved data is still available.')+`<section class="panel"><p class="notice danger" role="alert">${esc(scopedError.message)}</p><button class="button" data-action="refresh">Try again</button></section>`;return false;}
+ $('#workspace').innerHTML=heading(title,'Loading your latest shop information…')+'<section class="panel"><p role="status">Loading…</p></section>';
+ if(scopedPendingKey!==key){const epoch=scopedGeneration;scopedPendingKey=key;adminReads.load(view,params).then(()=>{
+  if(epoch!==scopedGeneration||!state.connected)return;scopedPendingKey=null;if(state.view===view&&adminReads.key(view,scopedParams(view))===key)render();
+ }).catch(error=>{if(epoch!==scopedGeneration||!state.connected)return;scopedPendingKey=null;scopedError={key,message:error.message||'Could not load this view. Please try again.'};if(state.view===view)render();});}
+ return false;
+}
+function orderPagination(){
+ if(!state.scopedReads)return '';
+ const total=state.orderTotal,start=total?state.orderPage*state.orderPageSize+1:0,end=Math.min(total,(state.orderPage+1)*state.orderPageSize),busy=state.orderPageLoading;
+ return `<div class="order-pagination"><p class="muted" role="status">${busy?'Loading matching orders…':`Showing ${start}–${end} of ${total} matching orders`}</p><div class="row-actions"><button type="button" class="button button-secondary" data-action="order-page" data-direction="-1" ${busy||!state.orderPage?'disabled':''}>Previous</button><button type="button" class="button button-secondary" data-action="order-page" data-direction="1" ${busy||end>=total?'disabled':''}>Next</button></div></div><p class="help-text">The checkbox selects this page. Select all matching orders to print across pages. CSV export includes every matching order.</p>`;
+}
+function showOrderLoading(){
+ if(state.view!=='orders'||!$('#order-table'))return;
+ state.orderPageLoading=true;state.selectedOrderId=null;syncOrderQuickPanel();$('#order-table').innerHTML='<p class="muted" role="status">Loading matching orders…</p>';$('#order-count').textContent='Loading…';$('#order-pagination').innerHTML=orderPagination();syncOrderPrintSelection();
+ const all=$('[data-action=select-matching-orders]');if(all)all.disabled=true;
+}
+async function requestOrderPage(){
+ if(!state.connected||!state.scopedReads||state.view!=='orders')return;
+ const params=scopedParams('orders'),key=adminReads.key('orders',params),epoch=scopedGeneration;showOrderLoading();
+ try{const value=await adminReads.load('orders',params);if(epoch!==scopedGeneration||state.view!=='orders'||adminReads.key('orders',scopedParams('orders'))!==key)return;applyScopedRead('orders',value);if($('#order-table'))updateOrderResults();else render();}
+ catch(error){if(epoch!==scopedGeneration||state.view!=='orders'||adminReads.key('orders',scopedParams('orders'))!==key)return;if(!$('#order-table')){scopedError={key,message:error.message};render();return;}$('#order-table').innerHTML=`<p class="notice danger" role="alert">${esc(error.message||'Could not load matching orders. Refresh and try again.')}</p>`;$('#order-count').textContent='Results unavailable';}
+}
+
 function flavorMenusView() {
   return heading('Flavor menus', 'Plan the flavors you showcase, month by month.', `<button class="button button-secondary" data-action="categories">Arrange categories</button><button class="button button-secondary" data-action="reorder-products" ${ownerLocked()}>Arrange flavors</button><button class="button button-secondary" data-view="flavors">Photos & ordering settings</button><button class="button" data-action="edit-flavor-menu" ${ownerLocked()}>+ Add flavor</button>`) + readonly() + '<p class="notice">Lineups determine which flavors can have stock for each month. Publish a lineup to show it and allow orders. Hidden flavors cannot be ordered. Shop closures always take priority.</p>' + renderFlavorMenus(state, { today: manilaDate(), esc, disabled: ownerLocked() });
 }
@@ -269,9 +324,10 @@ function editFlavorMenu(id) {
   const form = $("[data-form=flavor-menu-editor]");
   form.dataset.expectedCurrentMonth = String(fieldChecked(form, "current_month"));
   form.dataset.expectedNextMonth = String(fieldChecked(form, "next_month"));
+  catalogDraft.mount(form,{reset:true});
 }
 function productionView() {
-  const report=buildProduction(state.orders,state.productionRange.from,state.productionRange.to);
+  const report=state.scopedReads?state.productionReport:buildProduction(state.orders,state.productionRange.from,state.productionRange.to);
   return heading('Production', 'Your confirmed orders, translated into cheesecake pieces and boxes.', `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh orders</button>`) + `<section class="panel production-date-panel"><form data-form="production-range" class="production-filter">${formError}${productionCalendar(state.productionRange,manilaDate(),state.productionMode)}<div class="production-picker-footer"><span>Totals use pickup / delivery dates.</span><button class="button" type="submit">View production</button></div></form></section>` + renderProduction(report,{esc,dateLabel:humanDate});
 }
 function analyticsView() {
@@ -279,15 +335,15 @@ function analyticsView() {
 }
 function overviewView() {
   const today = manilaDate();
-  const todayOrders = state.orders.filter(o => o.fulfillment_date === today && isActiveFulfillment(o));
-  const reviews = state.orders.filter(needsPaymentReview);
-  const upcoming = state.orders.filter(o => o.fulfillment_date >= today && isActiveFulfillment(o)).sort((a, b) => a.fulfillment_date.localeCompare(b.fulfillment_date));
+  const todayOrders = state.scopedReads?null:state.orders.filter(o => o.fulfillment_date === today && isActiveFulfillment(o));
+  const reviews = state.scopedReads?null:state.orders.filter(needsPaymentReview);
+  const upcoming = state.scopedReads?state.reporting.overview_orders:state.orders.filter(o => o.fulfillment_date >= today && isActiveFulfillment(o)).sort((a, b) => a.fulfillment_date.localeCompare(b.fulfillment_date));
   const activeProducts = state.products.filter(p => p.active).length;
   return heading('A little overview', `Your kitchen, at a glance. ${humanDate(today)} · Manila`, `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh</button>${owner()?'<button class="button button-secondary" data-view="newsletter" data-newsletter-tab="campaigns">Create newsletter</button>':''}<a class="button" href="order.html">Open shop ↗</a>`) +
     `<div class="metric-grid">${[
-      ['Today’s orders', todayOrders.length, 'Pickup and delivery, active orders'],
-      ['Payments to review', reviews.length, 'Proof received · quantities held'],
-      ['Upcoming orders', upcoming.length, 'Scheduled today and beyond'],
+      ['Today’s orders', state.scopedReads?state.reporting.order_summary.today:todayOrders.length, 'Pickup and delivery, active orders'],
+      ['Payments to review', state.scopedReads?state.reporting.order_summary.review:reviews.length, 'Proof received · quantities held'],
+      ['Upcoming orders', state.scopedReads?state.reporting.order_summary.upcoming:upcoming.length, 'Scheduled today and beyond'],
       ['Active products', activeProducts, 'Availability set by product and date']
     ].map(([title, value, note]) => `<div class="panel metric-card"><div class="metric-label">${title}<span aria-hidden="true">↗</span></div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></div>`).join('')}</div>
     ${state.connected?renderAttention(state,{esc,dateTime}):''}
@@ -303,26 +359,29 @@ function emailStatusCard() {
   return `<section class="panel" style="margin-top:22px"><div class="section-heading"><h2>Email delivery</h2></div>${rows.length ? `<p class="muted">Latest ${rows.length} notifications: ${Object.entries(counts).map(([status, count]) => `${count} ${label(status).toLowerCase()}`).map(esc).join(' · ')}</p>` : '<p class="muted">No order notifications queued yet. Email sending requires the configured email service and scheduler.</p>'}${problems.map(row => `<div class="notice email-alert ${row.status === 'skipped' ? '' : 'danger'}"><strong>${esc(label(row.event_type))}</strong> · ${esc(state.orders.find(o => o.id === row.order_id)?.reference || 'Order notification')}<p>${esc(row.last_error)}</p><button class="button button-secondary" data-action="review-email-alert" data-id="${esc(row.id)}">Acknowledge &amp; dismiss</button></div>`).join('')}${reviewed.length ? `<details class="email-reviewed"><summary>Reviewed notifications (${reviewed.length})</summary>${reviewed.map(row => `<p><strong>${esc(label(row.event_type))}</strong> · ${esc(label(row.status))}<br>${esc(row.last_error)}</p>`).join('')}</details>` : ''}<p class="help-text no-margin">Queued or pending messages have not been confirmed delivered. A sent status means the email provider accepted the message; check the recipient inbox during acceptance testing.</p></section>`;
 }
 function filteredOrders() {
+  if(state.scopedReads)return state.orders;
   const f = state.filters;
   const query = f.search.toLowerCase();
   return state.orders.filter(o => matchesOrderView(o,state.orderTaskView,manilaDate()) && (!query || `${o.reference} ${o.buyer?.name || ''} ${o.buyer?.email || ''} ${o.buyer?.phone || ''}`.toLowerCase().includes(query)) && (!f.payment || (f.payment === 'under_review' ? needsPaymentReview(o) : o.payment_status === f.payment)) && matchesFulfillmentStatus(o, f.fulfillment) && (!f.date || o.fulfillment_date === f.date) && (!f.method || o.method === f.method) && (!f.refund || Boolean(o.refund_label) === (f.refund === 'yes')) && (!f.upcoming || o.fulfillment_date >= manilaDate() && isActiveFulfillment(o))).sort((a, b) => f.upcoming ? a.fulfillment_date.localeCompare(b.fulfillment_date) : b.created_at.localeCompare(a.created_at));
 }
 function orderTable(orders, compact = false) {
+  const selectionHeader=compact?'':`<th class="order-select-cell"><input type="checkbox" id="select-print-orders" aria-label="${state.scopedReads?'Select this page for printing':'Select all shown orders for printing'}"></th>`;
   if (!orders.length) return empty('No orders to show', 'Orders matching your filters will appear here.');
-  return `<div class="table-wrap"><table class="data-table"><thead><tr>${compact ? '' : '<th class="order-select-cell"><input type="checkbox" id="select-print-orders" aria-label="Select all shown orders for printing"></th>'}<th>Order / customer</th><th>Fulfillment</th><th>Payment</th>${compact ? '' : '<th>Next step</th>'}<th>Total</th></tr></thead><tbody>${orders.map(order => `<tr ${!compact?`data-order-row="${esc(order.id)}" class="${order.id===state.selectedOrderId?'order-selected':''}"`:''}>${compact ? '' : `<td class="order-select-cell"><input type="checkbox" data-print-order="${esc(order.id)}" aria-label="Select ${esc(order.reference)} for printing" ${state.printSelection.has(order.id) ? 'checked' : ''}></td>`}<td><button class="table-link" data-action="open-order" data-id="${esc(order.id)}">${esc(order.reference)}</button><small>${esc(order.buyer?.name || 'Client not recorded')}${order.refund_label ? ' · Refund label' : ''}</small></td><td>${esc(humanDate(order.fulfillment_date))}<small>${esc(order.order_source==='in_person'?'In-person sale':label(order.method))}</small></td><td>${badge(order.payment_status)}</td>${compact ? '' : `<td><span class="order-next-heading">${esc(orderNextStep(order).title)}</span>${badge(fulfillmentStatus(order))}<button type="button" class="table-link order-select-action" data-action="select-order" data-id="${esc(order.id)}" aria-label="Quick actions for ${esc(order.reference)}" aria-controls="order-quick-panel" aria-expanded="${order.id===state.selectedOrderId}">Quick actions →</button></td>`}<td>${money(order.total_cents)}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="data-table"><thead><tr>${selectionHeader}<th>Order / customer</th><th>Fulfillment</th><th>Payment</th>${compact ? '' : '<th>Next step</th>'}<th>Total</th></tr></thead><tbody>${orders.map(order => `<tr ${!compact?`data-order-row="${esc(order.id)}" class="${order.id===state.selectedOrderId?'order-selected':''}"`:''}>${compact ? '' : `<td class="order-select-cell"><input type="checkbox" data-print-order="${esc(order.id)}" aria-label="Select ${esc(order.reference)} for printing" ${state.printSelection.has(order.id) ? 'checked' : ''}></td>`}<td><button class="table-link" data-action="open-order" data-id="${esc(order.id)}">${esc(order.reference)}</button><small>${esc(order.buyer?.name || 'Client not recorded')}${order.refund_label ? ' · Refund label' : ''}</small></td><td>${esc(humanDate(order.fulfillment_date))}<small>${esc(order.order_source==='in_person'?'In-person sale':label(order.method))}</small></td><td>${badge(order.payment_status)}</td>${compact ? '' : `<td><span class="order-next-heading">${esc(orderNextStep(order).title)}</span>${badge(fulfillmentStatus(order))}<button type="button" class="table-link order-select-action" data-action="select-order" data-id="${esc(order.id)}" aria-label="Quick actions for ${esc(order.reference)}" aria-controls="order-quick-panel" aria-expanded="${order.id===state.selectedOrderId}">Quick actions →</button></td>`}<td>${money(order.total_cents)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function syncOrderPrintSelection() {
   if (state.view !== 'orders') return;
   const shown = new Set(filteredOrders().map(order => order.id));
-  state.printSelection.forEach(id => { if (!shown.has(id)) state.printSelection.delete(id); });
+  if(!state.scopedReads)state.printSelection.forEach(id => { if (!shown.has(id)) state.printSelection.delete(id); });
   const count = state.printSelection.size;
   const all = $('#select-print-orders');
-  if (all) { all.checked = count > 0 && count === shown.size; all.indeterminate = count > 0 && count < shown.size; }
+  const pageSelected=[...shown].filter(id=>state.printSelection.has(id)).length;
+  if(all){all.checked=shown.size>0&&pageSelected===shown.size;all.indeterminate=pageSelected>0&&pageSelected<shown.size;all.disabled=state.orderPageLoading;}
   $$('[data-print-order]').forEach(box => { box.checked = state.printSelection.has(box.dataset.printOrder); });
   const status = $('#print-selection-count');
-  if (status) status.textContent = `${count} selected`;
+  if(status)status.textContent=`${count} selected${state.scopedReads?' across pages':''}`;
   const button = $('[data-action="print-selected-orders"]');
-  if (button) { button.disabled = !count || !state.connected; button.textContent = count ? `Print selected (${count})` : 'Print selected'; }
+  if (button) { button.disabled = !count || !state.connected || state.orderPageLoading; button.textContent = count ? `Print selected (${count})` : 'Print selected'; }
   const clear = $('[data-action="clear-print-selection"]');
   if (clear) clear.disabled = !count;
 }
@@ -340,10 +399,10 @@ async function loadPrintOrders(ids) {
 function ordersView() {
   const f = state.filters,shown=filteredOrders();
   if(!shown.some(o=>o.id===state.selectedOrderId))state.selectedOrderId=null;
-  return heading('Orders', 'From the first checkout to the final handoff.', `<button class="button button-secondary" data-action="export-orders" ${locked()}>Export CSV</button><button class="button" data-action="refresh" ${locked()}>Refresh orders</button>`) + orderViewTabs() + `<div class="orders-dashboard${state.selectedOrderId?' has-order-selection':''}"><section class="panel"><div class="filters"><label>Search<input type="search" id="order-search" data-filter="search" placeholder="Reference, name, email, or phone" value="${esc(f.search)}"></label><label>Payment<select data-filter="payment">${options(PAYMENT, f.payment, 'All payment statuses')}</select></label><label>Fulfillment<select data-filter="fulfillment">${options(FULFILLMENT, f.fulfillment, 'All fulfillment statuses')}</select></label><label>Method<select data-filter="method">${options(['pickup', 'delivery'], f.method, 'Pickup & delivery')}</select></label></div><div class="filter-secondary">${input('filter-date', 'Fulfillment date', f.date, 'date', 'data-filter="date"')}${select('filter-refund', 'Refund label', option('', 'All orders', f.refund) + option('yes', 'With Refund label', f.refund) + option('no', 'Without Refund label', f.refund), 'data-filter="refund"')}<label class="check-field no-margin"><input type="checkbox" data-filter="upcoming" ${f.upcoming ? 'checked' : ''}>Upcoming, grouped by date</label><button class="button button-quiet" data-action="clear-filters">Clear filters</button></div><div class="section-heading"><h2 class="order-view-title">${orderViewTitle()}</h2><p class="muted no-margin" id="order-count">${filteredOrders().length} orders</p></div><div class="order-print-actions"><p id="print-selection-count" aria-live="polite">0 selected</p><button class="button button-secondary" data-action="print-selected-orders" disabled>Print selected</button><button class="button button-quiet" data-action="clear-print-selection" disabled>Clear selection</button></div><div id="order-table">${orderTable(shown)}</div></section><aside class="panel order-quick-panel" id="order-quick-panel" aria-label="Selected order" ${state.selectedOrderId?'':'hidden'}>${currentOrderPanel()}</aside></div>`;
+  return heading('Orders', 'From the first checkout to the final handoff.', `<button class="button button-secondary" data-action="export-orders" ${locked()}>Export CSV</button><button class="button" data-action="refresh" ${locked()}>Refresh orders</button>`) + orderViewTabs() + `<div class="orders-dashboard${state.selectedOrderId?' has-order-selection':''}"><section class="panel"><div class="filters"><label>Search<input type="search" id="order-search" data-filter="search" placeholder="Reference, name, email, or phone" value="${esc(f.search)}"></label><label>Payment<select data-filter="payment">${options(PAYMENT, f.payment, 'All payment statuses')}</select></label><label>Fulfillment<select data-filter="fulfillment">${options(FULFILLMENT, f.fulfillment, 'All fulfillment statuses')}</select></label><label>Method<select data-filter="method">${options(['pickup', 'delivery'], f.method, 'Pickup & delivery')}</select></label></div><div class="filter-secondary">${input('filter-date', 'Fulfillment date', f.date, 'date', 'data-filter="date"')}${select('filter-refund', 'Refund label', option('', 'All orders', f.refund) + option('yes', 'With Refund label', f.refund) + option('no', 'Without Refund label', f.refund), 'data-filter="refund"')}<label class="check-field no-margin"><input type="checkbox" data-filter="upcoming" ${f.upcoming ? 'checked' : ''}>Upcoming, grouped by date</label><button class="button button-quiet" data-action="clear-filters">Clear filters</button></div><div class="section-heading"><h2 class="order-view-title">${orderViewTitle()}</h2><p class="muted no-margin" id="order-count">${state.scopedReads?state.orderTotal:filteredOrders().length} orders</p></div><div class="order-print-actions"><p id="print-selection-count" aria-live="polite">0 selected</p><button class="button button-secondary" data-action="print-selected-orders" disabled>Print selected</button><button class="button button-quiet" data-action="clear-print-selection" disabled>Clear selection</button>${state.scopedReads?`<button class="button button-quiet" data-action="select-matching-orders" ${!state.orderTotal?'disabled':''}>Select all ${state.orderTotal} matching orders</button>`:''}</div><div id="order-table">${orderTable(shown)}</div><div id="order-pagination">${orderPagination()}</div></section><aside class="panel order-quick-panel" id="order-quick-panel" aria-label="Selected order" ${state.selectedOrderId?'':'hidden'}>${currentOrderPanel()}</aside></div>`;
 }
 function orderViewTitle(){return {all:'All orders',review:'Needs review',today:'Due today'}[state.orderTaskView]||'All orders';}
-function orderViewTabs(){return `<div class="order-view-tabs" role="group" aria-label="Order views">${[['review','Needs review'],['today','Due today'],['all','All orders']].map(([id,title])=>`<button type="button" class="button" data-action="order-view" data-order-view="${id}" aria-pressed="${state.orderTaskView===id}">${title}<span>${state.orders.filter(o=>matchesOrderView(o,id,manilaDate())).length}</span></button>`).join('')}</div>`;}
+function orderViewTabs(){return `<div class="order-view-tabs" role="group" aria-label="Order views">${[['review','Needs review'],['today','Due today'],['all','All orders']].map(([id,title])=>`<button type="button" class="button" data-action="order-view" data-order-view="${id}" aria-pressed="${state.orderTaskView===id}">${title}<span>${state.scopedReads?state.reporting.order_summary[id]:state.orders.filter(o=>matchesOrderView(o,id,manilaDate())).length}</span></button>`).join('')}</div>`;}
 function currentOrderPanel(){const order=state.orders.find(o=>o.id===state.selectedOrderId);return order?`<button type="button" class="order-quick-close" data-action="close-quick-order" aria-label="Close quick actions">×</button>${orderQuickPanel(order,{escapeHtml:esc,money,formatDate:humanDate,locked:!state.connected})}`:'';}
 function syncOrderQuickPanel(){
  const panel=$('#order-quick-panel');panel.hidden=!state.selectedOrderId;panel.innerHTML=currentOrderPanel();
@@ -356,7 +415,9 @@ function closeQuickOrder(){
 }
 function updateOrderResults(){
  const orders=filteredOrders();if(!orders.some(o=>o.id===state.selectedOrderId))state.selectedOrderId=null;
- $('#order-table').innerHTML=orderTable(orders);$('#order-count').textContent=`${orders.length} orders`;
+ $('#order-table').innerHTML=orderTable(orders);$('#order-count').textContent=`${state.scopedReads?state.orderTotal:orders.length} orders`;
+ if($('#order-pagination'))$('#order-pagination').innerHTML=orderPagination();
+ const selectAll=$('[data-action=select-matching-orders]');if(selectAll){selectAll.textContent=`Select all ${state.orderTotal} matching orders`;selectAll.disabled=!state.orderTotal||state.orderPageLoading;}
  syncOrderQuickPanel();syncOrderPrintSelection();
 }
 function selectQuickOrder(id){
@@ -446,15 +507,16 @@ function promoUsage(promo) {
   return `<strong>${promo.usage_count} / ${promo.global_limit}</strong><small>${promo.redeemed_count} paid · ${promo.reserved_count} reserved</small>`;
 }
 function filteredPromos(now = Date.now()) {
-  return state.promos.filter(promo => !state.promoFilter || promoStatus(promo, now) === state.promoFilter);
+  const search=state.promoSearch.trim().toLocaleLowerCase();
+  return state.promos.filter(promo => (!state.promoFilter || promoStatus(promo, now) === state.promoFilter)&&(!search||promo.code.toLocaleLowerCase().includes(search)));
 }
 function promoResults(now = Date.now()) {
   const promos = filteredPromos(now);
-  return `<p class="muted" role="status">Showing ${promos.length} of ${state.promos.length} promo codes</p><section class="panel">${promos.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Code</th><th>Discount</th><th>Minimum products</th><th>Uses / total limit</th><th>Per account</th><th>Expires · Manila</th><th>Status</th><th></th></tr></thead><tbody>${promos.map(promo => `<tr><td><strong>${esc(promo.code)}</strong></td><td>${promo.kind === 'percent' ? `${promo.value}%` : money(promo.value)}${promo.cap_cents && promo.kind === 'percent' ? `<small>Up to ${money(promo.cap_cents)}</small>` : ''}</td><td>${money(promo.min_subtotal_cents)}</td><td>${promoUsage(promo)}</td><td>${promo.per_account_limit} uses</td><td>${esc(dateTime(promo.expires_at))}</td><td>${badge(promoStatus(promo, now))}</td><td><div class="row-actions"><button class="table-link" data-action="edit-promo" data-id="${esc(promo.id)}">Edit</button><button type="button" class="table-link" data-action="delete-promo" data-id="${esc(promo.id)}" aria-label="Delete promo ${esc(promo.code)}" ${ownerLocked()}>Delete</button></div></td></tr>`).join('')}</tbody></table></div>` : empty(state.promos.length ? 'No matching promo codes' : 'A thoughtful extra, when you’re ready', state.promos.length ? 'Choose another status to see your other promo codes.' : 'Create percentage or fixed-amount discounts with minimum spend and usage limits.')}</section>`;
+  return `<p class="muted" role="status">Showing ${promos.length} of ${state.promos.length} promo codes</p><section class="panel">${promos.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Code</th><th>Discount</th><th>Minimum products</th><th>Uses / total limit</th><th>Per account</th><th>Expires · Manila</th><th>Status</th><th></th></tr></thead><tbody>${promos.map(promo => `<tr><td><strong>${esc(promo.code)}</strong></td><td>${promo.kind === 'percent' ? `${promo.value}%` : money(promo.value)}${promo.cap_cents && promo.kind === 'percent' ? `<small>Up to ${money(promo.cap_cents)}</small>` : ''}</td><td>${money(promo.min_subtotal_cents)}</td><td>${promoUsage(promo)}</td><td>${promo.per_account_limit} uses</td><td>${esc(dateTime(promo.expires_at))}</td><td>${badge(promoStatus(promo, now))}</td><td><div class="row-actions"><button class="table-link" data-action="edit-promo" data-id="${esc(promo.id)}">Edit</button><button type="button" class="table-link" data-action="delete-promo" data-id="${esc(promo.id)}" aria-label="Delete promo ${esc(promo.code)}" ${ownerLocked()}>Delete</button></div></td></tr>`).join('')}</tbody></table></div>` : empty(state.promos.length ? 'No matching promo codes' : 'A thoughtful extra, when you’re ready', state.promos.length ? 'Try another code or status to see your other promo codes.' : 'Create percentage or fixed-amount discounts with minimum spend and usage limits.')}</section>`;
 }
 function promosView() {
   return heading('A little treat', 'Promo codes for customers with verified email accounts.', `<button class="button" data-action="new-promo" ${owner() ? '' : 'disabled'}>+ Create promo code</button>`) + readonly() +
-    `<h2 class="regular-promo-heading">Regular promo codes</h2><div class="filter-secondary">${select('promo-status-filter', 'Status', option('', 'All promo codes', state.promoFilter) + option('active', 'Active', state.promoFilter) + option('expired', 'Expired', state.promoFilter) + option('inactive', 'Inactive', state.promoFilter), 'id="promo-status-filter" aria-controls="promo-results" aria-describedby="promo-filter-help"')}<p id="promo-filter-help" class="muted">Inactive codes have not expired, but are disabled or not yet activated.</p></div><div id="promo-results">${promoResults()}</div><p class="muted">Discounts apply to products and option surcharges. Delivery fees are excluded. Paid and reserved uses both count toward the total limit. Reservations include orders awaiting payment or payment review; expired, rejected or cancelled unpaid orders release them. Paid cancellations and refunds remain counted.</p>${owner()?`<div class="newsletter-promo-section">${newsletterOffers.render()}</div>`:''}`;
+    `<h2 class="regular-promo-heading">Regular promo codes</h2><div class="filter-secondary regular-promo-filters">${input('promo-search', 'Search codes', state.promoSearch, 'search', 'id="promo-search" placeholder="Search regular codes" aria-controls="promo-results"')}${select('promo-status-filter', 'Status', option('', 'All promo codes', state.promoFilter) + option('active', 'Active', state.promoFilter) + option('expired', 'Expired', state.promoFilter) + option('inactive', 'Inactive', state.promoFilter), 'id="promo-status-filter" aria-controls="promo-results" aria-describedby="promo-filter-help"')}<p id="promo-filter-help" class="muted">Inactive codes have not expired, but are disabled or not yet activated.</p></div><div id="promo-results">${promoResults()}</div><p class="muted">Discounts apply to products and option surcharges. Delivery fees are excluded. Paid and reserved uses both count toward the total limit. Reservations include orders awaiting payment or payment review; expired, rejected or cancelled unpaid orders release them. Paid cancellations and refunds remain counted.</p>${owner()?`<div class="newsletter-promo-section">${newsletterOffers.render()}</div>`:''}`;
 }
 function deletePromoDialog(id) {
   const promo = state.promos.find(item => item.id === id);
@@ -473,11 +535,13 @@ function teamView() {
 }
 
 function openProduct(id) {
+  catalogDraft.clear();
   productCopy = null;
   productDraft = clone(state.products.find(p => p.id === id) || { kind: state.view === 'flavors' ? 'flavor' : 'set', box_flavors: [], price_confirmed: false, in_rotation: true, name: '', description: '', category_id: '', price_cents: 0, min_quantity: 1, lead_days: 1, active: false, pickup_only: false, allow_same_day: false, photos: [], option_groups: [], sort_order: 0 });
   renderProductDialog();
 }
 function duplicateProduct(id) {
+  catalogDraft.clear();
   if (!owner() || !state.connected) return;
   const source = state.products.find(p => p.id === id && !p.deleted_at);
   if (!source) return;
@@ -533,7 +597,7 @@ function bindPhotoOrder() {
       const [photo] = productDraft.photos.splice(from, 1);
       productDraft.photos.splice(to, 0, photo);
       $('#product-photo-order').innerHTML = renderProductPhotos(productDraft.photos, { escapeHtml: esc, safeImage, disabled: false });
-      bindPhotoOrder();
+      bindPhotoOrder();catalogDraft.sync();
       $('#photo-order-status').textContent = `Photo moved to position ${to + 1} of ${productDraft.photos.length}.${to === 0 ? ' This is the menu cover.' : ''}`;
       $(`[data-photo-move="${to}"]`).focus({ preventScroll: true });
     },
@@ -544,7 +608,7 @@ function updateProductPhotos() {
   const anchor = $('#product-photos'), before = anchor?.getBoundingClientRect().top;
   clearPhotoDrag();
   $('#product-photo-order').innerHTML = renderProductPhotos(productDraft.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) });
-  bindPhotoOrder();
+  bindPhotoOrder();catalogDraft.sync();
   if (anchor && Number.isFinite(before)) modal.scrollTop += anchor.getBoundingClientRect().top - before;
   $('#photo-order-status').textContent = `${productDraft.photos.length} photo${productDraft.photos.length === 1 ? '' : 's'}. Save the item to keep your changes.`;
 }
@@ -575,6 +639,7 @@ function renderProductDialog() {
   </form>`);
   bindPhotoOrder();
   updateProductLabelPreview();
+  catalogDraft.mount($('[data-form=product]'));
   for (const name of ['label_enabled', 'label_text', 'label_color']) $('[data-form="product"]').elements.namedItem(name).addEventListener('input', updateProductLabelPreview);
   $('[data-form="product"]').elements.namedItem('kind').addEventListener('change', () => { captureProduct(); renderProductDialog(); });
 }
@@ -835,14 +900,19 @@ async function onAction(button) {
     case 'reset-quantities': monthDrafts.clear(state.inventoryMonth);state.inventoryDrafts = {}; updateInventoryProducts(); break;
     case 'close-dialog': closeDialog(); break;
     case 'refresh': await Promise.all([refresh(), visitorPoller.refresh()]); toast('Dashboard refreshed.'); break;
-    case 'upcoming': state.filters.upcoming = true; state.view = 'orders'; render(); break;
-    case 'clear-filters': state.filters = { search: '', payment: '', fulfillment: '', date: '', method: '', refund: '', upcoming: false }; state.printSelection.clear(); render(); break;
+    case 'upcoming': state.filters.upcoming=true;state.orderPage=0;state.view='orders';render();break;
+    case 'clear-filters': state.orderPage=0;state.filters = { search: '', payment: '', fulfillment: '', date: '', method: '', refund: '', upcoming: false }; state.printSelection.clear(); render(); break;
     case 'clear-print-selection': state.printSelection.clear(); syncOrderPrintSelection(); break;
     case 'print-selected-orders': {
-      const ids = filteredOrders().filter(order => state.printSelection.has(order.id)).map(order => order.id);
-      if (ids.length) await printOrderSlips(() => loadPrintOrders(ids), { products: state.products, settings: state.settings });
+      const selected=new Set(state.printSelection),filters=orderFilters(),scoped=state.scopedReads;
+      if(selected.size)await printOrderSlips(async()=>{
+        const matches=scoped?(await api('admin_order_ids',filters)).ids:filteredOrders().map(order=>order.id);
+        return loadPrintOrders(matches.filter(id=>selected.has(id)));
+      }, { products: state.products, settings: state.settings });
       break;
     }
+    case 'order-page': state.orderPage=Math.max(0,state.orderPage+Number(button.dataset.direction));await requestOrderPage();break;
+    case 'select-matching-orders': {const filters=orderFilters(),key=JSON.stringify(filters),result=await api('admin_order_ids',filters);if(state.view==='orders'&&JSON.stringify(orderFilters())===key){state.printSelection=new Set(result.ids);syncOrderPrintSelection();}break;}
     case 'clear-product-filters':
       state.productFilters = { search: '', status: '', category: '' };
       $$('[data-product-filter]').forEach(control => { control.value = ''; });
@@ -865,7 +935,7 @@ async function onAction(button) {
       const affected=state.products.filter(p=>!p.deleted_at&&p.kind==='set'&&p.box_flavors?.includes(id));
       const detail=product.kind==='flavor' ? ' Boxes containing this flavor will become unavailable to order.'+(affected.length?' Affected boxes: '+affected.map(p=>p.name).join(', ')+'.':'') : ' This product will no longer be offered for new orders.';
       if(!await confirmDialog('Delete '+product.name+'?'+detail+' Existing orders and saved records will be preserved.',{title:'Delete '+(product.kind==='flavor'?'flavor':'product'),confirmLabel:'Delete',cancelLabel:'Keep item'}))return;
-      await api('delete_product',{id});closeDialog();await refresh();toast('Item deleted. Existing orders and records are preserved.');break;
+      await api('delete_product',{id});catalogDraft.clear();closeDialog();await refresh();toast('Item deleted. Existing orders and records are preserved.');break;
     }
     case 'categories': categoriesDialog(); break;
     case 'reorder-products': catalogOrderDialog('products'); break;
@@ -883,7 +953,7 @@ async function onAction(button) {
     case 'edit-promo': promoDialog(id); break;
     case 'delete-promo': deletePromoDialog(id); break;
     case 'load-team': await loadTeam(); break;
-    case 'order-view': state.selectedOrderId=null;state.orderTaskView=button.dataset.orderView;state.filters={search:'',payment:'',fulfillment:'',date:'',method:'',refund:'',upcoming:false};state.printSelection.clear();state.view='orders';render();$('[data-order-view="'+state.orderTaskView+'"]').focus({preventScroll:true});break;
+    case 'order-view': state.orderPage=0;state.selectedOrderId=null;state.orderTaskView=button.dataset.orderView;state.filters={search:'',payment:'',fulfillment:'',date:'',method:'',refund:'',upcoming:false};state.printSelection.clear();state.view='orders';render();$('[data-order-view="'+state.orderTaskView+'"]')?.focus({preventScroll:true});break;
     case 'select-order': selectQuickOrder(id);break;
     case 'close-quick-order': closeQuickOrder();break;
     case 'quick-order': await quickOrderAction(id,button.dataset.intent);break;
@@ -919,7 +989,7 @@ async function onAction(button) {
     case 'add-edit-item': captureEdit(); { const product = state.products.find(p => p.active) || state.products[0]; editDraft.items.push({ product_id: product.id, quantity: product.min_quantity || 1, selections: newSelections(product) }); } renderEditOrder(); break;
     case 'remove-edit-item': captureEdit(); editDraft.items.splice(index, 1); renderEditOrder(); break;
     case 'print-order': await printOrderSlips(activeOrder, { products: state.products, settings: state.settings }); break;
-    case 'export-orders': exportOrders(); break;
+    case 'export-orders': await exportOrders(); break;
   }
 }
 function csvCell(value) {
@@ -927,8 +997,8 @@ function csvCell(value) {
   if (/^[\s]*[=+\-@]/.test(text) || /^[\t\r\n]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
-function exportOrders() {
-  const orders = filteredOrders();
+async function exportOrders() {
+  const orders=state.scopedReads?(await api('admin_order_export',orderFilters())).orders:filteredOrders();
   if (!orders.length) { toast('There are no matching orders to export.'); return; }
   const rows = [['Order reference', 'Placed at (Asia/Manila)', 'Fulfillment date', 'Method', 'Payment status', 'Fulfillment status', 'Refund label', 'Buyer name', 'Buyer email', 'Buyer phone', 'Recipient name', 'Recipient phone', 'Address', 'Items', 'Subtotal PHP', 'Discount PHP', 'Delivery PHP', 'Current total PHP', 'Originally approved PHP', 'Payment reference', 'Instructions']];
   orders.forEach(o => rows.push([o.reference, dateTime(o.created_at), o.fulfillment_date, label(o.method), label(o.payment_status), label(fulfillmentStatus(o)), o.refund_label ? 'Yes' : 'No', o.buyer?.name, o.buyer?.email, o.buyer?.phone, o.recipient?.name, o.recipient?.phone, [o.address?.line1, o.address?.line2, o.address?.locality, o.address?.postal_code].filter(Boolean).join(', '), o.items.map(item => `${item.name} × ${item.quantity}${selectionText(item) ? ` (${selectionText(item)})` : ''}`).join('; '), amount(o.subtotal_cents), amount(o.discount_cents), amount(o.delivery_cents), amount(o.total_cents), o.paid_amount_cents == null ? '' : amount(o.paid_amount_cents), o.payment_reference, o.instructions]));
@@ -940,6 +1010,7 @@ function exportOrders() {
 
 document.addEventListener('click', async event => {
   const view = event.target.closest('[data-view]');
+  if(view&&state.view==='settings'&&view.dataset.view!==state.view&&!await settingsDraft.canLeave())return;
   if(view && state.view==='website-photos' && view.dataset.view!==state.view){const manager=$('#website-photos-manager');if(manager?.dataset.busy==='true'){toast('Please wait for the photo to finish saving.');return;}if(manager?.dataset.dirty==='true'&&!await confirmDialog('Discard unsaved website photo changes?',{title:'Unsaved photos',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;}
   if(view && state.view==='maintenance' && view.dataset.view!==state.view){const manager=$('#maintenance-manager');if(manager?.dataset.busy==='true'){toast('Please wait for maintenance settings to save.');return;}if(manager?.dataset.dirty==='true'&&!await confirmDialog('Discard unsaved maintenance settings?',{title:'Unsaved maintenance settings',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;}
   if(view && state.view==='affiliates' && view.dataset.view!==state.view){
@@ -963,6 +1034,7 @@ document.addEventListener('click', async event => {
 });
 document.addEventListener('input', event => {
   const target = event.target;
+  if(target.id==='promo-search'){state.promoSearch=target.value;syncPromoStatuses();return;}
   if (target.closest('[data-form="flavor-headings"]')) {
     state.headingDraftRevision ??= Number(target.form.dataset.editRevision);
     state.headingDraft = Object.fromEntries(['current','next','collection'].map(key => [key, fieldValue(target.form, key)]));
@@ -984,6 +1056,7 @@ document.addEventListener('input', event => {
   if (target.dataset.filter) {
     state.printSelection.clear();
     state.filters[target.dataset.filter] = target.type === 'checkbox' ? target.checked : target.value;
+    if(state.scopedReads){state.orderPage=0;rememberOrderView();clearTimeout(orderSearchTimer);if(target.dataset.filter==='search'){showOrderLoading();orderSearchTimer=setTimeout(()=>void requestOrderPage(),250);}else void requestOrderPage();return;}
     const orders = filteredOrders();
     $('#order-table').innerHTML = orderTable(orders);
     $('#order-count').textContent = `${orders.length} orders`;if(state.selectedOrderId&&!orders.some(o=>o.id===state.selectedOrderId))state.selectedOrderId=null;syncOrderQuickPanel();
@@ -1138,7 +1211,7 @@ document.addEventListener('submit', async event => {
   if (!form.reportValidity()) return;
   form.dataset.busy = 'true';
   const submit = event.submitter || $('button[type="submit"]', form); const previousText = submit.textContent;
-  const productControls = form.dataset.form === 'product' ? $$('input,select,textarea,button',form).filter(el => !el.disabled) : [];
+  const productControls = ['product','settings'].includes(form.dataset.form) ? $$('input,select,textarea,button',form).filter(el => !el.disabled) : [];
   productControls.forEach(el => el.disabled = true);
   submit.disabled = true; submit.textContent = 'Saving…';
   try {
@@ -1172,7 +1245,7 @@ async function submitForm(form, submitter) {
           if(impact.months.length&&!await confirmFlavorRemoval({heading:payload.name,items:impact.months.map(m=>({...m,label:monthLabel(m.month)})),description:'Removing this flavor stops new orders and clears its unsold stock for the months below.',saveLabel:'Save flavor'}, {parentDialog:modal,returnFocus:$('button[type=submit]',form)}))break;
         }
         if(!form.isConnected||!modal.open)break;
-        await api('save_flavor_editor',payload); closeDialog(); await refresh(); toast('Flavor and menu placements saved.');
+        await api('save_flavor_editor',payload); catalogDraft.clear();closeDialog(); await refresh(); toast('Flavor and menu placements saved.');
       } finally {controls.forEach((el,i)=>el.disabled=disabled[i]);}
       break;
     }
@@ -1202,7 +1275,7 @@ async function submitForm(form, submitter) {
       if (productDraft.option_groups.some(group => !group.choices.length || !group.choices.some(choice => choice.active))) throw new Error('Every option group needs at least one available choice.');
       await api('save_product', { product: savedProduct, ...(productDraft.id ? { expected_revision: editRevision(productDraft) } : {}) });
       form.dataset.busy = 'false';
-      closeDialog();
+      catalogDraft.clear();closeDialog();
       try { await refresh(); } catch (error) { toast('Product saved. Refresh the dashboard to see it.'); return; }
       toast(publication === 'draft' ? 'Draft saved. This product is hidden.' : publication === 'publish' ? 'Product published.' : 'Product saved.'); break;
     }
@@ -1248,7 +1321,7 @@ async function submitForm(form, submitter) {
       settings.nonproduction_dates = validDateList(fieldValue(form, 'nonproduction_dates'), 'Non-production dates');
       settings.blocked_dates = validDateList(fieldValue(form, 'blocked_dates'), 'Blocked fulfillment dates');
       settings.delivery_blocked_dates = validDateList(fieldValue(form, 'delivery_blocked_dates'), 'Blocked delivery dates');
-      await api('save_settings', { settings, ...editorVersion(form) }); await refresh(); toast('Shop settings saved.'); break;
+      await api('save_settings', { settings, ...editorVersion(form) });settingsDraft.clear();await refresh();toast('Shop settings saved.'); break;
     }
     case 'delete-promo':
       await api('delete_promo', { id: form.dataset.id });
@@ -1348,7 +1421,7 @@ async function init() {
     }
     staffUserId=data.session.user.id;
     auth.onAuthStateChange((event,next) => {
-      if(event==='SIGNED_OUT'||next?.user?.id&&next.user.id!==staffUserId){orderView.clear();monthDrafts.reset();staffUserId=null;bootstrapRequest++;state.connected=false;state.orders=[];state.inventoryDrafts={};state.inventoryDates=[];activeOrder=null;editDraft=null;orderEditBaseline=null;visitorPoller.reset();modal.close();$('#workspace').replaceChildren();location.replace('admin-account.html?next=manage.html');}
+      if(event==='SIGNED_OUT'||next?.user?.id&&next.user.id!==staffUserId){adminReads.invalidate();scopedGeneration++;clearTimeout(orderSearchTimer);orderView.clear();monthDrafts.reset();staffUserId=null;bootstrapRequest++;state.connected=false;state.orders=[];state.inventoryDrafts={};state.inventoryDates=[];activeOrder=null;editDraft=null;orderEditBaseline=null;visitorPoller.reset();modal.close();$('#workspace').replaceChildren();location.replace('admin-account.html?next=manage.html');}
     });
     await refresh();
     if(!state.connected||!staffUserId)return;

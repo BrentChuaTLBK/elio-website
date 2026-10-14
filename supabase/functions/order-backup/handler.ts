@@ -9,8 +9,12 @@ export async function syncBackup(client=google,dispatch=service,force=false){
  const info=client.info();if(info.configured)await dispatch('order_backup_identity',info);
  const start=await dispatch('order_backup_begin',{force});if(start.skipped)return start;
  let error:string|null=null,proof:any={};
- try{proof=await client.write(start.spreadsheet_id,start.snapshot,start.proof_archive_file_ids)||{};}catch(e){error=backupError(e);}
+ const checkpoint=async()=>{const checked=await dispatch('order_backup_checkpoint',{lease_token:start.lease_token,revision:start.revision});if(checked?.ok!==true)throw Error('Backup lease expired.');};
+ try{proof=await client.write(start.spreadsheet_id,start.snapshot,start.proof_archive_file_ids,{checkpoint,archiveRevisions:start.proof_archive_revisions||{}})||{};}catch(e){error=backupError(e);}
  const connection=await dispatch('order_backup_finish',{lease_token:start.lease_token,revision:start.revision,snapshot_at:start.snapshot.generated_at,active_count:start.snapshot.active_count,active_review_count:start.snapshot.active_review_count||0,paid_history_count:start.snapshot.paid_history_count,...proof,error});
+ // Only delete an app-tracked superseded revision after database completion.
+ // Cleanup failure cannot invalidate the already verified current backup.
+ if(!error&&'cleanup' in client)try{await client.cleanup(proof);}catch{/* Retain the extra revision for operator cleanup. */}
  return {ok:!error,connection};
 }
 export const handle=endpoint(async(request,headers)=>{

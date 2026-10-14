@@ -1,0 +1,20 @@
+{
+  "package": "crc-32",
+  "version": "1.2.2",
+  "license": "Apache-2.0",
+  "source": "https://registry.npmjs.org/crc-32/-/crc-32-1.2.2.tgz",
+  "integrity": "sha512-ROmzCKrTnOwybPcJApAA6WBWij23HVfGVNKqqrZpuyZOHqK2CwHSvpGuyt/UNNvaIjEd8X5IFGp4Mh+Ie1IHJQ==",
+  "adaptation": "Selected the local factory branch and appended an ES-module crc32 export; upstream algorithm unchanged.",
+  "files": [
+    {
+      "name": "LICENSE",
+      "bytes": 11355,
+      "sha256": "c542ba7851b5d39a5face477e47a27cb7c00a9759e321b66824e79718bffe1ac"
+    },
+    {
+      "name": "crc32.js",
+      "bytes": 3808,
+      "sha256": "1abb9eab83746c0520d3510ac2b2fb9dcd242df56498bb9104cb2a3c7d93c3d8"
+    }
+  ]
+}

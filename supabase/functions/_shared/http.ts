@@ -100,7 +100,7 @@ export function uuid(value: unknown, name = "Order ID"): string {
 // Read bounded bytes before parsing multipart/JSON, even for chunked requests.
 export async function readBody(request: Request, maximum: number): Promise<Uint8Array> {
   const declared = Number(request.headers.get("content-length"));
-  if (declared > maximum) throw new HttpError(413, "The upload is too large. Images must be 5 MB or smaller.");
+  if (declared > maximum) throw new HttpError(413, "The request body is too large.");
   if (!request.body) throw new HttpError(400, "The request body is empty.");
   const reader = request.body.getReader();
   const parts: Uint8Array[] = [];
@@ -111,7 +111,7 @@ export async function readBody(request: Request, maximum: number): Promise<Uint8
     total += value.byteLength;
     if (total > maximum) {
       await reader.cancel();
-      throw new HttpError(413, "The upload is too large. Images must be 5 MB or smaller.");
+      throw new HttpError(413, "The request body is too large.");
     }
     parts.push(value);
   }
@@ -147,6 +147,17 @@ export async function verifiedUser(request: Request, required = false): Promise<
   });
   const user = await response.json().catch(() => null);
   if (!response.ok || !user?.id) throw new HttpError(401, "Your session has expired. Sign in again.");
+  // Use the caller's verified JWT for the current database role/session check.
+  // A service-role request below cannot establish the caller's second factor.
+  const accessResponse = await fetch(`${url}/rest/v1/rpc/shop_api`, {
+    method: "POST",
+    headers: { apikey: key, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_action: "account_access", p_payload: {}, p_token: null }),
+    signal: AbortSignal.timeout(10000),
+  });
+  const access = await accessResponse.json().catch(() => null);
+  if (!accessResponse.ok || !access || !("role" in access)) throw new HttpError(503, "Your account access could not be verified. Please try again.");
+  if (access.role === "owner" && access.mfa_required !== false) throw new HttpError(403, "Verify your authenticator code in Team sign in before using owner tools.");
   return uuid(user.id, "User ID");
 }
 

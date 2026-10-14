@@ -100,6 +100,7 @@ const actualFetch=globalThis.fetch;
 globalThis.fetch=async(url,options)=>{
   calls.push(url);
   if(url.endsWith('/auth/v1/user'))return Response.json(expired?{}:{id:user},{status:expired?401:200});
+  if(url.endsWith('/rest/v1/rpc/shop_api'))return Response.json({role:'owner',mfa_required:false});
   if(url.endsWith('/rest/v1/rpc/shop_service')){
     assert.deepEqual(JSON.parse(options.body),{p_action:'authorize_analytics',p_payload:{user_id:user}});
     return denied?Response.json({message:'Authorized staff access required'},{status:403}):Response.json({allowed:true});
@@ -120,7 +121,7 @@ try {
     for(let i=0;i<2;i++){
       const response=await handle(req());assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.deepEqual(await response.json(),{status:'not_configured'});
     }
-    assert.equal(calls.length,4);
+    assert.equal(calls.length,6);
   });
   await test('CORS and HTTP method checks reject unsupported requests',async()=>{
     calls=[];assert.equal((await handle(req('test-session',{headers:{origin:'https://untrusted.example.test'}}))).status,403);

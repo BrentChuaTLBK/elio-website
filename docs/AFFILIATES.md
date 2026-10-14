@@ -43,12 +43,12 @@ With **All affiliates** selected, owners see overall product sales, commissions 
 
 Owners make transfers outside Elio, then choose **Record payment**. A positive amount, date, payment method and image receipt are required; reference and notes are optional and visible to the affiliate. Partial payments are supported. The saved payment reduces the available balance and automatically becomes an **Affiliate payouts** expense in Accounting on the payment date. No manual expense entry is needed for that payment. Unpaid earnings are shown in Affiliates, not recorded as a cash expense.
 
-New receipt uploads accept JPEG, PNG, HEIC/HEIF and WebP up to 20 MB. They are
-converted locally to WebP, with a maximum 3200-pixel longest edge and quality 94
-to preserve receipt text. Converted files must be at most 5 MB. PDFs are not
+New receipt uploads accept JPEG, PNG, HEIC/HEIF and WebP up to 20 MiB (20,971,520 bytes). The browser tries
+local WebP conversion, with a maximum 3200-pixel longest edge and quality 94
+to preserve receipt text. Converted files must be at most 5 MiB; when conversion fails, a structurally validated original may be retained up to the 20 MiB limit. PDFs are not
 supported. Existing receipts retain their original formats.
 
-The upload endpoint verifies Auth identity and then independently enforces owner permissions in the database. It validates image bytes (JPG/PNG/WebP, max 5 MB, retaining compatibility with older clients), stores in the private `affiliate-payout-proofs` bucket, and records the payment after rechecking the balance under a lock. Stable request IDs, cached conversion results and file/content fingerprints make retries safe. An ambiguous network result is checked before deleting any upload, preserving receipts for accepted payments.
+The upload endpoint verifies Auth identity and then independently enforces owner permissions in the database. It validates image bytes (JPEG/PNG/HEIC/HEIF/WebP, maximum 20 MiB), stores in the private `affiliate-payout-proofs` bucket, and records the payment after rechecking the balance under a lock. Stable request IDs, cached conversion results and file/content fingerprints make retries safe. An ambiguous network result is checked before deleting any upload, preserving receipts for accepted payments.
 
 Only an owner or the assigned affiliate can request a receipt link. Signed links expire after five minutes. No public Storage policy or direct client table access is granted. Use **Void record** with a reason to correct a mistaken entry; this restores the balance and removes its Accounting expense while keeping the original receipt and audit history. It does not transfer or retrieve money.
 

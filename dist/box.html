@@ -2,10 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="robots" content="index, follow">
+  <script id="elio-private-indexing">// Run in the head before customer data can render. Private links share public
+// HTML, but their order/authentication fragments must never become search pages.
+(() => {
+  'use strict';
+  const publicParameters = new Set(['product', 'collection', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_id', 'utm_content', 'utm_term']);
+  let privateVisit = false;
+  function protectPrivateVisit(force = false) {
+    const url = new URL(location.href);
+    privateVisit ||= force || [...url.searchParams.keys()].some(key => !publicParameters.has(key)) || (url.hash !== '' && !/^#[a-z][a-z0-9-]*$/i.test(url.hash));
+    if (!privateVisit) return;
+    const robots = document.querySelector('meta[name="robots"]') || document.head.appendChild(document.createElement('meta'));
+    robots.name = 'robots';
+    robots.content = 'noindex, nofollow';
+  }
+  protectPrivateVisit();
+  addEventListener('hashchange', () => protectPrivateVisit());
+  addEventListener('popstate', () => protectPrivateVisit());
+  addEventListener('elio-private-order', () => protectPrivateVisit(true));
+})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#3d251c">
-  <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="Explore the Elio box: three individual square Basque cheesecakes, beautifully boxed. Online ordering is coming soon.">
+  <meta name="description" content="Explore the Elio box: three individual square Basque cheesecakes, beautifully boxed. Discover premade boxes or build your own, with pickup and delivery options.">
   <title>The Elio box — Elio Basque Cheesecake</title>
   <link rel="icon" type="image/png" sizes="64x64" href="assets/elio-favicon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/elio-apple-touch-icon.png">
@@ -19,6 +38,7 @@
 <script type="module" src="assets/quantity-stepper.js"></script>
 <link rel="stylesheet" href="assets/site-maintenance.css?v=maintenance-2"><script type="module" src="assets/site-maintenance.js?v=maintenance-2"></script>
 <link rel="stylesheet" href="assets/site-analytics.css"><script type="module" src="assets/site-analytics.js"></script>
+<link rel="canonical" href="https://eliocheesecakes.com/box">
 </head>
 <body class="box-page">
   <a class="skip-link" href="#main">Skip to content</a>

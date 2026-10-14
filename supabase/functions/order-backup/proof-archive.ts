@@ -1,9 +1,17 @@
 import {credentials} from '../_shared/http.ts';
-import {BackupError,makeProofArchive as buildArchive} from '../../../dist/assets/admin/proof-archive.js';
+import {createHash} from 'node:crypto';
+import {BackupError,makeProofArchive as buildArchive,proofArchiveStream as buildStream} from '../../../dist/assets/admin/proof-archive.js';
 export {MAX_ARCHIVE_BYTES,zipFiles,sha256} from '../../../dist/assets/admin/proof-archive.js';
 const MAX_PROOF_BYTES=20*1024*1024;
 async function bounded(response:Response){
  if(!response.ok||!response.body||Number(response.headers.get('content-length'))>MAX_PROOF_BYTES)throw new BackupError('proof_files');
+ const declared=response.headers.get('content-length'),size=declared===null?null:Number(declared);
+ if(size!==null&&(!Number.isSafeInteger(size)||size<0))throw new BackupError('proof_files');
+ if(size!==null){
+  const bytes=new Uint8Array(size),reader=response.body.getReader();let at=0;
+  for(;;){const r=await reader.read();if(r.done)break;if(at+r.value.length>size){await reader.cancel();throw new BackupError('proof_files');}bytes.set(r.value,at);at+=r.value.length;}
+  if(at!==size)throw new BackupError('proof_files');return bytes;
+ }
  const reader=response.body.getReader(),chunks:Uint8Array[]=[];let length=0;
  for(;;){const r=await reader.read();if(r.done)break;length+=r.value.length;if(length>MAX_PROOF_BYTES){await reader.cancel();throw new BackupError('proof_files');}chunks.push(r.value);}
  const bytes=new Uint8Array(length);let at=0;for(const c of chunks){bytes.set(c,at);at+=c.length;}return bytes;
@@ -13,3 +21,4 @@ export async function readProof(path:string,{request=fetch,getCredentials=creden
 }
 
 export const makeProofArchive=(snapshot:any,download=readProof)=>buildArchive(snapshot,download);
+export const proofArchiveStream=(snapshot:any,download=readProof,options={})=>buildStream(snapshot,download,{...options,hashFactory:()=>createHash('sha256')});

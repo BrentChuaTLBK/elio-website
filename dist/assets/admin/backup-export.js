@@ -1,5 +1,5 @@
 import {activeRecoveryOrders,recoveryFlavors,recoveryEnvelope,validateRecovery} from './recovery-data.js';
-import {makeProofArchive} from './proof-archive.js';
+import {makePartitionedProofArchive,MAX_PROOF_BYTES} from './proof-archive.js';
 import {excelLibrary} from './accounting-export.js';
 
 export function buildRecoveryWorkbook(data,ExcelJS){
@@ -17,14 +17,14 @@ export function buildRecoveryWorkbook(data,ExcelJS){
 export async function recoveryExcel(data){return buildRecoveryWorkbook(data,await excelLibrary()).xlsx.writeBuffer();}
 export async function recoveryZip(data,api,{request=fetch,onProgress=()=>{}}={}){
  const orders=activeRecoveryOrders(validateRecovery(data)),byPath=new Map(orders.filter(o=>o.proof_path).map(o=>[o.proof_path,o]));let done=0;
- return makeProofArchive(data,async path=>{
+ return makePartitionedProofArchive(data,async path=>{
   const order=byPath.get(path);if(!order)throw Error('A payment proof changed. Refresh the backup and try again.');
   onProgress(`Copying payment proof ${++done} of ${byPath.size}…`);
   const signed=await api('proof_url',{order_id:order.id});const u=new URL(signed.url);
   const expected='/storage/v1/object/sign/payment-proofs/'+path;
   if(u.protocol!=='https:'||u.username||u.password||u.hostname!=='dzxyhckkkrzqpwpavngn.supabase.co'||decodeURIComponent(u.pathname)!==expected)throw Error('The payment proof changed. Refresh the backup and try again.');
   const response=await request(u.toString(),{cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(20000)});if(!response.ok||!response.body)throw Error('An attached payment proof could not be downloaded. Try again.');
-  const reader=response.body.getReader(),parts=[];let size=0;for(;;){const r=await reader.read();if(r.done)break;size+=r.value.length;if(size>5*1024*1024){await reader.cancel();throw Error('The payment proof exceeds the download limit.');}parts.push(r.value);}const bytes=new Uint8Array(size);let at=0;for(const p of parts){bytes.set(p,at);at+=p.length;}return bytes;
+  const reader=response.body.getReader(),parts=[];let size=0;for(;;){const r=await reader.read();if(r.done)break;size+=r.value.length;if(size>MAX_PROOF_BYTES){await reader.cancel();throw Error('The payment proof exceeds the 20 MiB download limit.');}parts.push(r.value);}const bytes=new Uint8Array(size);let at=0;for(const p of parts){bytes.set(p,at);at+=p.length;}return bytes;
  });
 }
 export const recoveryJson=async data=>JSON.stringify(await recoveryEnvelope(data),null,2);

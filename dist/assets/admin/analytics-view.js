@@ -9,7 +9,7 @@ const count = value => new Intl.NumberFormat('en-PH').format(value);
 export function renderAnalytics(state, { today, money, escapeHtml: esc, formatDate }) {
   const filter = state.analyticsFilter;
   const range = filter.period === 'custom' ? filter : analyticsDateRange(filter.period, today);
-  const report = buildAnalytics(state.orders, { ...range, today, products: state.products });
+  const report = state.scopedReads ? state.analyticsReport : buildAnalytics(state.orders, { ...range, today, products: state.products });
   const dates = report.range;
   const dateLabel = dates.start && dates.end ? (dates.start === dates.end ? formatDate(dates.start) : `${formatDate(dates.start)} – ${formatDate(dates.end)}`) : 'All time';
   const metric = (key, title, value, note) => `<article class="panel metric-card"><div class="metric-label">${esc(title)}</div><div class="metric-value" data-analytics-metric="${key}">${esc(value)}</div><div class="metric-note">${esc(note)}</div></article>`;
