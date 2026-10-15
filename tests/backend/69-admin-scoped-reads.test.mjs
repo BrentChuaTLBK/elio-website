@@ -9,7 +9,7 @@ import {join,resolve} from 'node:path';
 import {buildAnalytics} from '../../dist/assets/admin/analytics.js';
 import {buildProduction} from '../../dist/assets/admin/production.js';
 import {normalizeAnalytics,normalizeProduction} from '../../dist/assets/admin/scoped-reports.js';
-import {matchesOrderView} from '../../dist/assets/admin/order-dashboard.js';
+import {isUpcomingOrder,matchesOrderView} from '../../dist/assets/admin/order-dashboard.js';
 import {matchesFulfillmentStatus,needsPaymentReview,isActiveFulfillment} from '../../dist/assets/admin/refund-status.js';
 import {attentionItems} from '../../dist/assets/admin/needs-attention.js';
 const require=createRequire(process.env.PGLITE_PACKAGE_ROOT?join(resolve(process.env.PGLITE_PACKAGE_ROOT),'package.json'):import.meta.url),{PGlite}=require('@electric-sql/pglite');
@@ -55,8 +55,8 @@ export default async function({db,check,state}){
   await assert.rejects(()=>api('admin_analytics',{start:'2026-02-30',end:today}));await assert.rejects(()=>api('admin_production',{from:next,to:today}),/valid/);
  })();
  await check('Pages, complete CSV data and global selection IDs preserve every order filter',async()=>{
-  for(const f of [{},{task:'review'},{task:'today'},{search:prefix+'12'},{search:'scope-1@'},{search:'09000000001'},{search:'%'},{payment:'under_review'},{payment:'paid',fulfillment:'cancelled'},{fulfillment:'refunded'},{date:today,method:'delivery'},{refund:'yes'},{refund:'no',upcoming:true},{task:'today',search:'Scope buyer',method:'pickup'}]){
-   const expected=complete.orders.filter(o=>matchesOrderView(o,f.task||'all',today)&&(!f.search||`${o.reference} ${o.buyer?.name||''} ${o.buyer?.email||''} ${o.buyer?.phone||''}`.toLowerCase().includes(f.search.toLowerCase()))&&(!f.payment||(f.payment==='under_review'?needsPaymentReview(o):o.payment_status===f.payment))&&matchesFulfillmentStatus(o,f.fulfillment)&&(!f.date||o.fulfillment_date===f.date)&&(!f.method||o.method===f.method)&&(!f.refund||Boolean(o.refund_label)===(f.refund==='yes'))&&(!f.upcoming||o.fulfillment_date>=today&&isActiveFulfillment(o))).sort((a,b)=>(f.upcoming?ordinal(a.fulfillment_date,b.fulfillment_date):0)||newestFirst(a,b));
+  for(const f of [{},{task:'review'},{task:'today'},{task:'awaiting_payment'},{task:'awaiting_payment',upcoming:true},{search:prefix+'12'},{search:'scope-1@'},{search:'09000000001'},{search:'%'},{payment:'under_review'},{payment:'paid',fulfillment:'cancelled'},{fulfillment:'refunded'},{date:today,method:'delivery'},{refund:'yes'},{refund:'no',upcoming:true},{task:'today',search:'Scope buyer',method:'pickup'}]){
+   const expected=complete.orders.filter(o=>matchesOrderView(o,f.task||'all',today)&&(!f.search||`${o.reference} ${o.buyer?.name||''} ${o.buyer?.email||''} ${o.buyer?.phone||''}`.toLowerCase().includes(f.search.toLowerCase()))&&(!f.payment||(f.payment==='under_review'?needsPaymentReview(o):o.payment_status===f.payment))&&matchesFulfillmentStatus(o,f.fulfillment)&&(!f.date||o.fulfillment_date===f.date)&&(!f.method||o.method===f.method)&&(!f.refund||Boolean(o.refund_label)===(f.refund==='yes'))&&(!f.upcoming||isUpcomingOrder(o,today))).sort((a,b)=>(f.upcoming?ordinal(a.fulfillment_date,b.fulfillment_date):0)||newestFirst(a,b));
    const ids=[];for(let page=0;page<Math.max(1,Math.ceil(expected.length/17));page++){const result=await api('admin_order_page',{...f,page,limit:17});assert.equal(result.total,expected.length);assert(result.orders.length<=17);ids.push(...result.orders.map(o=>o.id));}
    assert.deepEqual(ids,expected.map(o=>o.id),JSON.stringify(f));assert.deepEqual((await api('admin_order_ids',f)).ids,ids);assert.deepEqual((await api('admin_order_export',f)).orders.map(o=>o.id),ids);
   }
@@ -70,8 +70,74 @@ export default async function({db,check,state}){
  })();
  await check('Core bootstrap bounds previews while preserving complete operational counts and catalog data',async()=>{
   const core=await api('admin_bootstrap',{scope:'core'});assert.equal(core.orders_mode,'scoped');assert.deepEqual(core.orders,[]);
-  assert.equal(core.reporting.order_summary.all,complete.orders.length);assert.equal(core.reporting.order_summary.review,complete.orders.filter(needsPaymentReview).length);assert.equal(core.reporting.order_summary.today,complete.orders.filter(o=>o.fulfillment_date===today&&isActiveFulfillment(o)).length);assert.equal(core.reporting.order_summary.upcoming,complete.orders.filter(o=>o.fulfillment_date>=today&&isActiveFulfillment(o)).length);
+  assert.equal(core.reporting.order_summary.all,complete.orders.length);assert.equal(core.reporting.order_summary.review,complete.orders.filter(needsPaymentReview).length);assert.equal(core.reporting.order_summary.today,complete.orders.filter(o=>o.fulfillment_date===today&&isActiveFulfillment(o)).length);assert.equal(core.reporting.order_summary.upcoming,complete.orders.filter(o=>isUpcomingOrder(o,today)).length);assert.equal(core.reporting.order_summary.awaiting_payment,complete.orders.filter(o=>matchesOrderView(o,'awaiting_payment',today)).length);
   assert(core.reporting.overview_orders.length<=7);assert(core.reporting.attention.items.length<=6);assert.equal(core.reporting.attention.total,attentionItems(complete).length);assert.deepEqual(core.products,complete.products);assert.deepEqual(core.settings,complete.settings);assert(!JSON.stringify(core.reporting).includes('access_token'));
   assert.equal((await h.rawApi('admin_order_page',{search:prefix},h.ids.staff)).total,125);
+ })();
+ await check('Upcoming retains overdue paid work until completion and Awaiting payment excludes closed orders',async()=>{
+  const yesterday=await h.day(-1),older=await h.day(-2),queuePrefix='QUEUE-'+randomUUID().slice(0,8)+'-',before=(await api('admin_bootstrap',{scope:'core'})).reporting.order_summary;
+  // Explicit expected memberships below keep this regression independent from
+  // the JavaScript predicate used by the broad parity test above.
+  const cases=[
+   ['paid-oldest',older,'paid','confirmed'],
+   ['paid-yesterday',yesterday,'paid','confirmed'],
+   ['paid-pending',yesterday,'paid','pending_confirmation'],
+   ['paid-preparing',yesterday,'paid','preparing'],
+   ['paid-ready',yesterday,'paid','ready_for_pickup'],
+   ['paid-delivery',yesterday,'paid','out_for_delivery'],
+   ['paid-completed',yesterday,'paid','completed'],
+   ['paid-cancelled',yesterday,'paid','cancelled'],
+   ['paid-expired',yesterday,'paid','expired'],
+   ['paid-refund',yesterday,'paid','confirmed',true],
+   ['unpaid-yesterday',yesterday,'awaiting_payment','pending_confirmation'],
+   ['unpaid-today',today,'awaiting_payment','pending_confirmation'],
+   ['unpaid-tomorrow',next,'awaiting_payment','pending_confirmation'],
+   ['review-yesterday',yesterday,'under_review','pending_confirmation'],
+   ['rejected-yesterday',yesterday,'rejected','pending_confirmation'],
+   ['paid-today',today,'paid','confirmed'],
+   ['paid-tomorrow',next,'paid','confirmed'],
+   ['unpaid-completed',yesterday,'awaiting_payment','completed'],
+   ['unpaid-cancelled',yesterday,'awaiting_payment','cancelled'],
+   ['unpaid-expired',yesterday,'awaiting_payment','expired'],
+   ['unpaid-refund',yesterday,'awaiting_payment','pending_confirmation',true],
+   ['review-tomorrow',next,'under_review','pending_confirmation'],
+   ['rejected-tomorrow',next,'rejected','pending_confirmation']
+  ];
+  const rows=cases.map(([name,fulfillment_date,payment_status,fulfillment_status,refund_label=false],i)=>({id:randomUUID(),reference:queuePrefix+name,created_at:`2026-09-15T12:${String(i).padStart(2,'0')}:00Z`,fulfillment_date,payment_status,fulfillment_status,refund_label,method:name==='paid-delivery'?'delivery':'pickup'}));
+  await db.query(`insert into elio.orders(id,reference,created_at,fulfillment_date,method,payment_status,fulfillment_status,refund_label,data,idempotency_key,access_digest,access_encrypted,request_hash,payment_deadline)
+   select id,reference,created_at,fulfillment_date,method,payment_status,fulfillment_status,refund_label,'{"buyer":{"name":"Local queue fixture","email":"queue@example.test"},"items":[],"total_cents":10000}'::jsonb,gen_random_uuid(),extensions.digest(id::text,'sha256'),decode('00','hex'),'isolated-queue-fixture',now()+interval '1 day'
+   from jsonb_to_recordset($1::jsonb) as x(id uuid,reference text,created_at timestamptz,fulfillment_date date,method text,payment_status text,fulfillment_status text,refund_label boolean)`,[JSON.stringify(rows)]);
+  const expectedIds=names=>names.map(name=>rows[cases.findIndex(c=>c[0]===name)].id);
+  const upcoming=['paid-oldest','paid-delivery','paid-ready','paid-preparing','paid-pending','paid-yesterday','paid-today','unpaid-today','rejected-tomorrow','review-tomorrow','paid-tomorrow','unpaid-tomorrow'];
+  const awaiting=['unpaid-tomorrow','unpaid-today','unpaid-yesterday'];
+  const verifySelection=async(filters,names)=>{
+   const ids=expectedIds(names),actual=[];
+   for(let page=0;page<Math.max(1,Math.ceil(ids.length/2));page++){
+    const result=await api('admin_order_page',{search:queuePrefix,...filters,page,limit:2});
+    assert.equal(result.total,ids.length);actual.push(...result.orders.map(o=>o.id));
+   }
+   assert.deepEqual(actual,ids,'Small pages retain the exact queue order');
+   const selection=await api('admin_order_ids',{search:queuePrefix,...filters}),exported=await api('admin_order_export',{search:queuePrefix,...filters});
+   assert.equal(selection.total,ids.length);assert.equal(exported.total,ids.length);
+   assert.deepEqual(selection.ids,ids);assert.deepEqual(exported.orders.map(o=>o.id),ids);
+  };
+  const verifyOverview=async(upcomingDelta)=>{
+   const full=await api('admin_bootstrap'),core=await api('admin_bootstrap',{scope:'core'}),summary=core.reporting.order_summary;
+   assert.equal(summary.upcoming,before.upcoming+upcomingDelta);assert.equal(summary.awaiting_payment,before.awaiting_payment+3);
+   const expected=full.orders.filter(o=>isUpcomingOrder(o,today)).sort((a,b)=>ordinal(a.fulfillment_date,b.fulfillment_date)||newestFirst(a,b)).slice(0,7);
+   assert.deepEqual(core.reporting.overview_orders.map(o=>o.id),expected.map(o=>o.id),'Overview uses the same ordered queue as the Upcoming filter');
+  };
+  await verifySelection({upcoming:true},upcoming);
+  await verifySelection({task:'awaiting_payment'},awaiting);
+  await verifySelection({task:'awaiting_payment',upcoming:true},['unpaid-today','unpaid-tomorrow']);
+  await verifySelection({upcoming:true,date:yesterday},['paid-delivery','paid-ready','paid-preparing','paid-pending','paid-yesterday']);
+  await verifySelection({task:'awaiting_payment',date:yesterday},['unpaid-yesterday']);
+  await verifyOverview(upcoming.length);
+  const completed=await h.action('set_fulfillment',await h.order(rows[0].id),{status:'completed'});
+  assert.equal(completed.fulfillment_status,'completed');
+  await verifySelection({upcoming:true},upcoming.slice(1));
+  await verifySelection({task:'awaiting_payment'},awaiting);
+  await verifyOverview(upcoming.length-1);
+  assert.equal((await api('admin_order_page',{search:rows[0].reference})).total,1,'Completing an order preserves it in All orders');
  })();
 }

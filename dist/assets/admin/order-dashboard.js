@@ -2,8 +2,12 @@ import {isActiveFulfillment,needsPaymentReview} from './refund-status.js';
 import {deliveryFeeSummary} from '../delivery-fee.js';
 const closed=new Set(['cancelled','expired','completed','refunded']);
 const label=value=>String(value||'').replaceAll('_',' ').replace(/^\w/,c=>c.toUpperCase());
+export function isUpcomingOrder(order,today){
+ return isActiveFulfillment(order)&&(order.fulfillment_date>=today||order.payment_status==='paid');
+}
 export function matchesOrderView(order,view,today){
  if(view==='review')return needsPaymentReview(order);
+ if(view==='awaiting_payment')return order.payment_status==='awaiting_payment'&&isActiveFulfillment(order);
  if(view==='today')return order.fulfillment_date===today&&isActiveFulfillment(order);
  return true;
 }

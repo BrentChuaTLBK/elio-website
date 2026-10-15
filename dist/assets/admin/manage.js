@@ -1,6 +1,6 @@
 import {createAdminReads} from './admin-reads.js';
 import {createEditorDraft} from './editor-draft.js';
-import {matchesOrderView,orderNextStep,orderQuickPanel} from './order-dashboard.js';
+import {isUpcomingOrder,matchesOrderView,orderNextStep,orderQuickPanel} from './order-dashboard.js';
 import {adminOrderView,inventoryMonthDrafts} from './progress-state.js';
 import {temporaryOrderReadFailure} from './account-return.js';
 import {mountBackup} from './backup.js';
@@ -337,13 +337,13 @@ function overviewView() {
   const today = manilaDate();
   const todayOrders = state.scopedReads?null:state.orders.filter(o => o.fulfillment_date === today && isActiveFulfillment(o));
   const reviews = state.scopedReads?null:state.orders.filter(needsPaymentReview);
-  const upcoming = state.scopedReads?state.reporting.overview_orders:state.orders.filter(o => o.fulfillment_date >= today && isActiveFulfillment(o)).sort((a, b) => a.fulfillment_date.localeCompare(b.fulfillment_date));
+  const upcoming = state.scopedReads?state.reporting.overview_orders:state.orders.filter(o => isUpcomingOrder(o,today)).sort((a, b) => a.fulfillment_date.localeCompare(b.fulfillment_date));
   const activeProducts = state.products.filter(p => p.active).length;
   return heading('A little overview', `Your kitchen, at a glance. ${humanDate(today)} · Manila`, `<button class="button button-secondary" data-action="refresh" ${locked()}>Refresh</button>${owner()?'<button class="button button-secondary" data-view="newsletter" data-newsletter-tab="campaigns">Create newsletter</button>':''}<a class="button" href="order.html">Open shop ↗</a>`) +
     `<div class="metric-grid">${[
       ['Today’s orders', state.scopedReads?state.reporting.order_summary.today:todayOrders.length, 'Pickup and delivery, active orders'],
       ['Payments to review', state.scopedReads?state.reporting.order_summary.review:reviews.length, 'Proof received · quantities held'],
-      ['Upcoming orders', state.scopedReads?state.reporting.order_summary.upcoming:upcoming.length, 'Scheduled today and beyond'],
+      ['Upcoming orders', state.scopedReads?state.reporting.order_summary.upcoming:upcoming.length, 'Today onward, plus overdue paid orders'],
       ['Active products', activeProducts, 'Availability set by product and date']
     ].map(([title, value, note]) => `<div class="panel metric-card"><div class="metric-label">${title}<span aria-hidden="true">↗</span></div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></div>`).join('')}</div>
     ${state.connected?renderAttention(state,{esc,dateTime}):''}
@@ -362,7 +362,7 @@ function filteredOrders() {
   if(state.scopedReads)return state.orders;
   const f = state.filters;
   const query = f.search.toLowerCase();
-  return state.orders.filter(o => matchesOrderView(o,state.orderTaskView,manilaDate()) && (!query || `${o.reference} ${o.buyer?.name || ''} ${o.buyer?.email || ''} ${o.buyer?.phone || ''}`.toLowerCase().includes(query)) && (!f.payment || (f.payment === 'under_review' ? needsPaymentReview(o) : o.payment_status === f.payment)) && matchesFulfillmentStatus(o, f.fulfillment) && (!f.date || o.fulfillment_date === f.date) && (!f.method || o.method === f.method) && (!f.refund || Boolean(o.refund_label) === (f.refund === 'yes')) && (!f.upcoming || o.fulfillment_date >= manilaDate() && isActiveFulfillment(o))).sort((a, b) => f.upcoming ? a.fulfillment_date.localeCompare(b.fulfillment_date) : b.created_at.localeCompare(a.created_at));
+  return state.orders.filter(o => matchesOrderView(o,state.orderTaskView,manilaDate()) && (!query || `${o.reference} ${o.buyer?.name || ''} ${o.buyer?.email || ''} ${o.buyer?.phone || ''}`.toLowerCase().includes(query)) && (!f.payment || (f.payment === 'under_review' ? needsPaymentReview(o) : o.payment_status === f.payment)) && matchesFulfillmentStatus(o, f.fulfillment) && (!f.date || o.fulfillment_date === f.date) && (!f.method || o.method === f.method) && (!f.refund || Boolean(o.refund_label) === (f.refund === 'yes')) && (!f.upcoming || isUpcomingOrder(o,manilaDate()))).sort((a, b) => f.upcoming ? a.fulfillment_date.localeCompare(b.fulfillment_date) : b.created_at.localeCompare(a.created_at));
 }
 function orderTable(orders, compact = false) {
   const selectionHeader=compact?'':`<th class="order-select-cell"><input type="checkbox" id="select-print-orders" aria-label="${state.scopedReads?'Select this page for printing':'Select all shown orders for printing'}"></th>`;
@@ -401,8 +401,8 @@ function ordersView() {
   if(!shown.some(o=>o.id===state.selectedOrderId))state.selectedOrderId=null;
   return heading('Orders', 'From the first checkout to the final handoff.', `<button class="button button-secondary" data-action="export-orders" ${locked()}>Export CSV</button><button class="button" data-action="refresh" ${locked()}>Refresh orders</button>`) + orderViewTabs() + `<div class="orders-dashboard${state.selectedOrderId?' has-order-selection':''}"><section class="panel"><div class="filters"><label>Search<input type="search" id="order-search" data-filter="search" placeholder="Reference, name, email, or phone" value="${esc(f.search)}"></label><label>Payment<select data-filter="payment">${options(PAYMENT, f.payment, 'All payment statuses')}</select></label><label>Fulfillment<select data-filter="fulfillment">${options(FULFILLMENT, f.fulfillment, 'All fulfillment statuses')}</select></label><label>Method<select data-filter="method">${options(['pickup', 'delivery'], f.method, 'Pickup & delivery')}</select></label></div><div class="filter-secondary">${input('filter-date', 'Fulfillment date', f.date, 'date', 'data-filter="date"')}${select('filter-refund', 'Refund label', option('', 'All orders', f.refund) + option('yes', 'With Refund label', f.refund) + option('no', 'Without Refund label', f.refund), 'data-filter="refund"')}<label class="check-field no-margin"><input type="checkbox" data-filter="upcoming" ${f.upcoming ? 'checked' : ''}>Upcoming, grouped by date</label><button class="button button-quiet" data-action="clear-filters">Clear filters</button></div><div class="section-heading"><h2 class="order-view-title">${orderViewTitle()}</h2><p class="muted no-margin" id="order-count">${state.scopedReads?state.orderTotal:filteredOrders().length} orders</p></div><div class="order-print-actions"><p id="print-selection-count" aria-live="polite">0 selected</p><button class="button button-secondary" data-action="print-selected-orders" disabled>Print selected</button><button class="button button-quiet" data-action="clear-print-selection" disabled>Clear selection</button>${state.scopedReads?`<button class="button button-quiet" data-action="select-matching-orders" ${!state.orderTotal?'disabled':''}>Select all ${state.orderTotal} matching orders</button>`:''}</div><div id="order-table">${orderTable(shown)}</div><div id="order-pagination">${orderPagination()}</div></section><aside class="panel order-quick-panel" id="order-quick-panel" aria-label="Selected order" ${state.selectedOrderId?'':'hidden'}>${currentOrderPanel()}</aside></div>`;
 }
-function orderViewTitle(){return {all:'All orders',review:'Needs review',today:'Due today'}[state.orderTaskView]||'All orders';}
-function orderViewTabs(){return `<div class="order-view-tabs" role="group" aria-label="Order views">${[['review','Needs review'],['today','Due today'],['all','All orders']].map(([id,title])=>`<button type="button" class="button" data-action="order-view" data-order-view="${id}" aria-pressed="${state.orderTaskView===id}">${title}<span>${state.scopedReads?state.reporting.order_summary[id]:state.orders.filter(o=>matchesOrderView(o,id,manilaDate())).length}</span></button>`).join('')}</div>`;}
+function orderViewTitle(){return {all:'All orders',review:'Needs review',awaiting_payment:'Awaiting payment',today:'Due today'}[state.orderTaskView]||'All orders';}
+function orderViewTabs(){return `<div class="order-view-tabs" role="group" aria-label="Order views">${[['review','Needs review'],['awaiting_payment','Awaiting payment'],['today','Due today'],['all','All orders']].map(([id,title])=>`<button type="button" class="button" data-action="order-view" data-order-view="${id}" aria-pressed="${state.orderTaskView===id}">${title}<span>${state.scopedReads?state.reporting.order_summary[id]:state.orders.filter(o=>matchesOrderView(o,id,manilaDate())).length}</span></button>`).join('')}</div>`;}
 function currentOrderPanel(){const order=state.orders.find(o=>o.id===state.selectedOrderId);return order?`<button type="button" class="order-quick-close" data-action="close-quick-order" aria-label="Close quick actions">×</button>${orderQuickPanel(order,{escapeHtml:esc,money,formatDate:humanDate,locked:!state.connected})}`:'';}
 function syncOrderQuickPanel(){
  const panel=$('#order-quick-panel');panel.hidden=!state.selectedOrderId;panel.innerHTML=currentOrderPanel();
@@ -900,7 +900,7 @@ async function onAction(button) {
     case 'reset-quantities': monthDrafts.clear(state.inventoryMonth);state.inventoryDrafts = {}; updateInventoryProducts(); break;
     case 'close-dialog': closeDialog(); break;
     case 'refresh': await Promise.all([refresh(), visitorPoller.refresh()]); toast('Dashboard refreshed.'); break;
-    case 'upcoming': state.filters.upcoming=true;state.orderPage=0;state.view='orders';render();break;
+    case 'upcoming': state.filters={search:'',payment:'',fulfillment:'',date:'',method:'',refund:'',upcoming:true};state.orderTaskView='all';state.selectedOrderId=null;state.printSelection.clear();state.orderPage=0;state.view='orders';render();break;
     case 'clear-filters': state.orderPage=0;state.filters = { search: '', payment: '', fulfillment: '', date: '', method: '', refund: '', upcoming: false }; state.printSelection.clear(); render(); break;
     case 'clear-print-selection': state.printSelection.clear(); syncOrderPrintSelection(); break;
     case 'print-selected-orders': {
