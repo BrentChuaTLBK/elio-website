@@ -160,9 +160,10 @@ try{
    }
    entries.push({id:'archived-entry',category_id:'archived-filter',kind:'expense',entry_date:'2026-09-24',amount_cents:3456,source:'Manual',revision:1,note:'Archived category entry'});
    await allTime.click();
-   const records=page.locator('.accounting-records'),categoryFilter=records.getByLabel('Filter by category',{exact:true});
+   const records=page.locator('.accounting-records'),categoryFilter=records.locator('[name=entry_category]');
    await records.locator('.section-heading .badge').getByText('112 entries',{exact:true}).waitFor();
    assert.equal(await categoryFilter.inputValue(),'','All categories is the default');
+   assert.equal(await categoryFilter.evaluate(select=>select.closest('label').firstChild.textContent),'Filter by category','The category selector has a visible label');
    assert.equal(await categoryFilter.locator('option[value=""]').textContent(),'All categories');
    assert.deepEqual(new Set(await categoryFilter.locator('option').evaluateAll(options=>options.map(o=>o.value))),new Set(['',...categories.map(c=>c.id)]),'Every category is available, including automatic, archived and empty categories');
    assert.equal(await categoryFilter.locator('option[value="archived-filter"]').textContent(),'Seasonal packaging & decorations <retired> (archived)');
