@@ -47,7 +47,7 @@ try{
      const eligible=[...entries,...(cost?.amount_cents!=null?[{id:order.id,category_id:'cost',kind:'expense',entry_date:cost.cost_date,amount_cents:cost.amount_cents,note:cost.note,source:'Delivery cost',order_id:order.id,reference:order.reference}]:[])].filter(e=>!excludeOrder||e.order_id!==order.id);
      if(payload.all_time){const dates=eligible.map(e=>e.entry_date).sort();payload.start=dates[0]||'2026-10-02';payload.end=dates.at(-1)||payload.start;}
      const all=eligible.filter(e=>e.entry_date>=payload.start&&e.entry_date<=payload.end);
-     response={...payload,report_version:2,categories,entries:all,summary:categories.filter(c=>!c.archived).map(c=>({...c,sales_cents:all.filter(e=>e.category_id===c.id&&e.kind==='sale').reduce((n,e)=>n+e.amount_cents,0),expense_cents:all.filter(e=>e.category_id===c.id&&e.kind==='expense').reduce((n,e)=>n+e.amount_cents,0),entry_count:all.filter(e=>e.category_id===c.id).length})),deliveries:excludeOrder?[]:[{order_id:order.id,reference:order.reference,approval_date:'2026-09-24',status:order.fulfillment_status,fee_cents:15000,cost_cents:cost?.amount_cents??null,cost_date:cost?.cost_date||null}],legacy_count:0};
+     response={...payload,report_version:2,categories,entries:all,summary:categories.filter(c=>!c.archived||all.some(e=>e.category_id===c.id)).map(c=>({...c,sales_cents:all.filter(e=>e.category_id===c.id&&e.kind==='sale').reduce((n,e)=>n+e.amount_cents,0),expense_cents:all.filter(e=>e.category_id===c.id&&e.kind==='expense').reduce((n,e)=>n+e.amount_cents,0),entry_count:all.filter(e=>e.category_id===c.id).length})),deliveries:excludeOrder?[]:[{order_id:order.id,reference:order.reference,approval_date:'2026-09-24',status:order.fulfillment_status,fee_cents:15000,cost_cents:cost?.amount_cents??null,cost_date:cost?.cost_date||null}],legacy_count:0};
     }else if(action==='accounting_save_category'){await new Promise(r=>setTimeout(r,50));response={...payload,revision:payload.revision+1};const old=categories.findIndex(c=>c.id===payload.id);if(old>=0)categories[old]=response;else categories.push(response);}
     else if(action==='accounting_save_entry'){await new Promise(r=>setTimeout(r,50));response={...payload,source:'Manual',revision:payload.revision+1};const old=entries.findIndex(e=>e.id===payload.id);if(old>=0)entries[old]=response;else entries.push(response);}
     else if(action==='accounting_delete_entry'){entries.splice(entries.findIndex(e=>e.id===payload.id),1);response={};}
@@ -149,12 +149,92 @@ try{
    await page.waitForFunction(()=>document.querySelector('[data-accounting=all-time]').getAttribute('aria-pressed')==='false');
    assert.equal(await timeframe.locator('.accounting-range-note').isHidden(),true);
    assert.equal(calls.filter(c=>c.action==='accounting_report').at(-1).payload.all_time,undefined,'Custom month leaves All time');
+   // Category filtering uses the complete loaded report, including entries beyond page one.
+   // Start a separate fixture phase so the existing amount and export checks stay unchanged.
+   categories.push({id:'archived-filter',name:'Seasonal packaging & decorations <retired>',kind:'expense',archived:true,revision:1},
+     {id:'empty-filter',name:'A category without entries',kind:'sale',revision:1});
+   entries.length=0;cost=null;excludeOrder=false;
+   for(let i=0;i<60;i++){
+    entries.push({id:`shared-${i}`,category_id:'cakes',kind:i%2?'expense':'sale',entry_date:i%2?'2026-09-25':'2026-09-24',amount_cents:1000+i,source:'Manual',revision:1,note:`Shared category entry ${i}`});
+    if(i<51)entries.push({id:`automatic-${i}`,category_id:'website',kind:'sale',entry_date:i%2?'2026-09-25':'2026-09-24',amount_cents:2000+i,source:'Website',note:`Automatic category entry ${i}`});
+   }
+   entries.push({id:'archived-entry',category_id:'archived-filter',kind:'expense',entry_date:'2026-09-24',amount_cents:3456,source:'Manual',revision:1,note:'Archived category entry'});
+   await allTime.click();
+   const records=page.locator('.accounting-records'),categoryFilter=records.getByLabel('Filter by category',{exact:true});
+   await records.locator('.section-heading .badge').getByText('112 entries',{exact:true}).waitFor();
+   assert.equal(await categoryFilter.inputValue(),'','All categories is the default');
+   assert.equal(await categoryFilter.locator('option[value=""]').textContent(),'All categories');
+   assert.deepEqual(new Set(await categoryFilter.locator('option').evaluateAll(options=>options.map(o=>o.value))),new Set(['',...categories.map(c=>c.id)]),'Every category is available, including automatic, archived and empty categories');
+   assert.equal(await categoryFilter.locator('option[value="archived-filter"]').textContent(),'Seasonal packaging & decorations <retired> (archived)');
+   const overviewBefore=await page.locator('.accounting-summary,.accounting-net,.accounting-deliveries').allTextContents(),callsBeforeFilter=calls.length;
+   const visibleNotes=()=>records.locator('tbody tr .accounting-note').allTextContents();
+   const expectedNotes=(category,start=0,end=50)=>entries.filter(e=>!category||e.category_id===category).toReversed().slice(start,end).map(e=>e.note);
+   await records.locator('[data-accounting=next]').click();
+   assert.match(await records.locator('.accounting-pagination').textContent(),/Page 2 of 3/);
+   await categoryFilter.selectOption('cakes');
+   assert.equal(await records.locator('.section-heading .badge').textContent(),'60 of 112 entries');
+   assert.match(await records.locator('.accounting-pagination').textContent(),/Page 1 of 2/);
+   assert.deepEqual(await visibleNotes(),expectedNotes('cakes'),'Selecting a category resets pagination and finds matches across the full report');
+   assert.equal(await records.locator('[data-accounting=previous]').isDisabled(),true);
+   assert.deepEqual(new Set(await records.locator('tbody tr td:nth-child(2) strong').allTextContents()),new Set(['Custom cakes']));
+   const entryAmounts=await records.locator('tbody tr').evaluateAll(rows=>rows.map(row=>({sales:row.cells[3].textContent,expense:row.cells[4].textContent})));
+   assert.ok(entryAmounts.some(e=>e.sales.includes('₱')&&e.expense==='—')&&entryAmounts.some(e=>e.expense.includes('₱')&&e.sales==='—'),'Shared categories show both sales and expense entries');
+   const filterBox=await categoryFilter.boundingBox();assert.ok(filterBox.x>=0&&filterBox.x+filterBox.width<=width&&filterBox.height>=44,'Category selection fits the screen and has a touch-sized target');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Category filter causes no page overflow');
+   await records.locator('.section-heading').scrollIntoViewIfNeeded();
+   await page.screenshot({path:join(output,`category-filter-${width}.png`)});
+   await records.locator('[data-accounting=next]').click();
+   assert.deepEqual(await visibleNotes(),expectedNotes('cakes',50,100),'The second page contains every remaining matching entry');
+   assert.equal(await records.locator('[data-accounting=next]').isDisabled(),true);
+   await categoryFilter.selectOption('website');
+   assert.equal(await records.locator('.section-heading .badge').textContent(),'51 of 112 entries');
+   assert.match(await records.locator('.accounting-pagination').textContent(),/Page 1 of 2/);
+   assert.deepEqual(await visibleNotes(),expectedNotes('website'));
+   assert.ok((await records.locator('tbody tr td:nth-child(6)').allTextContents()).every(text=>text==='Automatic'),'Automatic entries remain visible under their system category');
+   await records.locator('[data-accounting=next]').click();
+   assert.deepEqual(await visibleNotes(),expectedNotes('website',50,100));
+   await categoryFilter.selectOption('');
+   assert.equal(await records.locator('.section-heading .badge').textContent(),'112 entries');
+   assert.match(await records.locator('.accounting-pagination').textContent(),/Page 1 of 3/);
+   assert.deepEqual(await visibleNotes(),expectedNotes(''),'All categories restores the complete report on page one');
+   await categoryFilter.selectOption('archived-filter');
+   assert.equal(await records.locator('.section-heading .badge').textContent(),'1 of 112 entries');
+   assert.deepEqual(await visibleNotes(),['Archived category entry']);
+   assert.equal(await records.locator('tbody strong').textContent(),'Seasonal packaging & decorations <retired>');
+   assert.equal(await records.locator('retired').count(),0,'Category names remain escaped text');
+   assert.equal(await records.locator('.accounting-pagination').count(),0);
+   await categoryFilter.selectOption('empty-filter');
+   assert.equal(await records.locator('.section-heading .badge').textContent(),'0 of 112 entries');
+   assert.equal(await records.getByText('No entries for this category in this timeframe.',{exact:true}).count(),1);
+   assert.equal(await records.locator('.accounting-pagination').count(),0);
+   assert.equal(calls.length,callsBeforeFilter,'Filtering and pagination make no API requests');
+   assert.deepEqual(await page.locator('.accounting-summary,.accounting-net,.accounting-deliveries').allTextContents(),overviewBefore,'Category selection does not narrow the overview totals or delivery comparison');
+   assert.match(await records.locator('.accounting-entry-filters .help-text').textContent(),/all categories/i,'Export scope is explicit while filtering');
+   await categoryFilter.selectOption('cakes');
+   const refreshed=page.waitForResponse(response=>response.url()===origin+'/fixture-api'&&response.request().postDataJSON().action==='accounting_report');
+   await page.locator('[data-accounting=refresh]').click();await refreshed;await page.waitForFunction(()=>!document.querySelector('[data-accounting=export]').disabled);
+   assert.equal(await categoryFilter.inputValue(),'cakes','Refresh retains the selected category');
+   assert.equal(await records.locator('.section-heading .badge').textContent(),'60 of 112 entries');
+   await pickDate(timeframe,'start','2026-09-24');await pickDate(timeframe,'end','2026-09-24');await timeframe.locator('[type=submit]').click();
+   await records.locator('.section-heading .badge').getByText('30 of 57 entries',{exact:true}).waitFor();
+   assert.equal(await categoryFilter.inputValue(),'cakes','Changing the timeframe retains the selected category');
+   assert.ok((await records.locator('tbody tr td:first-child').allTextContents()).every(date=>date==='2026-09-24'),'The category respects the current timeframe');
+   await allTime.click();await records.locator('.section-heading .badge').getByText('60 of 112 entries',{exact:true}).waitFor();
+   assert.equal(await categoryFilter.inputValue(),'cakes','All time retains the selected category');
+   const filteredDownloadPromise=page.waitForEvent('download');await page.locator('[data-accounting=export]').click();const filteredDownload=await filteredDownloadPromise;
+   const filteredFile=join(output,`category-filter-${width}.xlsx`);await filteredDownload.saveAs(filteredFile);
+   const filteredWorkbook=new ExcelJS.Workbook();await filteredWorkbook.xlsx.load(await readFile(filteredFile));
+   const exportedNotes=[];for(const sheet of filteredWorkbook.worksheets)if(!['Summary','Delivery comparison'].includes(sheet.name))sheet.eachRow(row=>{if(typeof row.getCell(6).value==='string')exportedNotes.push(row.getCell(6).value);});
+   assert.deepEqual(exportedNotes.filter(note=>entries.some(e=>e.note===note)).sort(),entries.map(e=>e.note).sort(),'Excel includes every category and every page even with a category selected');
+   assert.equal(await categoryFilter.inputValue(),'cakes','Export retains the selected category');
+   assert.equal(await records.locator('.section-heading .badge').textContent(),'60 of 112 entries');
+   assert.ok(calls.filter(c=>c.action==='accounting_report').every(c=>!Object.hasOwn(c.payload,'category_id')&&!Object.hasOwn(c.payload,'entry_category')),'Report requests remain scoped only to the timeframe');
    entries.length=0;cost=null;await allTime.click();await page.getByText('All time · No entries yet.',{exact:true}).waitFor();
    await pickDate(page.locator('.accounting-filters'),'start','2026-09-26');await pickDate(page.locator('.accounting-filters'),'end','2026-09-25');await page.locator('.accounting-filters [type=submit]').click();await page.getByText('The end date must be on or after the start date.',{exact:true}).waitFor();
    await navigateDashboard(page,'orders');await page.locator('[data-action=open-order][data-id=pickup]').click();await page.locator('#admin-dialog').waitFor();
    assert.equal(await page.locator('.delivery-accounting').count(),0,'Pickup orders have no delivery accounting section');
    assert.equal(calls.some(c=>c.action==='accounting_get_delivery'&&c.payload.order_id==='pickup'),false,'Pickup details never request courier accounting');
   }
-  assert.deepEqual(errors,[]);console.log(`PASS accounting ${width}px ${role}: permissions, summary, categories, manual entries, delivery cost, timeframe and real Excel download`);await ctx.close();
+  assert.deepEqual(errors,[]);console.log(`PASS accounting ${width}px ${role}: permissions, summary, categories, manual entries, delivery cost, timeframe, category filtering and real Excel download`);await ctx.close();
  }
 }finally{await browser.close();}

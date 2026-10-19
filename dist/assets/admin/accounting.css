@@ -68,3 +68,10 @@
  .accounting-report .data-table td[colspan]{display:block;padding:12px 0}
  .accounting-report .data-table .button{min-height:40px}
 }
+
+/* Category selection filters the entries list independently of the report totals. */
+.accounting-entry-filters{display:grid;grid-template-columns:minmax(200px,280px) minmax(0,1fr);gap:16px;align-items:end;margin:0 0 18px}
+.accounting-entry-filters .field{min-width:0;margin:0}
+.manage-page .accounting-entry-filters select{width:100%;min-width:0;height:44px}
+.accounting-report .accounting-entry-filters .help-text{margin:0 0 4px}
+@media(max-width:600px){.accounting-entry-filters{grid-template-columns:minmax(0,1fr);gap:8px}.accounting-report .accounting-entry-filters .help-text{margin:0}}

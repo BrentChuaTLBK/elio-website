@@ -7,7 +7,7 @@ import {mountBackup} from './backup.js';
 import {mountMarketingInsights} from './marketing-insights.js';
 import {renderAttention,loadAttentionCalendar} from './needs-attention.js';
 import {deliveryFeeSummary,separateDeliveryPaid} from '../delivery-fee.js';
-import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=accounting-mobile-audit-1';
+import {mountAccounting, mountDeliveryAccounting} from './accounting-manager.js?v=category-filter-1';
 import {mountCalendar} from './calendar-manager.js?v=summary-1';
 import {mountMaintenance} from './maintenance-admin.js?v=completed-status-1';
 import {mountWebsitePhotos} from './website-photos.js';
