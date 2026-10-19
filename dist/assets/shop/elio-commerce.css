@@ -72,7 +72,7 @@ dialog.elio-commerce::backdrop{background:#291b1970;backdrop-filter:blur(3px)}
 #product-dialog .product-photo-open .product-dialog-image{position:absolute;inset:0;display:block;width:100%;height:100%;aspect-ratio:auto;max-height:none;object-fit:cover;border-radius:0;user-select:none;-webkit-user-select:none}
 #product-dialog .product-photo-open[aria-pressed=true]{cursor:zoom-in}
 #product-dialog .product-photo-open[aria-pressed=true] .product-dialog-image{object-fit:contain}
-#product-dialog .product-photo-expand{position:absolute;bottom:10px;left:10px;display:block;padding:7px 10px;border:1px solid #dfcdb7b3;border-radius:6px;background:#fffcf7f0;color:#3d251c;font:11px/1.5 Arial,sans-serif;box-shadow:0 1px 4px #291b1914}
+#product-dialog .product-photo-expand{position:absolute;bottom:10px;left:10px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid #dfcdb7b3;border-radius:6px;background:#fffcf7f0;color:#3d251c;font:20px/1 Arial,sans-serif;box-shadow:0 1px 4px #291b1914}
 #product-dialog .product-photo-unavailable{position:absolute;inset:0;display:grid;place-items:center;padding:32px;font:12px/1.6 Arial,sans-serif}
 #product-dialog .product-photo-arrow{position:absolute;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #dfcdb7b3;border-radius:50%;background:#fffcf7ed;color:#3d251c;font:28px/1 Arial,sans-serif;cursor:pointer;box-shadow:0 1px 5px #291b1926}
 #product-dialog .product-photo-arrow:hover{background:#fff}

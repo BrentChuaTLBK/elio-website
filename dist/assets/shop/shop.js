@@ -2,7 +2,7 @@ import {acceptsReceipt} from './receipt-refresh.js';
 import {temporaryOrderReadFailure} from '../admin/account-return.js';
 import {basketLineKey,mergeBasketItems,basketIncreaseLimit,flavorPickerLimit,productDrafts} from './basket-interactions.js';
 import {productNavigation} from './product-navigation.js';
-import {mountProductPhotos} from './product-photo-viewer.js';
+import {mountProductPhotos} from './product-photo-viewer.js?v=icon-only-1';
 import {checkoutNavigation} from './checkout-navigation.js';
 import {responsiveImage} from '../responsive-images.js';
 import {checkoutFailure} from './checkout-recovery.js';

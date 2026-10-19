@@ -11,7 +11,7 @@ export function mountProductPhotos({root,parent,photos=[],name='Product'}) {
  const trigger=element('button',{type:'button',class:'product-photo-open','data-open-photo':'','aria-label':`Show full photo of ${name}`,'aria-pressed':'false'});
  const photo=element('img',{id:'detail-photo',class:'product-dialog-image',alt:name,decoding:'async',draggable:'false'});
  const unavailable=element('span',{class:'product-photo-unavailable','data-photo-retry':'',role:'status',hidden:''},'Photo unavailable — tap to retry');
- const caption=element('span',{class:'product-photo-expand','aria-hidden':'true'},'⤢  Show full photo');
+ const caption=element('span',{class:'product-photo-expand','aria-hidden':'true'},'⤢');
  trigger.append(photo,unavailable,caption);
  const previous=element('button',{type:'button',class:'product-photo-arrow','data-photo-prev':'','aria-label':'Previous photo'},'‹');
  const next=element('button',{type:'button',class:'product-photo-arrow','data-photo-next':'','aria-label':'Next photo'},'›');
@@ -24,8 +24,8 @@ export function mountProductPhotos({root,parent,photos=[],name='Product'}) {
  let index=0,full=false,failed=false,touch=null,destroyed=false,suppressClickUntil=0;
  function updateMode(){
   trigger.setAttribute('aria-pressed',String(full));
-  trigger.setAttribute('aria-label',failed?`Retry photo of ${name}`:`Show full photo of ${name}`);
-  caption.textContent=full?'⤡  Fill frame':'⤢  Show full photo';caption.hidden=failed;
+  trigger.setAttribute('aria-label',failed?`Retry photo of ${name}`:full?`Fill frame with photo of ${name}`:`Show full photo of ${name}`);
+  caption.textContent=full?'⤡':'⤢';caption.hidden=failed;
  }
  function select(value){
   if(destroyed)return;
