@@ -38,6 +38,11 @@ try{
   const {ctx,page,track,section,dialog}=await open(path,width);
   const originals=track.locator('.flavor-slide:not([data-carousel-copy])');assert.equal(await originals.count(),7);
   assert.equal(await track.locator('[data-carousel-copy]:not([aria-hidden=true]),[data-carousel-copy] a:not([tabindex="-1"])').count(),0);
+  const photos = track.locator('.flavor-slide .product-photo');
+  assert(await photos.evaluateAll(nodes => nodes.every(node => {
+    const rect = node.getBoundingClientRect();
+    return rect.width > 0 && Math.abs(rect.width - rect.height) <= 1 && getComputedStyle(node).borderRadius === '14%';
+  })), 'Every original and looped carousel photo has the same rounded square');
   assert.equal(await page.evaluate(()=>window.carouselMetrics().visible),width>1000?7:width>700?5:3);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await stationary(page,track);
   const next=section.getByRole('button',{name:'Next flavors',exact:true}),previous=section.getByRole('button',{name:'Previous flavors',exact:true});

@@ -57,14 +57,21 @@ dialog.flavor-detail-dialog::backdrop {
 }
 .flavor-detail-dialog .dialog-close:hover::before { background: #f2e6d6; }
 .flavor-detail-dialog .dialog-close svg { width: 17px; height: 17px; }
+.flavor-carousel .flavor-slide .product-photo,
+a.flavor-tile .flavor-tile-image,
+a.flavor-tile .flavor-tile-image .product-photo,
+.product-photo.flavor-portrait {
+  aspect-ratio: 1;
+  border-radius: 14%;
+}
+.flavor-carousel .product-placeholder::after,
+.flavor-tile .product-placeholder::after { border-radius: inherit; }
 .product-photo.flavor-portrait {
   display: grid;
   width: 100%;
-  aspect-ratio: 1;
   margin: 0;
   place-items: center;
   overflow: hidden;
-  border-radius: 50%;
   background: #efe4d5;
 }
 .flavor-portrait img.flavor-single-photo {

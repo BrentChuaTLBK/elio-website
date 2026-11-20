@@ -31,7 +31,7 @@ try{
   assert.equal(await page.locator('#monthly-flavors .flavor-month-badge').count(),0);assert.equal(await page.getByText('Discover flavor',{exact:true}).count(),0);assert.equal(await page.locator('#flavor-dialog').isVisible(),false);
   assert.equal(await page.locator('#monthly-flavors [data-flavor=vanilla] .flavor-brief').textContent(),data.flavors[0].description);
   assert.match(await page.locator('#monthly-flavors [data-flavor=vanilla] .detail-meta').innerText(),/Keep chilled/);
-  const size=await page.locator('#monthly-flavors .flavor-tile-image').first().boundingBox();assert.ok(size.width<=126);
+  const size=await page.locator('#monthly-flavors .flavor-tile-image').first().boundingBox();assert.ok(size.width<=126);assert.ok(Math.abs(size.width-size.height)<=1);assert.equal(await page.locator('#monthly-flavors .flavor-tile-image .product-photo').first().evaluate(el=>getComputedStyle(el).borderRadius),'14%');
   assert.equal(await page.locator('#monthly-flavors').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),width>900?2:1);
   assert.equal(await page.locator('.flavors-grid .flavors-box').count(),0);assert.equal(await page.locator('[data-website-photo]').count(),2);await fits();
   await page.screenshot({path:join(out,`monthly-${width}.png`),fullPage:true});
@@ -43,7 +43,7 @@ try{
   const grid = page.locator('#other-flavors-grid'), dialog = page.locator('#flavor-dialog');
   const vanilla = grid.locator('[data-flavor=vanilla]');
   assert.equal(await vanilla.innerText(), 'Vanilla');
-  assert.equal(await vanilla.locator('.product-photo').evaluate(el => getComputedStyle(el).borderRadius), '50%');
+  assert.equal(await vanilla.locator('.product-photo').evaluate(el => getComputedStyle(el).borderRadius), '14%');
   assert.equal(await grid.locator('.flavor-brief,.detail-meta,.flavor-month-badge').count(), 0);
   await page.getByRole('searchbox').fill('vanilla');
   await vanilla.focus(); await page.keyboard.press('Enter');
@@ -52,6 +52,9 @@ try{
   assert.match(await dialog.locator('.detail-meta').innerText(), /Keep chilled/);
   await page.waitForFunction(() => !document.querySelector('.flavor-flying-photo'));
   assert.equal(await dialog.locator('.detail-description').innerText(), data.flavors[0].description);
+  const portrait = dialog.locator('.flavor-detail-layout > .flavor-portrait');
+  const shape = await portrait.evaluate(el => ({corner: getComputedStyle(el).borderRadius, side: el.offsetWidth - el.offsetHeight}));
+  assert.deepEqual(shape, {corner: '14%', side: 0});
   await fits();
   await dialog.screenshot({path:join(out, `detail-${width}.png`)});
   await page.keyboard.press('Escape'); await dialog.waitFor({state:'hidden'});
