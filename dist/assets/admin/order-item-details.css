@@ -1,0 +1,35 @@
+.order-flavors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .2em .85em;
+  margin: .3em 0 0;
+  padding: 0;
+  list-style: none;
+}
+.order-flavors > li {
+  display: inline-flex;
+  gap: .35em;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+.order-flavors > li > span { min-width: 0; overflow-wrap: anywhere; }
+.order-flavor-icon {
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.order-flavor-surcharge { color: inherit; font-weight: 600; }
+.order-packing { font-weight: 600; }
+.pending-review .order-flavors {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.slip .order-flavors,
+.order-checklist-sheet .order-flavors { margin: 0; gap: .5mm 2mm; }
+.slip .order-flavor-icon,
+.order-checklist-sheet .order-flavor-icon { width: 4mm; height: 4mm; border-radius: .7mm; }
+.slip-text-only .order-flavor-icon { display: none; }

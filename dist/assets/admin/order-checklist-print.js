@@ -1,6 +1,7 @@
 import { calendarAddress } from './order-calendar.js';
 
 import { checklistTitles } from './order-checklist-data.js';
+import { orderItemDetails, renderOrderFlavors } from './order-item-details.js';
 
 const titles = { ...checklistTitles, preparation: 'Preparation checklist' };
 const dateFormat = new Intl.DateTimeFormat('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -10,31 +11,12 @@ const orderCount = count => `${count} ${count === 1 ? 'order' : 'orders'}`;
 const reference = order => order.reference || order.id || 'Order';
 const dateOf = order => order.date || order.fulfillment_date || '';
 
-function rawChoices(item, products) {
-  if (!item.selections) return [];
-  const product = products.find(product => product.id === item.product_id);
-  return Object.entries(item.selections).flatMap(([groupId, counts]) => {
-    const group = product?.option_groups?.find(group => group.id === groupId);
-    return Object.entries(counts || {}).filter(([, count]) => Number(count) > 0).map(([choiceId, quantity]) => ({
-      group: group?.label || groupId,
-      label: group?.choices?.find(choice => choice.id === choiceId)?.label || choiceId,
-      quantity,
-    }));
-  });
-}
-
 function optionsFor(item, products) {
-  const saved = Array.isArray(item.selection_labels) && item.selection_labels.length > 0;
-  const flavors = !saved && Array.isArray(item.flavor_contents) && item.flavor_contents.length > 0;
-  const choices = saved ? item.selection_labels : flavors ? item.flavor_contents : rawChoices(item, products);
-  const labels = choices.map(choice => {
-    if (typeof choice === 'string') return choice;
-    const name = choice?.label || choice?.name;
-    if (!name) return '';
-    const count = Number(choice.quantity ?? choice.count);
-    return [choice.group, `${count > 1 ? count + ' × ' : ''}${name}`].filter(Boolean).join(' — ');
-  }).filter(Boolean);
-  return labels.length ? `<span class="checklist-item-detail">${!flavors && Number(item.quantity) > 1 ? 'Per unit · ' : ''}${esc(labels.join(' · '))}</span>` : '';
+  const product = products.find(entry => entry.id === item.product_id);
+  const { flavors, insulated, extras } = orderItemDetails(item, product);
+  const packing = insulated ? `<span class="checklist-item-detail order-packing">Insulated · ${esc(insulated)}</span>` : '';
+  const other = extras.length ? `<span class="checklist-item-detail">${Number(item.quantity) > 1 ? 'Per unit · ' : ''}${esc(extras.join(' · '))}</span>` : '';
+  return packing + renderOrderFlavors(flavors, { products, esc }) + other;
 }
 
 export function renderChecklistItems(order, preparation = true, products = []) {
@@ -52,7 +34,7 @@ function detail(label, value) {
   return value ? `<p class="checklist-detail"><strong>${label}</strong> ${esc(value)}</p>` : '';
 }
 
-function orderRow(order, type) {
+function orderRow(order, type, products) {
   const detailed = type === 'orders' || type === 'preparation';
   const pickup = order.method === 'pickup';
   const buyer = order.buyer || {};
@@ -72,11 +54,11 @@ function orderRow(order, type) {
     <td class="checklist-mark"><span class="checklist-tick" aria-hidden="true"></span></td>
     <td class="checklist-order-body"><h3>${esc(buyer.name || recipient.name || 'Customer')} <span>${esc(reference(order))}</span></h3>
       ${meta ? `<p class="checklist-window">${esc(meta)}</p>` : ''}${handoff}
-      ${renderChecklistItems(order, detailed)}${type === 'orders' ? '' : detail('Instructions', order.instructions)}
+      ${renderChecklistItems(order, detailed, products)}${type === 'orders' ? '' : detail('Instructions', order.instructions)}
     </td></tr>`;
 }
 
-export function renderOrderChecklist({ orders, type, periodLabel }) {
+export function renderOrderChecklist({ orders, type, periodLabel, products = [] }) {
   if (!Object.hasOwn(titles, type)) throw new Error('Choose a checklist type.');
   const days = new Map();
   for (const order of orders) {
@@ -96,8 +78,8 @@ export function renderOrderChecklist({ orders, type, periodLabel }) {
       }
     }
     const body = type === 'orders'
-      ? [...groups].filter(([, rows]) => rows.length).map(([label, rows]) => `<tbody><tr class="checklist-method"><th scope="rowgroup" colspan="2">${label}</th></tr>${rows.map(order => orderRow(order, type)).join('')}</tbody>`).join('')
-      : `<tbody>${dayOrders.map(order => orderRow(order, type)).join('')}</tbody>`;
+      ? [...groups].filter(([, rows]) => rows.length).map(([label, rows]) => `<tbody><tr class="checklist-method"><th scope="rowgroup" colspan="2">${label}</th></tr>${rows.map(order => orderRow(order, type, products)).join('')}</tbody>`).join('')
+      : `<tbody>${dayOrders.map(order => orderRow(order, type, products)).join('')}</tbody>`;
     const countLabel = type === 'orders' ? orderCount(dayOrders.length) : `${titles[type]} · ${orderCount(dayOrders.length)}`;
     return `<table class="checklist-day" aria-label="${esc(dayLabel)}"><colgroup><col class="checklist-mark-column"><col></colgroup>
       <thead><tr><th colspan="2"><div class="checklist-day-heading"><h2>${esc(dayLabel)}</h2><span>${countLabel}</span></div></th></tr></thead>

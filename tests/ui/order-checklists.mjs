@@ -50,9 +50,15 @@ const orders = [
   order('LONG-RANGE-END', 63),
 ];
 
+const sampleChecklistOrder = orders.find(order => order.reference === 'PICK-ONE');
+sampleChecklistOrder.items.push({name:'Build your own trio',quantity:1,
+  selections:{'insulated-bag':{yes:1}},
+  flavor_contents:[{product_id:'vanilla-flavor',name:'Vanilla',quantity:2},{product_id:'matcha-flavor',name:'Matcha',quantity:1}],
+  selection_labels:[{group_id:'insulated-bag',group:'Add an insulated bag with ice?',label:'Yes · Insulated bag + ice',quantity:1}],
+});
 const client = await readFile(join(root, 'assets/admin/client.js'), 'utf8');
 const mock = checklistClient(client);
-const mime = {'.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2'};
+const mime = {'.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webp': 'image/webp'};
 const iphone = process.env.BROWSER_ENGINE === 'webkit';
 const browser = await (iphone ? webkit : chromium).launch({
   headless: true, executablePath: process.env.BROWSER_EXECUTABLE_PATH || undefined,
@@ -77,6 +83,7 @@ try {
       role: 'staff', categories: [], products: [], orders: [], inventory: [], zones: [], promos: [], staff: [],
       settings: {shop_name: 'Elio Basque Cheesecake', paused: false},
     };
+    if (action === 'flavor_collection') return {flavors:[{id:'matcha-flavor',name:'Matcha',photos:['assets/flavors-concept.webp']}]};
     if (action === 'calendar_list' || action === 'order_checklist_period') {
       const {from, to} = payload;
       assert.ok(from <= to && Date.parse(to) - Date.parse(from) <= 62 * 86400000);
@@ -141,6 +148,13 @@ try {
           [...table.tBodies].map(body=>[body.querySelector('th[scope=rowgroup]').textContent.trim(),
             [...body.querySelectorAll('[data-order-reference]')].map(row=>row.dataset.orderReference).sort()])));
         assert.deepEqual(groups,expected,'Each print date separates pickup, delivery and in-person sales under their own headings');
+      }
+      if (kind==='orders' && references.includes('PICK-ONE')) {
+        const order=sheet.locator('[data-order-reference=PICK-ONE]');
+        await order.locator('.order-flavor-icon').waitFor();
+        assert.deepEqual(await order.locator('.order-flavors li').allTextContents(),['2 × Vanilla','Matcha']);
+        assert.equal(await order.locator('.order-packing').innerText(),'Insulated · Yes');
+        assert.doesNotMatch(await order.innerText(),/Add an insulated bag with ice/);
       }
       assert.ok(await sheet.locator('.checklist-tick').first().isVisible(),'Preview has visible content before printing');
       assert.equal(await sheet.locator('.checklist-tick').count(),references.length);

@@ -1,9 +1,10 @@
 import { escapeHtml as esc, formatDate } from './client.js';
+import { flavorName, orderItemDetails, renderOrderFlavors } from './order-item-details.js';
 
 const label = value => String(value || '').replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase());
 const text = value => String(value ?? '').trim();
 const lines = values => values.map(text).filter(Boolean).join('\n');
-const previewUrl = new URL('./order-print.html?v=slip-copies-1', import.meta.url).href;
+const previewUrl = new URL('./order-print.html?v=flavor-details-1', import.meta.url).href;
 
 const paperDimensions = { a4: [297, 210], letter: [279.4, 215.9] };
 const maxCopies = 20;
@@ -11,20 +12,6 @@ const maxCopies = 20;
 function photoUrl(value) {
   if (typeof value !== 'string' || !(/^(https?:\/\/|assets\/)/.test(value))) return '';
   return new URL(value, document.baseURI).href;
-}
-
-function variations(item, product) {
-  if (Array.isArray(item.selection_labels) && item.selection_labels.length) {
-    return item.selection_labels.map(choice => typeof choice === 'string' ? choice :
-      `${choice.group ? choice.group + ': ' : ''}${Number(choice.quantity || choice.count) > 1 ? `${choice.quantity || choice.count} × ` : ''}${choice.label || choice.name || ''}`).join(' · ');
-  }
-  if (item.flavor_contents?.length) return item.flavor_contents.map(flavor => `${flavor.quantity} × ${flavor.name}`).join(' · ');
-  return Object.entries(item.selections || {}).flatMap(([groupId, choices]) => Object.entries(choices)
-    .filter(([, count]) => Number(count) > 0).map(([choiceId, count]) => {
-      const group = product?.option_groups?.find(entry => entry.id === groupId);
-      const choice = group?.choices?.find(entry => entry.id === choiceId);
-      return `${group?.label ? group.label + ': ' : ''}${count > 1 ? `${count} × ` : ''}${choice?.label || choiceId}`;
-    })).join(' · ');
 }
 
 // Only fields intended for the package are copied into the print document.
@@ -51,8 +38,12 @@ function printModel(order, products, settings) {
     buyer: { name: text(buyer.name) || 'Not recorded', phone: text(buyer.phone) || 'Not recorded', social }, details,
     items: (order.items || []).map((item, index) => {
       const product = products.find(entry => entry.id === item.product_id);
+      const { flavors, insulated, extras } = orderItemDetails(item, product);
+      const packing = insulated ? 'Insulated · ' + insulated : '';
+      const notes = lines([item.description, ...extras]);
+      const variation = lines([packing, flavors.map(flavorName).join(' · '), notes]);
       return { index, name: text(item.name) || product?.name || 'Product', quantity: item.quantity,
-        variation: lines([item.description, variations(item, product)]) || 'Standard', photo: photoUrl(product?.photos?.[0]) };
+        variation, notes, packing, flavors: renderOrderFlavors(flavors, { products, esc }), photo: photoUrl(product?.photos?.[0]) };
     }),
   };
 }
@@ -72,11 +63,12 @@ function createSlip(doc, model) {
     <footer class="slip-footer"><span class="slip-number">Slip 000 of 000</span><span>Keep all slips with this order</span></footer></article>`);
 }
 
-function itemCard(doc, item, value, continued = false) {
+function itemCard(doc, item, value, continued = false, withFlavors = false) {
   return element(doc, `<section class="slip-item" data-item-index="${item.index}" data-continued="${continued}">
     <div class="slip-photo">${!continued && item.photo ? `<img src="${esc(item.photo)}" alt="${esc(item.name)}" referrerpolicy="no-referrer">` : continued ? 'Cont.' : 'No photo'}</div>
     <div class="slip-item-copy"><h3 class="slip-item-title">${continued ? `<span class="slip-continuation">Item ${item.index + 1} continued</span>` : `<span class="slip-quantity">${esc(item.quantity)}×</span>${esc(item.name)}`}</h3>
-    <p class="slip-variation">${esc(value)}</p></div></section>`);
+    ${withFlavors ? (item.packing ? `<p class="order-packing">${esc(item.packing)}</p>` : '') + item.flavors : ''}
+    <p class="slip-variation"${!value && withFlavors ? ' hidden' : ''}>${esc(value)}</p></div></section>`);
 }
 
 function detailCard(doc, title, value, continued = false) {
@@ -147,24 +139,32 @@ function overflowSlips(doc,model){
 function paginate(doc, model) {
   const page=createSlip(doc,model);doc.querySelector('#slips').append(page);
   const items=page.querySelector('.slip-items');
-  for(const item of model.items)items.append(itemCard(doc,item,item.variation));
+  for (const item of model.items) items.append(itemCard(doc, item, item.notes, false, true));
+  const hasIcons = items.querySelector('.order-flavor-icon');
   for(const detail of model.details)if(detail.value&&detail.value!=='None')page.querySelector('.slip-details').append(detailCard(doc,detail.title,detail.value));
   page.querySelector('.slip-item-heading').textContent='Items to prepare · '+model.items.length;
   page.querySelector('.slip-footer span:last-child').textContent='Keep with this order';
   for(const mode of ['quarter','quarter-compact','half','half-compact']){
     const half=mode.startsWith('half');page.className='slip'+(half?' slip-half':'')+(mode.endsWith('compact')?' slip-compact':'');
     page.dataset.size=half?'half':'quarter';page.querySelector('.slip-number').textContent=half?'Half-sheet slip':'Quarter-sheet slip';
-    if(fitsSlip(page))return [page];
+    if (fitsSlip(page)) return [page];
+    if (hasIcons) {
+      page.classList.add('slip-text-only');
+      if (fitsSlip(page)) return [page];
+    }
   }
   page.remove();return overflowSlips(doc,model);
 }
 
 async function readyImages(doc) {
-  await Promise.all([...doc.images].map(img => new Promise(resolve => {
+  await Promise.all([...doc.images].filter(img => !img.closest('.slip-text-only') || !img.classList.contains('order-flavor-icon')).map(img => new Promise(resolve => {
     let timer;
     const done = () => {
       clearTimeout(timer); img.removeEventListener('load', done); img.removeEventListener('error', done);
-      if (!img.complete || !img.naturalWidth) img.parentElement.textContent = 'Photo unavailable';
+      if (!img.complete || !img.naturalWidth) {
+        if (img.classList.contains('order-flavor-icon')) img.remove();
+        else img.parentElement.textContent = 'Photo unavailable';
+      }
       resolve();
     };
     if (img.complete) return done();

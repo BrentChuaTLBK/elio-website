@@ -17,9 +17,21 @@ try {
   document.title = checklistTitles[type];
   if (orders.length) {
     const periodLabel = from === to ? formatDate(from) : `${formatDate(from)} – ${formatDate(to)}`;
-    sheet.innerHTML = renderOrderChecklist({ orders, type, periodLabel });
+    const render = (products = []) => {
+      sheet.innerHTML = renderOrderChecklist({ orders, type, periodLabel, products });
+      for (const photo of sheet.querySelectorAll('.order-flavor-icon')) {
+        photo.addEventListener('error', () => photo.remove(), { once: true });
+      }
+    };
+    render();
     status.hidden = true;
     print.disabled = false;
+    if (sheet.querySelector('.order-flavors')) {
+      // A missing catalog or photo must not delay printing the checklist.
+      api('flavor_collection').then(({ flavors }) => {
+        if (Array.isArray(flavors) && flavors.length) render(flavors.map(flavor => ({ ...flavor, kind: 'flavor' })));
+      }).catch(() => {});
+    }
   } else {
     status.textContent = 'No orders match this checklist for the selected dates.';
   }

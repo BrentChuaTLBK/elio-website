@@ -139,6 +139,23 @@ try{
  await form.getByRole('button',{name:'Save changes',exact:true}).click();await closed();
  assert.deepEqual((await row(draftId)).box_questions,[]);
  results.push('Owner adds and removes a required question and its priced choices on a mobile dashboard.');
+ await edit(draftId);
+ const presetButton=form.getByRole('button',{name:'Add insulated bag preset'});
+ await presetButton.click();
+ assert(await presetButton.isDisabled());
+ await form.getByLabel('Extra price for Yes · PHP').fill('40');
+ await form.getByRole('button',{name:'Save changes',exact:true}).click();await closed();
+ const [preset]=(await row(draftId)).box_questions;
+ assert.equal(preset.id,'insulated-bag');
+ assert.equal(preset.required_count,1);
+ assert.deepEqual(preset.choices.map(choice=>[choice.id,choice.surcharge_cents]),[['no',0],['yes',4000]]);
+ await edit(draftId);
+ assert.equal(await form.getByLabel('Extra price for Yes · PHP').inputValue(),'40.00');
+ await form.getByRole('button',{name:'Remove insulated bag preset'}).click();
+ assert(await presetButton.isEnabled());
+ await form.getByRole('button',{name:'Save changes',exact:true}).click();await closed();
+ assert.deepEqual((await row(draftId)).box_questions,[]);
+ results.push('The insulated bag preset uses stable Yes and No choices and preserves the configured surcharge across reopening.');
  for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:1000});await fits();assert.ok(await page.locator('.product-card-actions').first().evaluate(el=>el.scrollWidth<=el.clientWidth+1));if(width===390||width===1440)await page.screenshot({path:join(out,`product-cards-${width}.png`),fullPage:true});}
  actor=h.ids.staff;await page.reload();await navigateDashboard(page,'boxes');assert.equal(await page.locator('[data-action=duplicate-product]').count(),0);
  for(const user of [h.ids.staff,h.ids.customer,null])await assert.rejects(()=>invoke('save_product',{product:{...draft,id:undefined,name:'Unauthorized copy'}},user),/owner|Authorized/i);
