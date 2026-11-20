@@ -1,6 +1,7 @@
 import {api,auth,ready,escapeHtml as esc,money} from './client.js';
 import { printOrderSlips } from './order-slips.js?v=slip-copies-1';
 import { posItemVariations } from './pos-variations.js';
+import {boxQuestions,boxQuestionFields} from '../shop/box-questions.js';
 import {deliveryFeeSummary} from '../delivery-fee.js';
 import {accountingDatePicker,bindAccountingDates} from './accounting-date-picker.js?v=branded-calendars-1';
 const $=s=>document.querySelector(s),root=$('#pos'),dialog=$('#dialog');
@@ -34,7 +35,18 @@ function cartQuantity(item,index){
 }
 function currentProducts(){return mode==='in_person'?(event?.items||[]):[...catalog.products,...(catalog.pos_products||[])];}
 function product(id){return currentProducts().find(p=>p.id===id);}
-function linePrice(i){if(i.source==='custom')return i.unit_price_cents; if(editing){const old=editing.items.find(x=>x.product_id===i.product_id&&JSON.stringify(x.selections||{})===JSON.stringify(i.selections||{}));if(old)return old.unit_price_cents;}const p=product(i.product_id);if(!p)return i.unit_price_cents||0;return Number(p.price_cents||0)+(['custom_box','variant_item'].includes(p.kind)?Object.entries(i.selections?.flavors||{}).reduce((n,[id,q])=>n+flavorPrice(saleFlavor(id))*q,0):0);}
+function selectedBoxAnswers(p,selections,snapshot) {
+ if(Array.isArray(snapshot))return snapshot.filter(c=>c?.group_id&&c.group_id!=='flavors').map(c=>({...c,question:c.group}));
+ return boxQuestions(p).flatMap(q=>q.choices.filter(c=>Number(selections?.[q.id]?.[c.id])===1).map(c=>({question:q.label,...c})));
+}
+function readBoxAnswers(p,form) {
+ return Object.fromEntries(boxQuestions(p).map(q=>{
+  const id=form.get('box-question-'+q.id);
+  if(!q.choices.some(c=>c.id===id&&c.active!==false))throw Error('Choose one answer for '+q.label+'.');
+  return [q.id,{[id]:1}];
+ }));
+}
+function linePrice(i){if(i.source==='custom')return i.unit_price_cents; if(editing){const old=editing.items.find(x=>x.product_id===i.product_id&&JSON.stringify(x.selections||{})===JSON.stringify(i.selections||{}));if(old)return old.unit_price_cents;}const p=product(i.product_id);if(!p)return i.unit_price_cents||0;return Number(p.price_cents||0)+selectedBoxAnswers(p,i.selections).reduce((sum,c)=>sum+Number(c.surcharge_cents||0),0)+(['custom_box','variant_item'].includes(p.kind)?Object.entries(i.selections?.flavors||{}).reduce((n,[id,q])=>n+flavorPrice(saleFlavor(id))*q,0):0);}
 const draftFee=()=>draft.method!=='delivery'?0:editing?draft.delivery_cents:draft.delivery_fee_pending||draft.delivery_fee_recipient==='courier'?0:draft.delivery_cents;
 const draftCharge=()=>editing?draft.delivery_charge:mode==='direct'?{state:draft.delivery_fee_pending?'pending':draft.delivery_fee_recipient==='courier'?'courier':'included',recipient:draft.delivery_fee_recipient,fee_cents:draft.delivery_fee_pending?null:draft.delivery_cents}:null;
 const subtotal=()=>draft.items.reduce((sum,item)=>sum+linePrice(item)*item.quantity,0);
@@ -92,7 +104,7 @@ function renderSale(){
  const cash=event?.cash_session;
  return `${editing?`<p class="notice">Editing ${esc(editing.reference)}. Saved item prices are preserved. Changes are recorded in order history. ${button('cancel-edit','Leave editor')}</p>`:''}${mode==='in_person'&&!editing&&(!cash||cash.closed_at)?`<section class="panel"><h2>${cash?'Cash session closed':'Start today’s cash session'}</h2><p>Enter the opening float before the first sale. You can open with ₱0 if there is no cash float.</p>${cash?(role==='owner'?button('reopen-cash','Reopen cash session'):'<p>Ask the owner to reopen this cash session.</p>'):button('open-cash','Open cash session','class="primary"')}</section>`:''}
  <div class="sales-grid"><section class="panel catalog-panel"><div class="section-head"><h2>Choose items</h2>${mode==='direct'?button('custom-item','+ Add custom item'):'<small>Event stock only</small>'}</div><label class="search">Search items<input id="search" type="search" value="${esc(search)}" placeholder="Find a product"></label><div class="catalog">${products.map(p=>`<button type="button" class="product" data-add="${esc(p.id)}" ${p.active===false||mode==='in_person'&&eventAvailable(p)<1?'disabled':''}><strong>${esc(p.name)}</strong><span class="price">${money(p.price_cents)}</span><small>${p.kind==='variant_item'?'Choose 1 flavor · '+eventAvailable(p)+' more available':p.kind==='custom_box'?'Choose 3 flavors · surcharges apply'+(mode==='in_person'?' · '+eventAvailable(p)+' more available':''):p.source==='website'?(p.remaining_boxes==null?'Shared website flavor stock':`${p.remaining_boxes} available on this date`):p.remaining===null?'Unlimited stock':`${mode==='in_person'?eventAvailable(p):p.remaining??0} ${mode==='in_person'?'more available':'available'}`}</small>${p.source==='website'&&p.stock_available===false?'<small>Check availability for the selected date</small>':''}</button>`).join('')||'<p class="empty">No items available. Check the event setup or choose another date.</p>'}</div></section>
- <section class="panel checkout-panel" id="checkout-panel"><form id="sale-form">${(immediateSale()||mode==='direct')?button('back-to-items','← Back to items','class="back-to-items"'):''}<h2>${editing?'Order details':mode==='direct'?'Direct order':'Your sale'}</h2><div id="cart">${draft.items.map((i,index)=>`<div class="cart-line ${immediateSale()?'cart-line-quick':''}"><div><strong>${esc(product(i.product_id)?.name||i.name||'Saved item')}</strong>${i.description?`<small>${esc(i.description)}</small>`:''}${i.source==='custom'?button('edit-custom-item','Edit name / price',`data-id="${index}"`):''}<div class="cart-price"><strong>${money(linePrice(i))}</strong><span>each</span></div>${i.quantity>1?`<div class="cart-line-total">${money(linePrice(i)*i.quantity)} <span>for ${i.quantity}</span></div>`:''}<small>${i.selections?.flavors?Object.entries(i.selections.flavors).filter(([,q])=>q>0).map(([id,q])=>esc(q+' × '+(saleFlavor(id)?.name||'Saved flavor'))).join(', '):''}</small></div>${cartQuantity(i,index)}<button type="button" data-remove="${index}" aria-label="Remove item">×</button></div>`).join('')||'<p class="empty">Add items to your sale.</p>'}</div>
+ <section class="panel checkout-panel" id="checkout-panel"><form id="sale-form">${(immediateSale()||mode==='direct')?button('back-to-items','← Back to items','class="back-to-items"'):''}<h2>${editing?'Order details':mode==='direct'?'Direct order':'Your sale'}</h2><div id="cart">${draft.items.map((i,index)=>`<div class="cart-line ${immediateSale()?'cart-line-quick':''}"><div><strong>${esc(product(i.product_id)?.name||i.name||'Saved item')}</strong>${i.description?`<small>${esc(i.description)}</small>`:''}${i.source==='custom'?button('edit-custom-item','Edit name / price',`data-id="${index}"`):''}<div class="cart-price"><strong>${money(linePrice(i))}</strong><span>each</span></div>${i.quantity>1?`<div class="cart-line-total">${money(linePrice(i)*i.quantity)} <span>for ${i.quantity}</span></div>`:''}<small>${i.selections?.flavors?Object.entries(i.selections.flavors).filter(([,q])=>q>0).map(([id,q])=>esc(q+' × '+(saleFlavor(id)?.name||'Saved flavor'))).join(', '):''}</small>${selectedBoxAnswers(product(i.product_id),i.selections,i.selection_labels).map(c=>`<small>${esc(c.question)} — ${esc(c.label)}${c.surcharge_cents?' (+'+money(c.surcharge_cents)+')':''}</small>`).join('')}</div>${cartQuantity(i,index)}<button type="button" data-remove="${index}" aria-label="Remove item">×</button></div>`).join('')||'<p class="empty">Add items to your sale.</p>'}</div>
  ${mode==='direct'?directDiscountFields():''}
  ${!immediateSale()?`<div class="subheading fields">${select('method','Fulfillment',[['pickup','Pickup'],['delivery','Delivery']],draft.method)}${input('fulfillment_date','Fulfillment date',draft.fulfillment_date,'date','required')}</div>`:''}
  ${mode==='direct'&&role==='owner'?`<details><summary>Owner date override</summary><label class="check"><input name="override_dates" type="checkbox" ${draft.override_dates?'checked':''}>Override lead times and closed dates</label>${input('override_reason','Reason for override · optional',draft.override_reason,'text','maxlength="500"')}</details>`:''}
@@ -341,14 +353,14 @@ function choiceStock(f){
 function chooseBoxFlavors(p){
  let limit=3;
  const choices=mode==='in_person'?event.stock.filter(f=>p.choice_stock_ids.includes(f.id)).map(f=>({...f,price_cents:f.surcharge_cents,remaining:availableEventStock(f.id)})):catalog.flavors.map(choiceStock),selected=new Map(choices.map(f=>[f.id,0]));
- modal('Choose '+limit+' flavor pieces',`<form class="flavor-picker">${mode==='direct'?input('box_quantity','Boxes',1,'number','min="1" max="10000" step="1" required'):''}<p id="flavor-selection-status" class="muted" role="status" aria-live="polite">0 of ${limit} selected</p>${choices.map(f=>`<div class="flavor-choice"><span class="flavor-name">${esc(f.name)}${f.remaining===0?'<small>Unavailable</small>':''}${f.price_cents?`<small>+${money(f.price_cents)} per piece</small>`:''}</span><div class="flavor-stepper" role="group" aria-label="${esc(f.name)} quantity"><button type="button" data-flavor-minus="${esc(f.id)}" aria-label="Remove one ${esc(f.name)}" disabled>−</button><output data-flavor-count="${esc(f.id)}" aria-label="${esc(f.name)} pieces">0</output><button type="button" data-flavor-plus="${esc(f.id)}" aria-label="Add one ${esc(f.name)}">+</button></div></div>`).join('')}<button class="primary subheading" type="submit" disabled>Add box</button></form>`,async()=>{
+ modal('Choose '+limit+' flavor pieces',`<form class="flavor-picker">${mode==='direct'?input('box_quantity','Boxes',1,'number','min="1" max="10000" step="1" required'):''}<p id="flavor-selection-status" class="muted" role="status" aria-live="polite">0 of ${limit} selected</p>${choices.map(f=>`<div class="flavor-choice"><span class="flavor-name">${esc(f.name)}${f.remaining===0?'<small>Unavailable</small>':''}${f.price_cents?`<small>+${money(f.price_cents)} per piece</small>`:''}</span><div class="flavor-stepper" role="group" aria-label="${esc(f.name)} quantity"><button type="button" data-flavor-minus="${esc(f.id)}" aria-label="Remove one ${esc(f.name)}" disabled>−</button><output data-flavor-count="${esc(f.id)}" aria-label="${esc(f.name)} pieces">0</output><button type="button" data-flavor-plus="${esc(f.id)}" aria-label="Add one ${esc(f.name)}">+</button></div></div>`).join('')}${boxQuestionFields(boxQuestions(p),{},{esc,money})}<button class="primary subheading" type="submit" disabled>Add box</button></form>`,async form=>{
   const flavors=Object.fromEntries([...selected].filter(([,n])=>n>0));
   if(Object.values(flavors).reduce((a,b)=>a+b,0)!==limit)throw Error('Choose exactly '+limit+' pieces.');
   const quantity=limit/3;
   const group={id:'flavors',label:'flavors',required_count:3,choices};
-  const lines=posItemVariations([group],quantity,{flavors});
+  const lines=posItemVariations([group],quantity,{flavors}),answers=readBoxAnswers(p,form);
   const before=structuredClone(draft.items);
-  try{for(const line of lines)pushItem(p,line.selections,line.quantity);}catch(error){draft.items=before;throw error;}
+  try{for(const line of lines)pushItem(p,{...line.selections,...answers},line.quantity);}catch(error){draft.items=before;throw error;}
   dialog.close();render();
  });
  const form=dialog.querySelector('form'),total=()=>[...selected.values()].reduce((a,b)=>a+b,0);
@@ -356,9 +368,10 @@ function chooseBoxFlavors(p){
   form.querySelectorAll('[data-flavor-count]').forEach(el=>el.textContent=selected.get(el.dataset.flavorCount));
   form.querySelectorAll('[data-flavor-minus]').forEach(el=>el.disabled=selected.get(el.dataset.flavorMinus)===0);
   form.querySelectorAll('[data-flavor-plus]').forEach(el=>el.disabled=count>=limit||selected.get(el.dataset.flavorPlus)>=(choices.find(f=>f.id===el.dataset.flavorPlus)?.remaining??Infinity));
-  form.querySelector('[type=submit]').disabled=!limit||count!==limit;
+  form.querySelector('[type=submit]').disabled=!limit||count!==limit||Boolean(form.querySelector(':invalid'));
   form.querySelector('[role=status]').textContent=count+' of '+limit+' selected'+(count===limit?' · Remove a piece to change flavors.':'');
  }
+ form.addEventListener('change',update);
  form.elements.box_quantity?.addEventListener('input',update);
  form.querySelectorAll('[data-flavor-plus],[data-flavor-minus]').forEach(el=>el.onclick=()=>{
   if(busy)return;const id=el.dataset.flavorPlus||el.dataset.flavorMinus,previous=selected.get(id);
@@ -367,7 +380,11 @@ function chooseBoxFlavors(p){
  });
  update();
 }
-function addItem(id){readDraft();const p=product(id);if(!p||immediateSale()&&eventAvailable(p)<1)return;if(p.kind==='variant_item')chooseItemFlavor(p);else if(p.kind==='custom_box')chooseBoxFlavors(p);else{pushItem(p,{});render();}}
+function addItem(id){readDraft();const p=product(id);if(!p||immediateSale()&&eventAvailable(p)<1)return;if(p.kind==='variant_item')chooseItemFlavor(p);else if(p.kind==='custom_box')chooseBoxFlavors(p);else if(boxQuestions(p).length){
+ modal(p.name,`<form>${boxQuestionFields(boxQuestions(p),{},{esc,money})}<button class="primary" type="submit">Add box</button></form>`,async form=>{
+  pushItem(p,readBoxAnswers(p,form));dialog.close();render();
+ });
+ }else{pushItem(p,{});render();}}
 function pushItem(p,selections,quantity=1){const existing=draft.items.find(i=>i.product_id===p.id&&JSON.stringify(i.selections)===JSON.stringify(selections));if((existing?.quantity||0)+quantity>10000)throw Error('Each line can have up to 10,000 units.');if(existing)existing.quantity+=quantity;else draft.items.push({product_id:p.id,source:p.source||'event',quantity,selections,name:p.name});}
 async function editOrder(id){const o=await api('get_order',{order_id:id});if(['completed','cancelled','expired'].includes(o.fulfillment_status)||o.refund_label||o.order_source==='direct'&&o.payment_status==='under_review'){mode=o.order_source;view='orders';await load();render();return;}if(!['direct','in_person'].includes(o.order_source))throw Error('Use the kitchen editor for this order.');mode=o.order_source;eventId=o.event_id||'';editing=o;draft={...newDraft(),...structuredClone(o),payment:o.pos_payment||{method:'cash',cash_received_cents:null,reference:''},reason:'',items:structuredClone(o.items)};await load();mobileCheckout=mode==='direct';view='sale';render();}
 function payOrder(o){let p={method:'cash',cash_received_cents:null,reference:''},request=null;const draw=()=>{modal('Record full payment',`<form><p><strong>${esc(o.reference)}</strong> · ${money(o.total_cents)} due</p>${paymentFields(p)}<button class="primary" type="submit">Record payment received</button></form>`,async f=>{request??={order_id:o.id,revision:o.revision,idempotency_key:uid(),payment:{method:f.get('payment_method'),cash_received_cents:cents(f.get('cash_received')||'0'),reference:String(f.get('payment_reference')||'')}};let saved;try{saved=await api('pos_pay_order',request);}catch(error){if(error.code==='P0001'||/^22|^23/.test(error.code||''))request=null;else{dialog.querySelectorAll('input,select').forEach(el=>el.disabled=true);}throw error;}await load();dialog.close();render();showSaved(saved);});dialog.querySelector('[name=payment_method]').onchange=e=>{p.method=e.target.value;dialog.close();draw();};};draw();}

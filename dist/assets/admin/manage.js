@@ -578,7 +578,7 @@ function duplicateProduct(id) {
   const source = state.products.find(p => p.id === id && !p.deleted_at);
   if (!source) return;
   // Copy editable catalog details only. Identity, stock, menus and history belong to the original.
-  const fields = ['kind','description','category_id','category_ids','price_cents','min_quantity','minimum_order_unit','lead_days','pickup_only','allow_same_day','photos','option_groups','box_flavors','tagline','collection_details','label'];
+  const fields = ['kind','description','category_id','category_ids','price_cents','min_quantity','minimum_order_unit','lead_days','pickup_only','allow_same_day','photos','box_questions','box_flavors','tagline','collection_details','label'];
   productDraft = clone(Object.fromEntries(fields.filter(key => source[key] !== undefined).map(key => [key,source[key]])));
   const names = new Set(state.products.map(p => p.name.toLocaleLowerCase()));
   let name, number = 1;
@@ -592,10 +592,41 @@ function captureProduct() {
   const form = $('[data-form="product"]');
   if (!form) return;
   Object.assign(productDraft, { kind: fieldValue(form, 'kind') || productDraft.kind, price_confirmed: true, in_rotation: productDraft.kind==='flavor' ? true : productDraft.in_rotation, name: fieldValue(form, 'name'), description: fieldValue(form, 'description'), category_ids: $$('[name=category_ids]:checked',form).map(el=>el.value), category_id: $('[name=category_ids]:checked',form)?.value || null, price_cents: cents(fieldValue(form, 'price')), min_quantity: Number(fieldValue(form, 'min_quantity')), lead_days: Number(fieldValue(form, 'lead_days')), active: productDraft.kind==='flavor' ? !productDraft.collection_hidden : fieldChecked(form, 'active'), pickup_only: fieldChecked(form, 'pickup_only'), allow_same_day: fieldChecked(form, 'allow_same_day'), label: productLabelSettings({ enabled: fieldChecked(form, 'label_enabled'), text: fieldValue(form, 'label_text'), color: fieldValue(form, 'label_color') }) });
+  if (form.elements.collection_hidden) {
+    productDraft.collection_hidden = form.elements.collection_hidden.checked;
+    productDraft.active = !productDraft.collection_hidden;
+  }
+  if (productDraft.kind !== 'flavor') {
+    for (const [gi, question] of (productDraft.box_questions || []).entries()) {
+      question.label = fieldValue(form, 'group_label_' + gi).trim();
+      for (const [ci, choice] of question.choices.entries()) {
+        choice.label = fieldValue(form, `choice_label_${gi}_${ci}`).trim();
+        choice.surcharge_cents = cents(fieldValue(form, `choice_price_${gi}_${ci}`));
+      }
+    }
+  }
   if (productDraft.kind !== 'flavor') productDraft.minimum_order_unit = fieldValue(form, 'minimum_order_unit').trim() || 'box';
   if (productDraft.kind === 'set') productDraft.box_flavors = $$('[data-box-flavor]', form).map(select => select.value).filter(Boolean);
   if (productDraft.kind === 'flavor') Object.assign(productDraft, { tagline: fieldValue(form,'tagline'), collection_details: readFlavorDetails(form), min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
   productDraft.option_groups = [];
+}
+function boxQuestionFields(questions) {
+  return questions.map((question, gi) => `<fieldset class="option-group">
+    <legend>Question ${gi + 1}</legend>
+    ${input('group_label_' + gi, 'Question', question.label, 'text', 'required maxlength="160" placeholder="What packaging would you like?"')}
+    ${question.choices.map((choice, ci) => `<div class="field-row">
+      ${input(`choice_label_${gi}_${ci}`, 'Choice ' + (ci + 1), choice.label, 'text', 'required maxlength="240"')}
+      ${input(`choice_price_${gi}_${ci}`, 'Extra price per box · PHP', amount(choice.surcharge_cents), 'number', 'min="0" max="1000000" step="0.01"')}
+      <button type="button" class="button button-quiet" data-action="remove-choice" data-group="${gi}" data-index="${ci}" aria-label="Remove choice ${ci + 1} from question ${gi + 1}">Remove choice</button>
+    </div>`).join('')}
+    <div class="row-actions"><button type="button" class="button button-secondary" data-action="add-choice" data-index="${gi}">+ Add choice</button>
+    <button type="button" class="button button-quiet" data-action="remove-group" data-index="${gi}">Remove question</button></div>
+  </fieldset>`).join('');
+}
+function refreshBoxQuestions(focus) {
+  $('[data-box-questions]').innerHTML = boxQuestionFields(productDraft.box_questions);
+  $(focus)?.focus();
+  catalogDraft.sync();
 }
 function productLabelEditor(value) {
   const saved = productLabelSettings(value);
@@ -650,25 +681,28 @@ function renderProductDialog() {
   const kind = p.kind || 'set';
   const flavor = kind === 'flavor';
   const draftPublication = Boolean(productCopy || (p.id && (flavor ? p.collection_hidden : !p.active)));
+  const editingFlavor = flavor && p.id && !productCopy;
   const names = { flavor: 'flavor', set: 'fixed box', custom_box: 'custom box' };
   const boxChoices = state.products.filter(item => item.kind === 'flavor' && !item.deleted_at);
   const savedFlavor = value => boxChoices.find(item => item.id === value || item.slug === value)?.id || '';
   showDialog(productCopy ? 'Duplicate ' + names[kind] : p.id ? 'Edit ' + p.name : 'Add ' + names[kind], `<form data-form="product" ${draftPublication ? 'data-product-publication="true"' : ''}>${formError}
-    ${draftPublication ? `<p class="notice">${productCopy ? `Copy of <strong>${esc(productCopy.name)}</strong>. ` : ''}Save a draft to keep this item hidden, or publish when it is ready.${flavor ? ' Publishing adds it to the full collection. Choose its monthly lineups separately in Flavor menus.' : ''}</p>` : ''}
+    ${draftPublication && !editingFlavor ? `<p class="notice">${productCopy ? `Copy of <strong>${esc(productCopy.name)}</strong>. ` : ''}Save a draft to keep this item hidden, or publish when it is ready.${flavor ? ' Publishing adds it to the full collection. Choose its monthly lineups separately in Flavor menus.' : ''}</p>` : ''}
     ${flavor ? '<input type="hidden" name="kind" value="flavor">' : select('kind', 'Box type', option('set', 'Fixed box / set', kind) + option('custom_box', 'Custom box of three', kind), p.id ? 'disabled' : '')}
     ${input('name', flavor ? 'Flavor name' : 'Box name', p.name, 'text', 'required maxlength="160"')}
     ${flavor ? input('tagline', 'Tagline', p.tagline ?? window.ELIO_CONTENT?.flavors.find(f=>f.id===p.slug)?.line ?? '', 'text', 'maxlength="100"', 'For example: Classic and creamy. Shown on the flavor card and popup.') : ''}
     ${textarea('description', flavor ? 'Brief description' : 'Description', p.description, 'Describe the flavor or what makes this box special.', 'maxlength="6000"')}
     <div class="field-row">${input('price', flavor ? 'Surcharge per piece · PHP' : kind === 'set' ? 'Fixed price per box · PHP' : 'Base price per box · PHP', amount(p.price_cents), 'number', 'required min="0" max="1000000" step="0.01"', flavor ? 'Use 0 for flavors included in the base box price.' : kind === 'set' ? 'The full set price. Flavor surcharges apply only to custom boxes.' : '')}</div>
+    ${flavor && !productCopy ? `<section class="subsection"><h3>Visibility</h3>${check('collection_hidden', 'Hide flavor', p.collection_hidden === true, ownerLocked())}<p class="help-text">Hiding removes this flavor from all public collections and monthly lineups. To offer it again, unhide it and add it to a lineup.</p></section>` : ''}
     ${flavor || draftPublication ? '' : check('active', 'Show this product in shop', p.active)}
     ${kind === 'set' ? `<section class="subsection"><h3>Inside this box</h3><p class="muted">Choose a flavor for each of the three pieces. Repeats are welcome. Each box uses these flavors’ stock. If any required flavor is unavailable, the set is sold out.</p><div class="field-row three">${[0,1,2].map(i => select('box_flavor_' + i, 'Cheesecake ' + (i + 1), option('', 'Choose a flavor', savedFlavor(p.box_flavors?.[i])) + boxChoices.map(f => option(f.id, f.name, savedFlavor(p.box_flavors?.[i]))).join(''), 'data-box-flavor required')).join('')}</div></section>` : ''}
     ${kind === 'custom_box' ? '<p class="notice">Customers choose exactly three pieces. Each flavor adds its own surcharge and uses its own daily stock. Manage those choices in Flavors.</p>' : ''}
     ${flavor ? '<p class="notice">Inventory is counted in individual pieces and shared across all boxes. Set a quantity for each date in Daily quantities. Unavailable flavors also make their fixed sets unavailable.</p>' : `<section class="subsection"><h3>Ordering & fulfillment</h3><div class="field-row">${input('min_quantity', 'Minimum quantity per order', p.min_quantity || 1, 'number', 'required min="1" max="9999" step="1"')}${input('minimum_order_unit', 'Minimum order label', p.minimum_order_unit || 'box', 'text', 'maxlength="40"', 'Shown after a minimum of 2 or more. Use box for “boxes”, or enter your wording, such as “trays”.')}</div><div class="field-row">${input('lead_days', 'Full production days', p.lead_days || 0, 'number', 'required min="0" max="365" step="1"')}</div>${check('pickup_only', 'Pickup only', p.pickup_only === true)}${check('allow_same_day', 'Allow same-day orders (requires 0 production days)', p.allow_same_day === true)}</section>`}
+    ${flavor ? '' : `<section class="subsection"><h3>Box questions</h3><p class="muted">Customers choose one answer per question. Leave the extra price at zero for an included choice.</p><div data-box-questions>${boxQuestionFields(p.box_questions || [])}</div><button type="button" class="button button-secondary" data-action="add-group">+ Add question</button></section>`}
     ${flavor ? flavorDetailFields(p,{input,textarea,disabled:ownerLocked()}) : ''}
     ${categoryFields(p,areaCategories(),esc,ownerLocked())}
     ${productLabelEditor(p.label)}
     <section class="subsection"><h3>Photos</h3><p class="muted">${PHOTO_HELP} Product photos are public. The first photo is the cover.</p><p class="help-text" id="photo-order-help">Drag photos to rearrange them, or focus a photo and use the arrow keys. Save the item to keep your photo changes.</p><div id="product-photo-order">${renderProductPhotos(p.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) })}</div><p id="photo-order-status" class="sr-only" role="status" aria-live="polite"></p>${input('photos', 'Upload photos', '', 'file', `accept="${PHOTO_ACCEPT}" multiple id="product-photos" ` + ownerLocked())}</section>
-    ${draftPublication ? `<div class="dialog-actions"><button type="button" class="button button-secondary" data-action="close-dialog">Cancel</button><button type="submit" class="button button-secondary" name="publication" value="draft" ${ownerLocked()}>Save draft</button><button type="submit" class="button" name="publication" value="publish" ${ownerLocked()}>Publish product</button></div>` : actions(p.id ? 'Save changes' : 'Create ' + names[kind])}${p.id && owner() ? `<div class="subsection product-delete-section"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(p.id)}">Delete ${names[kind]}</button><p class="help-text">Existing orders and records are preserved.</p></div>` : ''}
+    ${draftPublication ? `<div class="dialog-actions"><button type="button" class="button button-secondary" data-action="close-dialog">Cancel</button><button type="submit" class="button button-secondary" name="publication" value="${editingFlavor ? 'save' : 'draft'}" ${ownerLocked()}>${editingFlavor ? 'Save changes' : 'Save draft'}</button><button type="submit" class="button" name="publication" value="publish" ${ownerLocked()}>Publish product</button></div>` : actions(p.id ? 'Save changes' : 'Create ' + names[kind])}${p.id && owner() ? `<div class="subsection product-delete-section"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(p.id)}">Delete ${names[kind]}</button><p class="help-text">Existing orders and records are preserved.</p></div>` : ''}
   </form>`);
   bindPhotoOrder();
   updateProductLabelPreview();
@@ -983,10 +1017,23 @@ async function onAction(button) {
     case 'new-category': categoryDialog(); break;
     case 'edit-category': categoryDialog(id); break;
     case 'delete-category': showDialog('Remove category', `<form data-form="delete-category" data-id="${esc(id)}">${formError}<p class="muted">Remove this category? Its products keep their other categories and inventory. Those with no categories still appear under All.</p>${actions('Remove category')}</form>`); break;
-    case 'add-group': captureProduct(); productDraft.option_groups.push({ id: uid(), label: '', required_count: 1, choices: [{ id: uid(), label: '', surcharge_cents: 0, active: true }] }); renderProductDialog(); break;
-    case 'remove-group': captureProduct(); productDraft.option_groups.splice(index, 1); renderProductDialog(); break;
-    case 'add-choice': captureProduct(); productDraft.option_groups[index].choices.push({ id: uid(), label: '', surcharge_cents: 0, active: true }); renderProductDialog(); break;
-    case 'remove-choice': captureProduct(); productDraft.option_groups[Number(button.dataset.group)].choices.splice(index, 1); renderProductDialog(); break;
+    case 'add-group': {
+      captureProduct();
+      const questions = productDraft.box_questions ||= [];
+      questions.push({ id: uid(), label: '', required_count: 1, choices: [1,2].map(() => ({ id: uid(), label: '', surcharge_cents: 0, active: true })) });
+      refreshBoxQuestions(`[name="group_label_${questions.length-1}"]`); break;
+    }
+    case 'remove-group':
+      captureProduct(); productDraft.box_questions.splice(index, 1); refreshBoxQuestions('[data-action="add-group"]'); break;
+    case 'add-choice': {
+      captureProduct(); const choices = productDraft.box_questions[index].choices;
+      choices.push({ id: uid(), label: '', surcharge_cents: 0, active: true });
+      refreshBoxQuestions(`[name="choice_label_${index}_${choices.length-1}"]`); break;
+    }
+    case 'remove-choice': {
+      captureProduct(); const group = Number(button.dataset.group);
+      productDraft.box_questions[group].choices.splice(index, 1); refreshBoxQuestions(`[data-action="add-choice"][data-index="${group}"]`); break;
+    }
     case 'remove-photo': captureProduct(); productDraft.photos.splice(index, 1); updateProductPhotos(); break;
     case 'new-zone': zoneDialog(); break;
     case 'edit-zone': zoneDialog(id); break;
@@ -1304,7 +1351,7 @@ async function submitForm(form, submitter) {
     }
     case 'product': {
       captureProduct();
-      const publication = form.dataset.productPublication === 'true' ? (submitter?.value === 'publish' ? 'publish' : 'draft') : null;
+      const publication = form.dataset.productPublication === 'true' && ['draft','publish'].includes(submitter?.value) ? submitter.value : null;
       const savedProduct = { ...productDraft, ...(productCopy ? { id: productCopy.id } : {}) };
       if (publication) {
         savedProduct.active = publication === 'publish';
@@ -1313,7 +1360,7 @@ async function submitForm(form, submitter) {
       if (productDraft.kind === 'set' && productDraft.box_flavors.length !== 3) throw new Error('Choose three flavors for this fixed box.');
       if (productDraft.allow_same_day && productDraft.lead_days !== 0) throw new Error('Same-day orders require 0 full production days. Set full production days to 0, or turn off Allow same-day orders.');
       if (productDraft.label.enabled && !productDraft.label.text) throw new Error('Enter text for your product label, or turn the label off.');
-      if (productDraft.option_groups.some(group => !group.choices.length || !group.choices.some(choice => choice.active))) throw new Error('Every option group needs at least one available choice.');
+      if ((productDraft.box_questions || []).some(question => !question.label || !question.choices.length || question.choices.some(choice => !choice.label))) throw new Error('Give every question a name and at least one named choice.');
       await api('save_product', { product: savedProduct, ...(productDraft.id ? { expected_revision: editRevision(productDraft) } : {}) });
       form.dataset.busy = 'false';
       catalogDraft.clear();closeDialog();

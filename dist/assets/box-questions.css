@@ -1,0 +1,11 @@
+.box-question {min-width:0;margin:16px 0;padding:0;border:0}
+.box-question legend {margin-bottom:6px;font-weight:600;overflow-wrap:anywhere}
+.box-question legend small {margin-left:6px;font-size:.85em;font-weight:400;color:var(--muted,#756656)}
+.box-question .box-answer {display:flex;align-items:center;gap:10px;min-height:44px;margin:0;padding:9px 4px;border-bottom:1px solid var(--line,#e6d9c9);cursor:pointer}
+.box-question .box-answer input {flex:none;width:16px;height:16px;min-height:0;margin:0;padding:0;accent-color:var(--brown,#764b29)}
+.box-question .box-answer span {flex:1;min-width:0;overflow-wrap:anywhere}
+.box-question .box-answer small {flex:none;color:var(--muted,#756656);white-space:nowrap}
+@media(max-width:800px) {
+  .trio-layout .trio-questions {order:2}
+  .trio-layout .trio-questions .box-question:first-child {margin-top:0}
+}

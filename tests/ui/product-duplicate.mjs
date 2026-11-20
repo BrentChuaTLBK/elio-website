@@ -113,7 +113,33 @@ try{
  await invoke('save_inventory',{rows:[{product_id:pistachio.id,date:orderDate,capacity:5,available:true}]});
  await assert.rejects(()=>invoke('quote',twoBoxes,null),/available|stock|pieces|capacity/i);
  results.push('A new paid flavor uses one ordinary photo. Its monthly menu editor can replace it and checkout uses the saved surcharge and daily stock.');
- await navigateDashboard(page,'boxes');for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:1000});await fits();assert.ok(await page.locator('.product-card-actions').first().evaluate(el=>el.scrollWidth<=el.clientWidth+1));if(width===390||width===1440)await page.screenshot({path:join(out,`product-cards-${width}.png`),fullPage:true});}
+ await navigateDashboard(page,'flavors');await edit(pistachio.id);
+ const hideFlavor=form.getByRole('checkbox',{name:'Hide flavor',exact:true});
+ await hideFlavor.check();await form.getByRole('button',{name:'Save changes',exact:true}).click();await closed();
+ for(const action of ['home_catalog','flavor_collection'])assert.equal((await invoke(action,{},null)).flavors.some(f=>f.id===pistachio.id),false);
+ assert.equal((await invoke('flavor_collection',{},null)).menus.some(m=>m.flavor_ids.includes(pistachio.id)),false);
+ await edit(pistachio.id);assert.equal(await hideFlavor.isChecked(),true);await hideFlavor.uncheck();
+ await form.getByRole('button',{name:'Save changes',exact:true}).click();await closed();
+ assert.equal((await invoke('flavor_collection',{},null)).flavors.some(f=>f.id===pistachio.id),true);
+ assert.equal((await invoke('flavor_collection',{},null)).menus.some(m=>m.flavor_ids.includes(pistachio.id)),false);
+ results.push('Edit flavor can hide and show the flavor globally, using the same visibility as Flavor menus.');
+ await navigateDashboard(page,'boxes');await edit(draftId);
+ await form.getByRole('button',{name:'Add question'}).click();
+ await form.locator('[name=group_label_0]').fill('What packaging would you like?');
+ await form.locator('[name=choice_label_0_0]').fill('Paper bag only');
+ await form.locator('[name=choice_label_0_1]').fill('Insulated bag + ice (recommended for long travel)');
+ await form.locator('[name=choice_price_0_1]').fill('37.50');
+ await form.getByRole('button',{name:'Add choice'}).click();
+ await form.getByRole('button',{name:'Remove choice 3 from question 1'}).click();
+ await form.getByRole('button',{name:'Save changes',exact:true}).click();await closed();
+ const savedQuestions=(await row(draftId)).box_questions;
+ assert.deepEqual(savedQuestions[0].choices.map(c=>c.surcharge_cents),[0,3750]);assert.equal(savedQuestions[0].required_count,1);
+ await edit(draftId);assert.equal(await form.locator('[name=choice_price_0_1]').inputValue(),'37.50');
+ await form.getByRole('button',{name:'Remove question',exact:true}).click();
+ await form.getByRole('button',{name:'Save changes',exact:true}).click();await closed();
+ assert.deepEqual((await row(draftId)).box_questions,[]);
+ results.push('Owner adds and removes a required question and its priced choices on a mobile dashboard.');
+ for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:1000});await fits();assert.ok(await page.locator('.product-card-actions').first().evaluate(el=>el.scrollWidth<=el.clientWidth+1));if(width===390||width===1440)await page.screenshot({path:join(out,`product-cards-${width}.png`),fullPage:true});}
  actor=h.ids.staff;await page.reload();await navigateDashboard(page,'boxes');assert.equal(await page.locator('[data-action=duplicate-product]').count(),0);
  for(const user of [h.ids.staff,h.ids.customer,null])await assert.rejects(()=>invoke('save_product',{product:{...draft,id:undefined,name:'Unauthorized copy'}},user),/owner|Authorized/i);
  assert.equal(await h.scalar("select count(*)::int from elio.products where data->>'name'='Unauthorized copy'"),0);results.push('Cards fit four viewport sizes; staff cannot duplicate and staff/customer/anonymous writes are rejected by the database.');
