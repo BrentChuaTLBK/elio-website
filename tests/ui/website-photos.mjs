@@ -14,7 +14,7 @@ const sdk=`export function createClient(){return {
  storage:{from:bucket=>({upload:async(path,file)=>{await window.photoUpload({bucket,path,type:file.type,size:file.size,header:[...new Uint8Array(await file.slice(0,12).arrayBuffer())]});return {};},getPublicUrl:path=>({data:{publicUrl:'https://dzxyhckkkrzqpwpavngn.supabase.co/storage/v1/object/public/website-images/'+path}})})},functions:{invoke:async()=>({data:{}})}}};`;
 async function rpc({p_action:a,p_payload:p={}}){
  if(a==='site_status')return {active:false,announce:false,server_time:new Date().toISOString()};
- if(a==='website_photos'){if(control.failRead)throw Error('Temporary service failure');return {photos:structuredClone(photos)};}
+ if(a==='website_photos'){if(control.readGate)await control.readGate;if(control.failRead)throw Error('Temporary service failure');return {photos:structuredClone(photos)};}
  if(a==='save_website_photo'){
   if(control.failSave){control.failSave=false;throw Error('Temporary save failure. Try again.');}
   if(p.revision!==photos[p.slot].revision)throw Error('This photo changed. Reload the saved photo before saving again.');
@@ -60,14 +60,43 @@ try{
  await card().locator('[name=alt]').fill('Pending conflicting description');photos.home_hero.revision++;
  await card().getByRole('button',{name:'Save photo',exact:true}).click();await card().getByRole('alert').waitFor();assert.equal(photos.home_hero.alt,'Freshly baked cheesecakes');
  await card().getByRole('button',{name:'Reload saved',exact:true}).click();await card().getByText('Your photo is published.',{exact:true}).waitFor();assert.equal(await card().locator('[name=alt]').inputValue(),'Freshly baked cheesecakes');
- await card().getByRole('button',{name:'Restore original',exact:true}).click();assert.notEqual(photos.home_hero.path,null);await card().getByRole('button',{name:'Save photo',exact:true}).click();await card().getByText('Saved. This photo is now published.',{exact:true}).waitFor();assert.equal(photos.home_hero.path,null);
- checks.push('Owner upload converts PNG to WebP, previews before publishing, retains failed drafts, retries without duplicate uploads, rejects stale saves, and restores the original only on Save.');
+ assert.equal(await page.getByRole('button',{name:'Restore original',exact:true}).count(),0);
+ assert.ok(photos.home_hero.path);
+ checks.push('Owner upload converts PNG to WebP, previews before publishing, retains failed drafts, retries without duplicate uploads, and reloads the published photo after a stale save.');
  for(const width of [1440,768,390,320]){await page.setViewportSize({width,height:1000});await clearLayout(page);await page.screenshot({path:join(out,'admin-'+width+'.png'),fullPage:true});}
  for(const p of ['story','shop','flavors']){await page.locator(`[data-photo-page="${p}"]`).click();assert.equal(await page.locator('[data-photo-slot]').count(),photoSlots.filter(s=>s.page===p).length);await clearLayout(page);}
  await ctx.close();assert.deepEqual(errors,[]);
  checks.push('All 14 photo slots grouped by page; admin navigation and layouts pass at 1440, 768, 390 and 320 pixels.');
  // Publish independent fixtures for every binding, including a dynamically inserted popup image.
  for(const [i,slot] of photoSlots.entries())photos[slot.id]={path:owner+'/'+`${String(i+1).padStart(8,'0')}-2222-4222-8222-222222222222.webp`,alt:'Replacement '+slot.id,position_x:23+i,position_y:40,revision:2};
+ // Hold the metadata response across cold load and warm reload, including a newly published photo.
+ const refreshCtx=await context(390),refresh=await refreshCtx.newPage(),bundled=[];
+ refresh.on('request',r=>{if(new URL(r.url()).pathname.endsWith('/assets/home-editorial-hero.webp'))bundled.push(r.url());});
+ for(const [iteration,id] of ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'].entries()){
+  let release;
+  control.readGate=new Promise(resolve=>{release=resolve;});
+  photos.home_hero={...photos.home_hero,path:owner+'/'+id+'.webp',alt:'Published home photo '+iteration};
+  if(iteration)await refresh.reload({waitUntil:'domcontentloaded'});else await refresh.goto(origin+'/index.html',{waitUntil:'domcontentloaded'});
+  const hero=refresh.locator('img[data-website-photo=home_hero]');
+  try{
+   assert.equal(await refresh.locator('#hero-title').isVisible(),true);
+   assert.equal(await hero.getAttribute('src'),null);
+   assert.equal(await hero.isVisible(),false);
+   assert.deepEqual(bundled,[]);
+  }finally{release();control.readGate=null;}
+  await refresh.waitForFunction(path=>document.querySelector('img[data-website-photo=home_hero]').currentSrc.endsWith(path),photos.home_hero.path);
+  assert.equal(await hero.getAttribute('alt'),photos.home_hero.alt);
+  assert.equal(await hero.isVisible(),true);
+  assert.deepEqual(bundled,[]);
+ }
+ control.failRead=true;await refresh.reload();
+ await refresh.waitForFunction(path=>document.querySelector('img[data-website-photo=home_hero]').currentSrc.endsWith(path),photos.home_hero.path);
+ assert.deepEqual(bundled,[]);await refreshCtx.close();
+ const cold=await context(320),offline=await cold.newPage();
+ await offline.goto(origin+'/index.html');
+ await offline.waitForFunction(()=>document.querySelector('img[data-website-photo=home_hero]').currentSrc.endsWith('/assets/home-editorial-hero.webp'));
+ await cold.close();control.failRead=false;
+ checks.push('A delayed cold load and refresh request only the published hero. An outage uses the last verified photo, or the original on a first visit.');
  for(const width of [1440,390,320]){
   const ctx=await context(width),page=await ctx.newPage();
   for(const file of ['index.html','story.html','order.html','flavors.html']){

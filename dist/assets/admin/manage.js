@@ -31,7 +31,6 @@ import { confirmFlavorRemoval } from './flavor-confirmation.js';
 import { socialContactMessage } from './checkout-fields.js';
 import { fulfillmentStatus, matchesFulfillmentStatus, isActiveFulfillment, needsPaymentReview } from './refund-status.js';
 import { renderProductPhotos, bindProductPhotoOrder } from './product-photos.js';
-import { flavorCutoutField, bindFlavorCutout } from './flavor-cutout.js';
 import { printOrderSlips } from './order-slips.js?v=slip-copies-1';
 import { pickupProofSection, bindPickupProof } from '../pickup-proof.js';
 import { mountOrderPhotos, orderPhotosMarkup } from './order-photos.js';
@@ -41,7 +40,7 @@ import { productLabelSettings, labelTextColor, MAX_LABEL_LENGTH } from './produc
 import { dateCalendar, bindDateCalendars, calendarDates, calendarMonthDays } from './date-calendar.js';
 import { quantitySelection, quantitySaveRows, quantityStatus, bulkQuantityDrafts } from './daily-quantities.js';
 import { analyticsDateRange, buildAnalytics } from './analytics.js';
-import { renderFlavorMenus, flavorMenuFields, menuMonths, menuFor, monthLabel, lineupChanged } from './flavor-menus.js?v=builder-cutout-1';
+import { renderFlavorMenus, flavorMenuFields, menuMonths, menuFor, monthLabel, lineupChanged } from './flavor-menus.js?v=menu-photos-2';
 import { renderAnalytics } from './analytics-view.js';
 import { mountAnalyticsChart } from './analytics-chart.js';
 import {renderPaymentEditor,mountPaymentEditor,readPaymentEditor} from './payment-options-editor.js';
@@ -358,7 +357,6 @@ function editFlavorMenu(id) {
   form.dataset.expectedCurrentMonth = String(fieldChecked(form, "current_month"));
   form.dataset.expectedNextMonth = String(fieldChecked(form, "next_month"));
   catalogDraft.mount(form,{reset:true});
-  bindFlavorCutout(form,{upload,safeImage,onChange:catalogDraft.sync});
 }
 function productionView() {
   const report=state.scopedReads?state.productionReport:buildProduction(state.orders,state.productionRange.from,state.productionRange.to);
@@ -580,7 +578,7 @@ function duplicateProduct(id) {
   const source = state.products.find(p => p.id === id && !p.deleted_at);
   if (!source) return;
   // Copy editable catalog details only. Identity, stock, menus and history belong to the original.
-  const fields = ['kind','description','category_id','category_ids','price_cents','min_quantity','lead_days','pickup_only','allow_same_day','photos','builder_cutout_url','option_groups','box_flavors','tagline','collection_details','label'];
+  const fields = ['kind','description','category_id','category_ids','price_cents','min_quantity','minimum_order_unit','lead_days','pickup_only','allow_same_day','photos','option_groups','box_flavors','tagline','collection_details','label'];
   productDraft = clone(Object.fromEntries(fields.filter(key => source[key] !== undefined).map(key => [key,source[key]])));
   const names = new Set(state.products.map(p => p.name.toLocaleLowerCase()));
   let name, number = 1;
@@ -594,8 +592,9 @@ function captureProduct() {
   const form = $('[data-form="product"]');
   if (!form) return;
   Object.assign(productDraft, { kind: fieldValue(form, 'kind') || productDraft.kind, price_confirmed: true, in_rotation: productDraft.kind==='flavor' ? true : productDraft.in_rotation, name: fieldValue(form, 'name'), description: fieldValue(form, 'description'), category_ids: $$('[name=category_ids]:checked',form).map(el=>el.value), category_id: $('[name=category_ids]:checked',form)?.value || null, price_cents: cents(fieldValue(form, 'price')), min_quantity: Number(fieldValue(form, 'min_quantity')), lead_days: Number(fieldValue(form, 'lead_days')), active: productDraft.kind==='flavor' ? !productDraft.collection_hidden : fieldChecked(form, 'active'), pickup_only: fieldChecked(form, 'pickup_only'), allow_same_day: fieldChecked(form, 'allow_same_day'), label: productLabelSettings({ enabled: fieldChecked(form, 'label_enabled'), text: fieldValue(form, 'label_text'), color: fieldValue(form, 'label_color') }) });
+  if (productDraft.kind !== 'flavor') productDraft.minimum_order_unit = fieldValue(form, 'minimum_order_unit').trim() || 'box';
   if (productDraft.kind === 'set') productDraft.box_flavors = $$('[data-box-flavor]', form).map(select => select.value).filter(Boolean);
-  if (productDraft.kind === 'flavor') Object.assign(productDraft, { tagline: fieldValue(form,'tagline'), collection_details: readFlavorDetails(form), builder_cutout_url: fieldValue(form,'builder_cutout_url') || null, min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
+  if (productDraft.kind === 'flavor') Object.assign(productDraft, { tagline: fieldValue(form,'tagline'), collection_details: readFlavorDetails(form), min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
   productDraft.option_groups = [];
 }
 function productLabelEditor(value) {
@@ -664,19 +663,17 @@ function renderProductDialog() {
     ${flavor || draftPublication ? '' : check('active', 'Show this product in shop', p.active)}
     ${kind === 'set' ? `<section class="subsection"><h3>Inside this box</h3><p class="muted">Choose a flavor for each of the three pieces. Repeats are welcome. Each box uses these flavors’ stock. If any required flavor is unavailable, the set is sold out.</p><div class="field-row three">${[0,1,2].map(i => select('box_flavor_' + i, 'Cheesecake ' + (i + 1), option('', 'Choose a flavor', savedFlavor(p.box_flavors?.[i])) + boxChoices.map(f => option(f.id, f.name, savedFlavor(p.box_flavors?.[i]))).join(''), 'data-box-flavor required')).join('')}</div></section>` : ''}
     ${kind === 'custom_box' ? '<p class="notice">Customers choose exactly three pieces. Each flavor adds its own surcharge and uses its own daily stock. Manage those choices in Flavors.</p>' : ''}
-    ${flavor ? '<p class="notice">Inventory is counted in individual pieces and shared across all boxes. Set a quantity for each date in Daily quantities. Unavailable flavors also make their fixed sets unavailable.</p>' : `<section class="subsection"><h3>Ordering & fulfillment</h3><div class="field-row">${input('min_quantity', 'Minimum boxes per order', p.min_quantity || 1, 'number', 'required min="1" max="9999" step="1"')}${input('lead_days', 'Full production days', p.lead_days || 0, 'number', 'required min="0" max="365" step="1"')}</div>${check('pickup_only', 'Pickup only', p.pickup_only === true)}${check('allow_same_day', 'Allow same-day orders (requires 0 production days)', p.allow_same_day === true)}</section>`}
+    ${flavor ? '<p class="notice">Inventory is counted in individual pieces and shared across all boxes. Set a quantity for each date in Daily quantities. Unavailable flavors also make their fixed sets unavailable.</p>' : `<section class="subsection"><h3>Ordering & fulfillment</h3><div class="field-row">${input('min_quantity', 'Minimum quantity per order', p.min_quantity || 1, 'number', 'required min="1" max="9999" step="1"')}${input('minimum_order_unit', 'Minimum order label', p.minimum_order_unit || 'box', 'text', 'maxlength="40"', 'Shown after a minimum of 2 or more. Use box for “boxes”, or enter your wording, such as “trays”.')}</div><div class="field-row">${input('lead_days', 'Full production days', p.lead_days || 0, 'number', 'required min="0" max="365" step="1"')}</div>${check('pickup_only', 'Pickup only', p.pickup_only === true)}${check('allow_same_day', 'Allow same-day orders (requires 0 production days)', p.allow_same_day === true)}</section>`}
     ${flavor ? flavorDetailFields(p,{input,textarea,disabled:ownerLocked()}) : ''}
     ${categoryFields(p,areaCategories(),esc,ownerLocked())}
     ${productLabelEditor(p.label)}
     <section class="subsection"><h3>Photos</h3><p class="muted">${PHOTO_HELP} Product photos are public. The first photo is the cover.</p><p class="help-text" id="photo-order-help">Drag photos to rearrange them, or focus a photo and use the arrow keys. Save the item to keep your photo changes.</p><div id="product-photo-order">${renderProductPhotos(p.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) })}</div><p id="photo-order-status" class="sr-only" role="status" aria-live="polite"></p>${input('photos', 'Upload photos', '', 'file', `accept="${PHOTO_ACCEPT}" multiple id="product-photos" ` + ownerLocked())}</section>
-    ${flavor ? flavorCutoutField(p.builder_cutout_url,{esc,safeImage,disabled:ownerLocked()}) : ''}
     ${draftPublication ? `<div class="dialog-actions"><button type="button" class="button button-secondary" data-action="close-dialog">Cancel</button><button type="submit" class="button button-secondary" name="publication" value="draft" ${ownerLocked()}>Save draft</button><button type="submit" class="button" name="publication" value="publish" ${ownerLocked()}>Publish product</button></div>` : actions(p.id ? 'Save changes' : 'Create ' + names[kind])}${p.id && owner() ? `<div class="subsection product-delete-section"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(p.id)}">Delete ${names[kind]}</button><p class="help-text">Existing orders and records are preserved.</p></div>` : ''}
   </form>`);
   bindPhotoOrder();
   updateProductLabelPreview();
   const form = $('[data-form=product]');
   catalogDraft.mount(form);
-  bindFlavorCutout(form,{upload,safeImage,onChange:catalogDraft.sync});
   for (const name of ['label_enabled', 'label_text', 'label_color']) $('[data-form="product"]').elements.namedItem(name).addEventListener('input', updateProductLabelPreview);
   $('[data-form="product"]').elements.namedItem('kind').addEventListener('change', () => { captureProduct(); renderProductDialog(); });
 }
@@ -1280,7 +1277,6 @@ async function submitForm(form, submitter) {
       payload.expected_next_month = form.dataset.expectedNextMonth === 'true';
       payload.category_ids=$$('[name=category_ids]:checked',form).map(el=>el.value);
       payload.collection_details=readFlavorDetails(form);
-      if(form.elements.namedItem('builder_cutout_url'))payload.builder_cutout_url=fieldValue(form,'builder_cutout_url')||null;
       payload.current_month = fieldChecked(form,'current_month'); payload.next_month = fieldChecked(form,'next_month'); payload.hidden = fieldChecked(form,'hidden'); payload.photos = JSON.parse(fieldValue(form,'photos') || '[]');
       const controls=$$('input,select,textarea,button',form),disabled=controls.map(el=>el.disabled);controls.forEach(el=>el.disabled=true);
       try {
