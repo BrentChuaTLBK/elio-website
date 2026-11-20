@@ -33,6 +33,15 @@ export async function verifyTrio(ctx,h,origin,fixed,date) {
   const fixedWidth=await dialog.evaluate(el=>el.clientWidth);
   await page.locator('#add-to-cart').click();
   await page.locator('#product-dialog').waitFor({state:'hidden'});
+  const mobileBasket=page.locator('#mobile-cart'),basketLabel=mobileBasket.locator('span').first();
+  assert.equal(await basketLabel.innerText(),'1 item · View basket');
+  await mobileBasket.tap();
+  const cart=page.locator('#quick-cart-dialog');
+  await cart.getByRole('button',{name:`Increase ${fixed.name} quantity`}).tap();
+  assert.equal(await basketLabel.textContent(),'2 items · View basket');
+  await cart.getByRole('button',{name:`Decrease ${fixed.name} quantity`}).tap();
+  assert.equal(await basketLabel.textContent(),'1 item · View basket');
+  await cart.getByRole('button',{name:'Close basket'}).tap();
   await page.locator(`[data-product="${trio.id}"]`).tap();
   const tile=id=>page.locator(`[data-trio-add="${id}"]`),slot=n=>page.locator(`[data-trio-remove="${n}"]`),total=page.locator('#detail-price');
   await page.locator('#add-to-cart').waitFor();
@@ -44,6 +53,16 @@ export async function verifyTrio(ctx,h,origin,fixed,date) {
   const more=page.locator('[data-trio-more]');
   if(await more.isVisible())await more.tap();
   assert.match(await tile(matcha.id).innerText(),/\+₱50 each/);
+  const tapRemove=async(index,dx,dy)=>{
+    const cross=slot(index).locator('.ep-remove');
+    await cross.scrollIntoViewIfNeeded();
+    const {x,y,width,height}=await cross.boundingBox();
+    await page.touchscreen.tap(x+width/2+dx,y+height/2+dy);
+    await slot(index).waitFor({state:'detached',timeout:3000});
+  };
+  await tile(matcha.id).tap();
+  await tapRemove(0,7,0);
+  assert.equal(await total.innerText(),'₱800.00');
   await tile(matcha.id).tap();await tile(vanilla.id).tap();await tile(matcha.id).tap();
   const menuPhoto=await tile(matcha.id).locator('.ep-thumb img').getAttribute('src');
   assert.equal(await slot(0).locator('img.framed').getAttribute('src'),menuPhoto);
@@ -52,7 +71,11 @@ export async function verifyTrio(ctx,h,origin,fixed,date) {
   await slot(1).locator('.ep-fallback').waitFor({state:'visible'});
   assert.equal(await slot(1).locator('.ep-fallback').innerText(),'Tap vanilla');
   assert.equal(await total.innerText(),'₱900.00');
-  await slot(0).tap();
+  await tapRemove(1,7,0);
+  assert.equal(await slot(0).getAttribute('data-trio-flavor'),matcha.id);
+  assert.equal(await slot(2).getAttribute('data-trio-flavor'),matcha.id);
+  await tile(vanilla.id).tap();
+  await tapRemove(0,18,0);
   assert.equal(await total.innerText(),'₱850.00');
   assert.equal(await page.locator('#add-to-cart').isDisabled(),true);
   await tile(vanilla.id).tap();
@@ -85,7 +108,8 @@ export async function verifyTrio(ctx,h,origin,fixed,date) {
   assert.equal(await page.locator('#checkout-dialog').evaluate(el=>el.open),false);
   const basket=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('elio-checkout-v1')).items);
   assert.equal(basket.length,2);assert.equal(basket.find(line=>line.product_id===trio.id).quantity,2);
-  await page.locator('#mobile-cart').tap();
+  assert.equal(await basketLabel.innerText(),'3 items · View basket');
+  await mobileBasket.tap();
   await page.locator('#checkout-button').tap();
   const form=page.locator('#checkout-form');await form.waitFor();
   for(const [field,value] of Object.entries({buyer_name:'Trio test',buyer_email:'trio@example.test',buyer_phone:'09170000000'}))await form.locator(`[name="${field}"]`).fill(value);
