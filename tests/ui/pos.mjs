@@ -58,7 +58,40 @@ try{
  assert.equal((await invoke('get_order',{order_id:direct.id})).delivery_charge.state,'paid');
  await feeButton().click();await page.getByRole('button',{name:'Correct delivery payment',exact:true}).click();await page.getByLabel('The delivery payment was returned to the customer, or was recorded in error').check();await page.getByLabel('Correction reason').fill('Receipt recorded in error');await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
  assert.equal((await invoke('get_order',{order_id:direct.id})).delivery_charge.state,'quoted');
- for(const width of [1440,768,390,320]){await page.setViewportSize({width,height:1000});await page.getByRole('button',{name:'New sale',exact:true}).click();await page.locator(`[data-add="${fixture.product.id}"]`).click();if(width<=650)await page.getByRole('button',{name:'View basket'}).click();await page.getByLabel('Fulfillment',{exact:true}).selectOption('delivery');await page.getByLabel('Delivery fee',{exact:true}).selectOption('true');const field=page.locator('.accounting-date-picker').filter({has:page.locator('[name=fulfillment_date]')});await field.locator('summary').click();await field.locator('[data-date-month]').waitFor();await page.screenshot({path:join(out,'pos-calendar-'+width+'.png'),fullPage:true});const box=await field.locator('.accounting-calendar').boundingBox();assert(box.x>=0&&box.x+box.width<=width+1);await field.locator('[data-date-close]').click();assert.equal(await page.locator('input[type=date]').count(),0);await page.screenshot({path:join(out,`direct-${width}.png`),fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`overflow at ${width}`);await page.locator('[data-remove]').click();}
+ for(const width of [1440,768,390,320]){
+  await page.setViewportSize({width,height:1000});
+  await page.getByRole('button',{name:'New sale',exact:true}).click();
+  await page.locator(`[data-add="${fixture.product.id}"]`).click();
+  if(width<=650)await page.getByRole('button',{name:'View basket'}).click();
+
+  const stepper=page.locator('#cart .cart-quantity');
+  const quantity=stepper.locator('[data-qty]');
+  const minus=stepper.locator('[data-quantity-minus]');
+  const plus=stepper.locator('[data-quantity-plus]');
+  assert(await stepper.evaluate(el=>el.scrollWidth<=el.clientWidth),`Cart quantity controls are clipped at ${width}px`);
+  assert.equal(await quantity.inputValue(),'1');
+  assert(await minus.isDisabled());
+  await plus.click();
+  assert.equal(await quantity.inputValue(),'2');
+  assert.match(await page.locator('#cart .cart-line-total').innerText(),/for 2/);
+  await minus.click();
+  assert.equal(await quantity.inputValue(),'1');
+  assert(await minus.isDisabled());
+
+  await page.getByLabel('Fulfillment',{exact:true}).selectOption('delivery');
+  await page.getByLabel('Delivery fee',{exact:true}).selectOption('true');
+  const field=page.locator('.accounting-date-picker').filter({has:page.locator('[name=fulfillment_date]')});
+  await field.locator('summary').click();
+  await field.locator('[data-date-month]').waitFor();
+  await page.screenshot({path:join(out,'pos-calendar-'+width+'.png'),fullPage:true});
+  const box=await field.locator('.accounting-calendar').boundingBox();
+  assert(box.x>=0&&box.x+box.width<=width+1);
+  await field.locator('[data-date-close]').click();
+  assert.equal(await page.locator('input[type=date]').count(),0);
+  await page.screenshot({path:join(out,`direct-${width}.png`),fullPage:true});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`overflow at ${width}`);
+  await page.locator('[data-remove]').click();
+ }
  for(const width of [1440,390,320]){
   await page.setViewportSize({width,height:1000});if(await page.getByRole('button',{name:'Back to items'}).isVisible())await page.getByRole('button',{name:'Back to items'}).click();await page.locator('[data-add="'+pickerBox.id+'"]').click();const picker=page.locator('.flavor-picker'),add=picker.getByRole('button',{name:'Add box',exact:true}),plus=picker.locator('[data-flavor-plus]'),minus=picker.locator('[data-flavor-minus]');
   assert.equal(await add.isDisabled(),true);assert.equal(await picker.locator('[data-flavor-minus]:not(:disabled)').count(),0);
