@@ -1,0 +1,105 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {accountingFixture} from './accounting-fixture.mjs';
+
+export default async function({db,state,check}){
+ const h=state.h,{api,ids,service,scalar}=h;
+ const {product,date}=await accountingFixture(h);
+ await db.query("update elio.products set data=data||'{\"min_quantity\":2}' where id=$1",[product.id]);
+ const custom={source:'custom',product_id:randomUUID(),quantity:1,name:'Custom cake',description:'Write Happy Birthday',unit_price_cents:5000};
+ const sale={order_source:'direct',method:'pickup',fulfillment_date:date,items:[h.item(product),custom],paid:true,payment:{method:'cash',cash_received_cents:15000}};
+ const quote=(p,actor=ids.staff)=>api('pos_quote',p,actor);
+ const create=async(p,actor=ids.staff)=>api('pos_create_order',{...p,expected_quote:await quote(p,actor),idempotency_key:randomUUID()},actor);
+ let o,token;
+ await check('direct orders sell one unit of a minimum-two box, preserve custom notes and discount products before delivery',async()=>{
+  await assert.rejects(api('quote',h.checkout(product,date)),/minimum|at least/i);
+  const q=await quote({...sale,method:'delivery',delivery_cents:4000,discount:{kind:'percent',value:10}});
+  assert.deepEqual([q.items[0].quantity,q.subtotal_cents,q.discount_cents,q.delivery_cents,q.total_cents],[1,15000,1500,4000,17500]);
+  assert.equal(q.items[1].description,custom.description);
+  assert.equal((await quote({...sale,method:'delivery',delivery_cents:4000,delivery_fee_recipient:'courier',discount:{kind:'fixed',value:500}})).total_cents,14500);
+  for(const discount of [{kind:'fixed',value:15001},{kind:'percent',value:101},{kind:'percent',value:-1}])await assert.rejects(quote({...sale,discount}),/discount|whole/i);
+  o=await create({...sale,discount:{kind:'percent',value:10}});
+  assert.equal(o.payment_status,'paid');assert.equal(o.total_cents,13500);assert.equal(o.pos_payment.change_cents,1500);
+  token=(await api('pos_payment_link',{order_id:o.id},ids.staff)).token;
+  const preview=await api('preview_edit_order',{order_id:o.id,revision:o.revision,changes:{items:[h.item(product,2),custom]}},ids.staff);
+  assert.equal(preview.discount_cents,2500);assert.equal(preview.total_cents,22500);
+ })();
+ await check('date overrides require an owner and keep stock and pickup-only rules',async()=>{
+  const today=await h.day(0), override={...sale,fulfillment_date:today,override_dates:true,override_reason:'Confirmed with kitchen'};
+  await assert.rejects(quote({...override,override_dates:false}),/production|override|closed/i);
+  await assert.rejects(quote(override),/owner/i);
+  const special=await create(override,ids.owner);
+  assert.equal(special.override_reason,override.override_reason);
+  const key=(await api('pos_payment_link',{order_id:special.id},ids.staff)).token;
+  const visible=await api('get_order',{order_id:special.id},null,key);assert(!('override_reason' in visible));assert(!('override_dates' in visible));
+  await assert.rejects(api('preview_edit_order',{order_id:special.id,revision:special.revision,changes:{items:[h.item(product,2),custom]}},ids.staff),/owner/i);
+  await h.inventory({id:product.box_flavors[0]},today,3);
+  await assert.rejects(quote({...override,items:[h.item(product,2)]},ids.owner),/stock|availab|remain/i);
+  await db.query("update elio.products set data=data||'{\"pickup_only\":true}' where id=$1",[product.id]);
+  await assert.rejects(quote({...override,method:'delivery'},ids.owner),/pickup only/);
+ })();
+ await check('calendar album tokens disclose only their own photos and revoke after last removal',async()=>{
+  const scope={order_id:o.id,user_id:ids.staff},id=randomUUID(),path=o.id+'/'+id+'.png',digest='f'.repeat(64);
+  const attach={...scope,photo_id:id,storage_path:path,mime_type:'image/png',sha256:digest,filename:'design.png'};
+  const list=async t=>service('order_photo_shared',{token:t});
+  assert.deepEqual(await list(token),[]);
+  for(const user_id of [null,ids.customer])await assert.rejects(service('order_photo_list',{...scope,user_id}),/staff|sign in|authorized/i);
+  await assert.rejects(service('order_photo_attach',attach),/missing/);
+  await db.query("insert into storage.objects(bucket_id,name) values('order-photos',$1)",[path]);
+  assert.equal((await service('order_photo_attach',attach)).accepted,true);
+  assert.equal((await service('order_photo_attach',attach)).id,id);
+  assert.equal((await service('order_photo_list',scope)).length,1);
+  const album=await scalar('select token from elio.order_photo_shares where order_id=$1',[o.id]);
+  assert.deepEqual(await list(album),[{id,storage_path:path}]);assert.deepEqual(await list('a'.repeat(64)),[]);
+  const queued=await scalar('select desired from elio.calendar_events where order_id=$1',[o.id]);assert.equal(queued.photo_share,album);
+  const calendar=await scalar('select elio.calendar_order(o) from elio.orders o where id=$1',[o.id]);assert.equal(calendar.photo_count,1);assert(!('photo_share' in calendar));
+  const customer=await api('get_order',{order_id:o.id},null,token);assert(!JSON.stringify(customer).includes(album));assert(!JSON.stringify(customer).includes(path));
+  const pickupPath=o.id+'/'+randomUUID()+'.png';
+  await service('commit_pickup_proof',{order_id:o.id,user_id:ids.staff,path:pickupPath,previous:null});
+  assert.equal((await service('read_pickup_proof',{order_id:o.id,token})).path,pickupPath);
+  await assert.rejects(service('read_pickup_proof',{order_id:o.id,token:album}),/authorized|access|unavailable/i);
+  assert.equal((await service('order_photo_detach',{...scope,photo_id:id})).storage_path,path);
+  assert.deepEqual(await list(album),[]);assert.equal(await scalar("select desired ? 'photo_share' from elio.calendar_events where order_id=$1",[o.id]),false);
+ })();
+ await check('separate delivery receipts follow the private order link, quote and staff recording rights',async()=>{
+  const d=await create({...sale,method:'delivery',items:[custom],delivery_fee_pending:true});
+  let quoted=await h.action('pos_set_delivery_fee',d,{recipient:'elio',fee_cents:3000,reason:'Courier quote'});const link=(await api('pos_payment_link',{order_id:d.id},ids.staff)).token;
+  const scope={order_id:d.id,token:link}, auth=()=>service('authorize_delivery_upload',scope);
+  const prepare=async()=>{const authorized=await auth(),path=d.id+'/'+randomUUID()+'.png';await db.query("insert into storage.objects(bucket_id,name) values('delivery-proofs',$1)",[path]);return {...scope,...authorized,path};};
+  await assert.rejects(service('authorize_delivery_upload',{...scope,token:'different'}),/access/i);
+  const stale=await prepare();quoted=await h.action('pos_set_delivery_fee',quoted,{recipient:'elio',fee_cents:2500,reason:'Updated quote'});
+  await assert.rejects(service('commit_delivery_receipt',stale),/quote changed/i);
+  const upload=await prepare();await service('commit_delivery_receipt',upload);assert.equal((await service('commit_delivery_receipt',upload)).saved,true);
+  quoted=await h.order(d.id);assert.equal(quoted.delivery_charge.proof_status,'under_review');assert.equal(quoted.paid_amount_cents,5000);
+  await assert.rejects(service('read_delivery_receipt',{...scope,user_id:ids.customer}),/staff|authorized/i);
+  assert.equal((await service('read_delivery_receipt',{...scope,user_id:ids.staff})).path,upload.path);
+  await assert.rejects(h.action('pos_set_delivery_fee',quoted,{recipient:'courier',fee_cents:1000,reason:'test'}),/review/i);
+  quoted=await h.action('pos_reject_delivery_receipt',quoted,{reason:'Please show the full receipt.'});
+  assert.equal(quoted.delivery_charge.proof_status,'rejected');const retry=await prepare();await service('commit_delivery_receipt',retry);quoted=await h.order(d.id);
+  await assert.rejects(h.action('pos_record_delivery_payment',quoted,{method:'cash',cash_received_cents:1000}),/cash received/i);
+  const paid=await h.action('pos_record_delivery_payment',quoted,{method:'cash',cash_received_cents:3000});assert.equal(paid.delivery_charge.change_cents,500);assert.equal(paid.paid_amount_cents,5000);
+  assert.equal(paid.delivery_charge.proof_status,'accepted');assert.equal((await h.action('pos_void_delivery_payment',paid,{reason:'Clerical correction',refund_confirmed:true})).delivery_charge.proof_status,undefined);
+ })();
+ await check('owner payment method changes apply only to Direct Sales, preserve recorded labels and reject stale edits',async()=>{
+  const config=await api('pos_catalog',{date},ids.staff),settings={revision:config.direct_methods_revision,methods:[{label:'Card terminal',active:true}]};
+  await assert.rejects(api('pos_save_direct_methods',settings,ids.staff),/owner/i);
+  const saved=await api('pos_save_direct_methods',settings,ids.owner);assert.equal(saved.methods[0].label,'Card terminal');
+  const direct=await create({...sale,items:[custom],payment:{method:'Card terminal'}});assert.equal(direct.pos_payment.label,'Card terminal');
+  await assert.rejects(api('pos_save_direct_methods',{...settings,methods:[]},ids.owner),/changed/i);
+  await api('pos_save_direct_methods',{revision:saved.revision,methods:[{label:'Card terminal',active:false}]},ids.owner);
+  await assert.rejects(create({...sale,items:[custom],payment:{method:'Card terminal'}}),/configured payment/i);
+  assert.equal((await h.order(direct.id)).pos_payment.label,'Card terminal');
+ })();
+ await check('private direct order link adds an optional email once and leaves newsletter enrollment separate',async()=>{
+  const p={order_id:o.id,email:' Buyer@Example.Test '};
+  await assert.rejects(api('add_order_email',p,ids.staff),/authorized/i);
+  await assert.rejects(api('add_order_email',p,null,'x'.repeat(64)),/authorized/i);
+  await assert.rejects(api('add_order_email',{...p,email:'invalid'},null,token),/valid email/i);
+  const result=await api('add_order_email',p,null,token);
+  assert.equal(result.email,'buyer@example.test');assert.equal(result.pos_email_opt_in,true);
+  const revision=(await h.order(o.id)).revision;
+  assert.deepEqual(await api('add_order_email',p,null,token),result);
+  assert.equal((await h.order(o.id)).revision,revision);
+  await assert.rejects(api('add_order_email',{...p,email:'different@example.test'},null,token),/already has an email/);
+ })();
+}

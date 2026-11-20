@@ -68,3 +68,6 @@ verify_jwt = false
 # Google service-account secrets remain on the server.
 [functions.order-backup]
 verify_jwt = false
+
+[functions.order-photos]
+verify_jwt = false

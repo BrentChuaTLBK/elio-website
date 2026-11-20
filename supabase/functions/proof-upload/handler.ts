@@ -9,26 +9,44 @@ export const handle = endpoint(async (request, headers) => {
   try { form = await new Response(bytes, { headers: { "Content-Type": contentType } }).formData(); }
   catch { throw new HttpError(400, "The upload form is invalid."); }
   const kind = field(form.get("kind"), "Upload type", 16, true);
-  if (!["proof", "product"].includes(kind)) throw new HttpError(400, "Choose a payment proof or product image.");
+  if (!["proof", "product", "pickup", "delivery"].includes(kind)) throw new HttpError(400, "Choose a supported photo upload type.");
   const file = form.get("file");
   if (!(file instanceof File) || form.getAll("file").length !== 1) throw new HttpError(400, "Choose one image to upload.");
   if (file.size > MAX_IMAGE_BYTES) throw new HttpError(413, "Images must be 20 MB or smaller.");
   const contents = new Uint8Array(await file.arrayBuffer());
   const image = imageType(contents);
-  const userId = await verifiedUser(request, kind === "product");
-  const orderId = kind === "proof" ? uuid(form.get("order_id")) : null;
+  const userId = await verifiedUser(request, kind === "product" || kind === "pickup");
+  const orderId = kind === "product" ? null : uuid(form.get("order_id"));
   const token = field(form.get("token"), "Order access token", 256);
   const suppliedReference = form.get("payment_reference");
   if (suppliedReference !== null && typeof suppliedReference !== "string") throw new HttpError(400, "Payment reference must be text.");
   const paymentReference = field(suppliedReference, "Payment reference", 200);
-  const authorization = await service("authorize_upload", { kind, order_id: orderId, token, user_id: userId });
+  const authorization = await service(kind === "pickup" ? "authorize_pickup_upload" : kind === "delivery" ? "authorize_delivery_upload" : "authorize_upload", { kind, order_id: orderId, token, user_id: userId });
   if (!authorization?.allowed) throw new HttpError(403, "You cannot upload an image for this request.");
   await validateImage(contents);
-  const bucket = kind === "proof" ? "payment-proofs" : "product-images";
-  const path = `${kind === "proof" ? orderId : userId}/${crypto.randomUUID()}.${image.extension}`;
+  const bucket = kind === "pickup" ? "pickup-proofs" : kind === "delivery" ? "delivery-proofs" : kind === "proof" ? "payment-proofs" : "product-images";
+  const path = `${orderId || userId}/${crypto.randomUUID()}.${image.extension}`;
   await storageRequest(`object/${bucket}/${path}`, "POST", contents, image.mime);
   if (kind === "product") {
     return json({ path, url: `${credentials().url}/storage/v1/object/public/${bucket}/${path}` }, 201, headers);
+  }
+  if (kind === "pickup" || kind === "delivery") {
+    let saved;
+    try {
+      saved = kind === "pickup"
+        ? await service("commit_pickup_proof", { order_id: orderId, user_id: userId, path, previous: authorization.previous })
+        : await service("commit_delivery_receipt", { order_id: orderId, user_id: userId, token, path, payment_reference: paymentReference, quoted_at: authorization.quoted_at, fee_cents: authorization.fee_cents });
+    } catch (error) {
+      // A timed-out commit may already own this file. Only clean up a confirmed rejection.
+      if (error instanceof HttpError && error.status === 400) {
+        await storageRequest(`object/${bucket}`, "DELETE", JSON.stringify({ prefixes: [path] }), "application/json").catch(() => {});
+      }
+      throw error;
+    }
+    if (saved.previous && saved.previous !== path) {
+      await storageRequest(`object/${bucket}`, "DELETE", JSON.stringify({ prefixes: [saved.previous] }), "application/json").catch(() => {});
+    }
+    return json({ saved: true }, 201, headers);
   }
   try {
     // Locks and validates the order again, closing the upload/expiry/rejection race.

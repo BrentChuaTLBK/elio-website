@@ -9,10 +9,10 @@ const source=await readFile(join(root,'assets/admin/client.js'),'utf8'),helpers=
 const base=Date.parse('2026-09-29T08:00:00Z'),iso=ms=>new Date(ms).toISOString();
 const mime={'.html':'text/html','.css':'text/css','.js':'text/javascript','.ttf':'font/ttf'};
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
-async function fixture(width,{future=false,manual=false,failInitially=false}={}){
- let server=base,revision=1,fail=failInitially,hold=false,release,heldResolve;
+async function fixture(width,{future=false,manual=false,failInitially=false,serverStart=base,previousStart=false}={}){
+ let server=serverStart,revision=1,fail=failInitially,hold=false,release,heldResolve;
  const held=new Promise(resolve=>{heldResolve=resolve;});
- let settings={mode:manual?'manual':'scheduled',announce:true,pause_uploads:true,message:'A few improvements.',starts_at:iso(base+(future?2000:-600000)),ends_at:iso(base+(future?5000:-300000))};
+ let settings={mode:manual?'manual':'scheduled',announce:true,pause_uploads:true,message:'A few improvements.',starts_at:iso(base+(previousStart?-86400000:future?2000:-600000)),ends_at:iso(base+(future?5000:-300000))};
  const calls=[],errors=[],ctx=await browser.newContext({viewport:{width,height:1000}});
  const snapshot=()=>{const active=settings.mode==='manual'||(settings.mode==='scheduled'&&Date.parse(settings.starts_at)<=server&&server<Date.parse(settings.ends_at));return {revision,settings:{...settings},status:{active,uploads_paused:active&&settings.pause_uploads,announce:settings.announce,starts_at:settings.starts_at,ends_at:settings.mode==='manual'?null:settings.ends_at,server_time:iso(server)}};};
  await ctx.route('**/*',async route=>{
@@ -84,6 +84,30 @@ try{
   await p.getByText('Maintenance settings saved.',{exact:true}).waitFor();const reply=p.waitForResponse('**/api');f.release();await reply;await p.clock.runFor(100);
   assert.equal(await p.locator('[data-maint-state] strong').textContent(),'Website maintenance is off');
   assert.equal(await p.locator('[data-maint-conflict]').isVisible(),false);await f.close();
+ }
+ {
+  const f=await fixture(390,{serverStart:Date.parse('2026-09-30T15:59:50Z')}),p=f.page;
+  const cal=p.locator('.accounting-date-picker').filter({has:p.locator('input[name=starts__date]')});
+  assert.equal(await p.locator('[name=starts__date]').inputValue(),'2026-09-30');
+  await cal.locator('summary').click();
+  assert(await cal.getByRole('button',{name:'Previous month'}).isDisabled());
+  assert(await cal.locator('[data-date-value="2026-09-29"]').isDisabled());
+  assert.equal(await cal.locator('[data-date-month] option[value="08"]').evaluate(option=>option.disabled),true);
+  await cal.locator('[data-date-year]').fill('2020');await cal.locator('[data-date-year]').dispatchEvent('change');
+  assert.equal(await cal.locator('[data-date-year]').inputValue(),'2026');
+  await cal.locator('[data-date-value="2026-09-30"]').focus();await p.keyboard.press('ArrowLeft');
+  assert.equal(await p.evaluate(()=>document.activeElement.dataset.dateValue),'2026-09-30');
+  await cal.getByRole('button',{name:'Next month'}).click();await cal.getByRole('button',{name:'Previous month'}).click();
+  assert(await cal.getByRole('button',{name:'Previous month'}).isDisabled());
+  await f.advance(30000);await p.waitForFunction(()=>document.querySelector('[name=starts__date]').value==='2026-10-01');
+  await cal.locator('summary').click();assert(await cal.getByRole('button',{name:'Previous month'}).isDisabled());await f.close();
+ }
+ {
+  const f=await fixture(390,{manual:true,previousStart:true}),p=f.page;
+  assert.equal(await p.locator('[name=starts__date]').inputValue(),'2026-09-29');
+  await p.locator('[name=message]').fill('Still working.');await p.getByRole('button',{name:'Save maintenance settings'}).click();
+  await p.getByText('Maintenance settings saved.',{exact:true}).waitFor();
+  assert.equal(f.calls.find(c=>c.action==='save_maintenance').payload.settings.starts_at,iso(base-86400000));await f.close();
  }
  console.log('PASS completed/upcoming/active states, server time, automatic boundaries, draft and revision preservation, manual mode, offline recovery, cleanup and save/refresh race');
 }finally{await browser.close();}

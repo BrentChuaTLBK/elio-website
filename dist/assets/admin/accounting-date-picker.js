@@ -7,13 +7,18 @@ const pad=n=>String(n).padStart(2,'0');
 const valid=(value,mode)=>isCalendarDate(mode==='month'?value+'-01':value);
 const label=(value,mode)=>mode==='month'?`${MONTHS[Number(value.slice(5,7))-1]} ${value.slice(0,4)}`:`${MONTHS[Number(value.slice(5,7))-1]} ${Number(value.slice(8))}, ${value.slice(0,4)}`;
 const withinBounds=(value,picker)=>!value||( (!picker.dataset.minDate||value>=picker.dataset.minDate.slice(0,value.length))&&(!picker.dataset.maxDate||value<=picker.dataset.maxDate.slice(0,value.length)) );
+const clampMonth=(month,picker)=>{
+ const min=picker.dataset.minDate?.slice(0,7),max=picker.dataset.maxDate?.slice(0,7);
+ return min&&month<min?min:max&&month>max?max:month;
+};
+const canNavigate=(month,picker)=>picker.dataset.mode==='month'?withinBounds(month.slice(0,4),picker):withinBounds(month,picker);
 let sequence=0;
 
 function calendarView(picker, focusDate='') {
  const {month,today,mode}=picker.dataset,selected=picker.querySelector('input[type=hidden]').value;
  const year=month.slice(0,4),title=mode==='month'?year:label(month,'month');
- const toolbar=`<div class="calendar-toolbar"><button type="button" class="calendar-nav" data-date-move="-1" aria-label="Previous ${mode==='month'?'year':'month'}">‹</button><strong aria-live="polite">${title}</strong><button type="button" class="calendar-nav" data-date-move="1" aria-label="Next ${mode==='month'?'year':'month'}">›</button></div>`;
- const jump=`<div class="accounting-calendar-jump">${mode==='date'?`<label>Month<select data-date-month>${MONTHS.map((name,i)=>`<option value="${pad(i+1)}" ${month.slice(5)===pad(i+1)?'selected':''}>${name}</option>`).join('')}</select></label>`:''}<label>Year<input type="text" data-date-year value="${year}" maxlength="4" inputmode="numeric" aria-label="Calendar year"></label></div><p class="accounting-calendar-error" data-date-navigation-error role="alert" hidden></p>`;
+ const toolbar=`<div class="calendar-toolbar"><button type="button" class="calendar-nav" data-date-move="-1" aria-label="Previous ${mode==='month'?'year':'month'}" ${canNavigate(shiftCalendarMonth(month,mode==='month'?-12:-1),picker)?'':'disabled'}>‹</button><strong aria-live="polite">${title}</strong><button type="button" class="calendar-nav" data-date-move="1" aria-label="Next ${mode==='month'?'year':'month'}" ${canNavigate(shiftCalendarMonth(month,mode==='month'?12:1),picker)?'':'disabled'}>›</button></div>`;
+ const jump=`<div class="accounting-calendar-jump">${mode==='date'?`<label>Month<select data-date-month>${MONTHS.map((name,i)=>`<option value="${pad(i+1)}" ${month.slice(5)===pad(i+1)?'selected':''} ${withinBounds(year+'-'+pad(i+1),picker)?'':'disabled'}>${name}</option>`).join('')}</select></label>`:''}<label>Year<input type="text" data-date-year value="${year}" maxlength="4" inputmode="numeric" aria-label="Calendar year"></label></div><p class="accounting-calendar-error" data-date-navigation-error role="alert" hidden></p>`;
  let grid;
  if(mode==='month') grid=`<div class="accounting-month-grid">${MONTHS.map((name,i)=>{const value=year+'-'+pad(i+1);return `<button type="button" class="calendar-day" data-date-value="${value}" aria-label="${name} ${year}" aria-pressed="${selected===value}" ${today.startsWith(value)?'aria-current="date"':''} ${withinBounds(value,picker)?'':'disabled'}>${name.slice(0,3)}</button>`;}).join('')}</div>`;
  else {
@@ -32,10 +37,10 @@ export function accountingDatePicker(name,title,value,today,{mode='date',optiona
  return `<div class="field accounting-date-field"><span id="${id}-label">${esc(title)}</span><details class="accounting-date-picker" data-mode="${mode}" data-today="${today}" data-month="${(value||today).slice(0,7)}" data-optional="${optional}" data-min-date="${esc(minDate)}" data-max-date="${esc(maxDate)}"><summary aria-labelledby="${id}-label ${id}-value" aria-describedby="${id}-error"><span id="${id}-value" data-date-label>${value?label(value,mode):'Choose a date'}</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/></svg></summary><input type="hidden" name="${esc(name)}" value="${value}" ${attrs}><div class="date-calendar accounting-calendar" aria-labelledby="${id}-label"></div></details><p class="accounting-calendar-error" id="${id}-error" data-date-error role="alert" hidden></p></div>`;
 }
 
-export function accountingDateTimePicker(name,title,value,today,{optional=false,attrs=''}={}){
+export function accountingDateTimePicker(name,title,value,today,{optional=false,attrs='',minDate=''}={}){
  if(value!==''&&!/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(value))throw Error('Choose a valid date and time.');
  const date=value.slice(0,10),hour=value?value.slice(11,13):'12',minute=value?value.slice(14,16):'00';
- return `<div class="accounting-datetime-field">${accountingDatePicker(name+'__date',title,date,today,{optional,attrs:'data-datetime-date'})}<div class="accounting-datetime-time"><label class="field">Hour<select data-datetime-hour aria-label="${esc(title)} hour">${Array.from({length:24},(_,i)=>`<option value="${pad(i)}" ${hour===pad(i)?'selected':''}>${i%12||12} ${i<12?'AM':'PM'}</option>`).join('')}</select></label><label class="field">Minute<select data-datetime-minute aria-label="${esc(title)} minute">${Array.from({length:60},(_,i)=>`<option value="${pad(i)}" ${minute===pad(i)?'selected':''}>${pad(i)}</option>`).join('')}</select></label></div><input type="hidden" data-datetime-value name="${esc(name)}" value="${esc(value)}" ${attrs}></div>`;
+ return `<div class="accounting-datetime-field">${accountingDatePicker(name+'__date',title,date,today,{optional,minDate,attrs:'data-datetime-date'})}<div class="accounting-datetime-time"><label class="field">Hour<select data-datetime-hour aria-label="${esc(title)} hour">${Array.from({length:24},(_,i)=>`<option value="${pad(i)}" ${hour===pad(i)?'selected':''}>${i%12||12} ${i<12?'AM':'PM'}</option>`).join('')}</select></label><label class="field">Minute<select data-datetime-minute aria-label="${esc(title)} minute">${Array.from({length:60},(_,i)=>`<option value="${pad(i)}" ${minute===pad(i)?'selected':''}>${pad(i)}</option>`).join('')}</select></label></div><input type="hidden" data-datetime-value name="${esc(name)}" value="${esc(value)}" ${attrs}></div>`;
 }
 
 function updateDateTime(wrapper){
@@ -102,9 +107,9 @@ export function bindAccountingDates(root) {
    setAccountingDate(root,picker.querySelector('input[type=hidden]').name,'',{notify:true});picker.open=false;picker.querySelector('summary').focus({preventScroll:true});
   }else if(button.dataset.dateMove){
    const next=shiftCalendarMonth(picker.dataset.month,Number(button.dataset.dateMove)*(picker.dataset.mode==='month'?12:1));
-   if(!isCalendarDate(next+'-01')||next.slice(0,4)==='0000')return;
+   if(!isCalendarDate(next+'-01')||next.slice(0,4)==='0000'||!canNavigate(next,picker))return;
    picker.dataset.month=next;render(picker,'',`[data-date-move="${button.dataset.dateMove}"]`);
-  }else if(button.hasAttribute('data-date-today')){picker.dataset.month=picker.dataset.today.slice(0,7);render(picker,'','[data-date-today]');}
+  }else if(button.hasAttribute('data-date-today')){picker.dataset.month=clampMonth(picker.dataset.today.slice(0,7),picker);render(picker,'','[data-date-today]');}
   else if(button.hasAttribute('data-date-close')){picker.open=false;picker.querySelector('summary').focus({preventScroll:true});}
  });
  root.addEventListener('change',event=>{
@@ -114,7 +119,7 @@ export function bindAccountingDates(root) {
   const year=picker.querySelector('[data-date-year]').value,month=picker.querySelector('[data-date-month]')?.value||picker.dataset.month.slice(5);
   const value=year.padStart(4,'0')+'-'+month;
   if(!/^[0-9]{1,4}$/.test(year)||Number(year)<1||!isCalendarDate(value+'-01')){const error=picker.querySelector('[data-date-navigation-error]');error.hidden=false;error.textContent='Enter a year from 1 to 9999.';picker.querySelector('[data-date-year]').setAttribute('aria-invalid','true');return;}
-  picker.dataset.month=value;render(picker,'',input.hasAttribute('data-date-year')?'[data-date-year]':'[data-date-month]');
+  picker.dataset.month=clampMonth(value,picker);render(picker,'',input.hasAttribute('data-date-year')?'[data-date-year]':'[data-date-month]');
  });
  root.addEventListener('keydown',event=>{
   const picker=event.target.closest('.accounting-date-picker');if(!picker)return;

@@ -1,5 +1,5 @@
 import { auth, ready, initializationError, authLink, api, escapeHtml as esc, money, formatDate } from './client.js';
-import { config } from './config.js';
+import { watchGoogleSignIn } from './google-signin.js';
 import {clearAdminOrderView} from './progress-state.js';
 import {accountReturn,temporaryOrderReadFailure} from './account-return.js';
 import {queueNewsletterActivation,clearNewsletterActivation} from '../shop/newsletter-activation.js';
@@ -17,7 +17,7 @@ const newsletterResult = document.querySelector('#account-newsletter-result');
 const newsletterStatus = document.querySelector('#account-newsletter-status');
 const newsletterRetry = document.querySelector('#account-newsletter-retry');
 const googleButton = document.querySelector('#google-signin');
-const googleLabel = googleButton.innerHTML;
+const provider = document.querySelector('#account-provider');
 const staffDestination = new URLSearchParams(location.search).get('next') === 'pos.html' ? 'pos.html' : 'manage.html';
 let returnStorage;try{returnStorage=window.sessionStorage;}catch{}
 const customerReturn=accountReturn({customer,search:location.search,received:authLink.received,storage:returnStorage});
@@ -197,7 +197,8 @@ function updateControls() {
   submit.textContent = mode === 'resend' && seconds > 0 ? `Resend in ${seconds}s` : {
     signin: 'Sign in', signup: 'Create account', reset: 'Send reset link', recovery: 'Save password', resend: 'Resend verification',
   }[mode];
-  googleButton.disabled = busy || !googleAvailable;
+  provider.hidden = !googleAvailable || !['signin', 'signup'].includes(mode) || form.hidden || Boolean(accountSession);
+  googleButton.disabled = busy || provider.hidden;
 }
 
 function startResendCooldown() {
@@ -207,27 +208,6 @@ function startResendCooldown() {
     updateControls();
     if (Date.now() >= resendAfter) clearInterval(timer);
   }, 1000);
-}
-
-async function updateGoogleAvailability() {
-  googleButton.disabled = true;
-  try {
-    const response = await fetch(`${config.supabaseUrl}/auth/v1/settings`, {
-      cache: 'no-store',
-      headers: { apikey: config.supabasePublishableKey },
-    });
-    if (!response.ok) throw new Error('Provider settings are unavailable.');
-    const settings = await response.json();
-    if (settings.external?.google) {
-      googleButton.innerHTML = googleLabel;
-      googleAvailable = true;
-    } else {
-      googleButton.textContent = 'Google sign-in coming soon';
-    }
-  } catch {
-    googleButton.textContent = 'Google sign-in unavailable right now';
-  }
-  updateControls();
 }
 
 function message(text, error = false) {
@@ -266,7 +246,6 @@ function setMode(value) {
   else form.password.removeAttribute('aria-describedby');
   const newsletter = document.querySelector('#account-newsletter');
   if (newsletter) newsletter.hidden = value !== 'signup' || newsletter.dataset.available !== 'true';
-  document.querySelector('#account-provider').hidden = emailOnly || value === 'recovery';
   document.querySelector('#account-recovery').hidden = emailOnly || value === 'recovery';
   document.querySelector('#account-tabs').hidden = value === 'recovery';
   document.querySelector('#account-back').hidden = !emailOnly;
@@ -301,7 +280,7 @@ document.querySelector('#account-signout').addEventListener('click', async () =>
 });
 
 googleButton.addEventListener('click', async () => {
-  if (busy) return;
+  if (busy || googleButton.disabled) return;
   busy = true;
   updateControls();
   message('Opening Google…');
@@ -316,7 +295,7 @@ googleButton.addEventListener('click', async () => {
         if (mode === 'signup' && newsletterChoice?.checked && !newsletterChoice.disabled) sessionStorage.setItem(oauthNewsletterKey, JSON.stringify({ provider: 'google', callback, createdAt: Date.now() }));
       } catch { newsletterMessage('Your browser couldn’t save the optional newsletter choice. You can join through the newsletter form after signing in.'); }
     }
-    const { error } = await auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callback } });
+    const { error } = await auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callback, queryParams: { prompt: 'select_account' } } });
     if (error) throw error;
   } catch (error) {
     message(/provider is not enabled|unsupported provider/i.test(error.message || '')
@@ -380,7 +359,15 @@ form.addEventListener('submit', async event => {
   } finally { busy = false; updateControls(); }
 });
 
-void updateGoogleAvailability();
+function startGoogleCheck() {
+  return watchGoogleSignIn(available => {
+    googleAvailable = available;
+    updateControls();
+  });
+}
+let stopGoogleCheck = startGoogleCheck();
+window.addEventListener('pagehide', () => stopGoogleCheck());
+window.addEventListener('pageshow', event => { if (event.persisted) stopGoogleCheck = startGoogleCheck(); });
 await ready;
 if (initializationError) message(initializationError.message, true);
 else if (auth) {

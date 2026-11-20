@@ -16,6 +16,13 @@ assert.equal(calendarId('https://calendar.google.com/calendar/embed?src=elio.che
 assert.throws(()=>calendarId('https://evil.test/'),CalendarError);
 const body=eventBody(order,job.event_id);assert.equal(body.end.date,'2026-10-01');assert.equal(body.colorId,'9');assert.match(body.description,/&lt;Recipient&gt;/);assert.deepEqual(body.attendees,[]);assert.equal(body.visibility,'private');
 assert.equal(eventBody({...order,method:'pickup'},job.event_id).colorId,'2');
+const album='a'.repeat(64);
+const referenced={...order,method:'pickup',photo_count:2,photo_share:album,instructions:'Keep <cold>',items:[{name:'Custom cake',quantity:1,description:'Write Happy Birthday'}]};
+const described=eventBody(referenced,job.event_id).description;
+assert.match(described,/Order notes: Keep &lt;cold&gt;/);assert.match(described,/Happy Birthday/);
+assert(described.includes('https://eliocheesecakes.com/order-photos.html#photos='+album));
+assert(!eventBody({...referenced,photo_count:0},job.event_id).description.includes(album));assert(!eventBody({...referenced,photo_share:'invalid'},job.event_id).description.includes('<a'));
+assert(calendarSummary(referenced).includes('2 order reference photos'));assert(!calendarSummary(referenced).includes(album));
 for(const method of ['pickup','delivery']){
  const completed=eventBody({...order,method,status:'completed'},job.event_id);
  assert.equal(completed.colorId,'8');assert.match(completed.summary,/^✓ Completed · /);
@@ -34,8 +41,8 @@ assert.equal(filteredCalendarOrders([order],{search:'makati'}).length,1);
   assert.match(summary,/Social media: Instagram · @mia.santos/);assert.match(summary,/Amount: ₱930.00/);
   assert.match(summary,/2 × Vanilla, 1 × Matcha/);assert.doesNotMatch(summary,/Do not repeat|Email:|Window:|Pickup location:|Reschedule|Buyer phone:/);
   if(method==='pickup'){
-   assert.equal(event.location,'');assert.doesNotMatch(summary,/Private kitchen|Call at the gate|Recipient:|Delivery address:/);
-   assert.deepEqual(summary.split('\n').filter(s=>s.includes(':')).map(s=>s.split(':')[0]),['Customer name','Phone number','Social media','Order ID','Order details','Amount']);
+   assert.equal(event.location,'');assert.doesNotMatch(summary,/Private kitchen|Recipient:|Delivery address:/);assert.match(summary,/Order notes: Call at the gate/);
+   assert.deepEqual(summary.split('\n').filter(s=>s.includes(':')).map(s=>s.split(':')[0]),['Customer name','Phone number','Social media','Order ID','Order details','Amount','Order notes']);
   }else{assert.equal(event.location,'12 Test St, Makati');assert.match(summary,/Recipient: <Recipient>/);assert.match(summary,/Delivery instructions: Call at the gate/);}
  }
  const sameRecipient={...sample,recipient:{name:sample.buyer.name,phone:sample.buyer.phone}};

@@ -32,12 +32,12 @@ export function calendarDescription(order:any){
  const items=(Array.isArray(order.items)?order.items:[]).flatMap((item:any)=>{
   const selections=Array.isArray(item.selection_labels)&&item.selection_labels.length?item.selection_labels:Array.isArray(item.flavor_contents)?item.flavor_contents:[];
   const details=selections.map((s:any)=>`${s.quantity?`${Number(s.quantity)||0} × `:''}${clean(s.label||s.name,200)}`).filter(Boolean);
-  return [`${Number(item.quantity)||0} × ${clean(item.name,200)}`,...(details.length?['  '+details.join(', ')]:[])];
+  return [`${Number(item.quantity)||0} × ${clean(item.name,200)}`,...(details.length?['  '+details.join(', ')]:[]),...(item.description?['  '+clean(item.description)]:[])];
  });
  const amount=Number.isSafeInteger(order.total_cents)&&order.total_cents>=0?new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(order.total_cents/100):'Not recorded';
  return [`Customer name: ${customer}`,`Phone number: ${contact||'Not provided'}`,`Social media: ${social}`,`Order ID: ${clean(order.reference,80)}`,
   ...(delivery?[...(name(order)!==customer?[`Recipient: ${name(order)}`]:[]),...(phone(order)&&phone(order)!==contact?[`Recipient phone: ${phone(order)}`]:[]),`Delivery address: ${address||'Not provided'}`]:[]),
-  '', 'Order details:',...items,'',`Amount: ${amount}`,...(delivery&&order.instructions?['',`Delivery instructions: ${clean(order.instructions)}`]:[])].join('\n');
+  '', 'Order details:',...items,'',`Amount: ${amount}`,...(order.instructions?['',`${delivery?'Delivery instructions':'Order notes'}: ${clean(order.instructions)}`]:[])].join('\n');
 }
 export function eventBody(order:any,eventId:string) {
   if(!/^\d{4}-\d{2}-\d{2}$/.test(order?.date)||!['pickup','delivery'].includes(order.method))throw new CalendarError('configuration');
@@ -47,8 +47,10 @@ export function eventBody(order:any,eventId:string) {
   const completed=order.status==='completed',delivery=order.method==='delivery',area=clean(order.address?.locality,100)||'Area not recorded';
   const address=delivery?[order.address?.line1,order.address?.line2,order.address?.locality,order.address?.postal_code].filter(Boolean).map(v=>clean(v)).join(', '):'';
   const url=`https://eliocheesecakes.com/manage.html#calendar?date=${order.date}&order=${encodeURIComponent(order.id)}`;
+  const album = typeof order.photo_share === 'string' && /^[0-9a-f]{64}$/.test(order.photo_share) && order.photo_count > 0
+    ? `\n\n<a href="https://eliocheesecakes.com/order-photos.html#photos=${order.photo_share}">View order reference photos</a>` : '';
   return {id:eventId,summary:`${completed?'✓ Completed · ':''}${delivery?`Delivery · ${area}`:'Pickup'} · ${clean(order.reference,80)} · ${name(order)}`.slice(0,500),
-    description:calendarDescription(order).split('\n').map(html).join('\n'),location:address,colorId:completed?'8':delivery?'9':'2',
+    description:calendarDescription(order).split('\n').map(html).join('\n')+album,location:address,colorId:completed?'8':delivery?'9':'2',
     start:{date:order.date},end:{date:end},visibility:'private',transparency:'transparent',status:'confirmed',
     reminders:{useDefault:false},attendees:[],source:{title:'Open in Elio',url},
     extendedProperties:{private:{elio_source:'elio-orders',elio_order_id:order.id}}};

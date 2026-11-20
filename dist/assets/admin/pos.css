@@ -32,3 +32,8 @@
 /* Use the site controls for numeric entry without native browser arrows. */
 input[type=number]{appearance:textfield;-moz-appearance:textfield}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}
+
+#direct-payment-review{margin:18px 0}
+#direct-payment-review fieldset{margin:0;padding:0;border:0}
+.cart-quantity input[data-qty]{width:100%;min-width:0;padding-inline:2px;text-align:center}
+@media(max-width:650px){.cart-line:has([data-qty]){grid-template-columns:minmax(0,1fr) 36px}.cart-line:has([data-qty])>div:first-child{grid-column:1/-1}.cart-line:has([data-qty]) .cart-quantity{width:140px}}

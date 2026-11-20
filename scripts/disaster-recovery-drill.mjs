@@ -55,7 +55,8 @@ export async function runDisasterRecoveryDrill({publicStorageExport=null,outputR
   await h.service('newsletter_subscribe',{email:'recovery@example.invalid',source:'home_footer',consent:true,consent_version:'elio-newsletter-v1',ip_hash:sha256('isolated-recovery')});
   const proof=(await db.query('select proof_path from elio.orders where id=$1',[paid.id])).rows[0].proof_path;
   const buckets=(await db.query('select * from storage.buckets order by id')).rows;
-  assert.equal(buckets.length,4);
+  assert.deepEqual(buckets.filter(b=>!b.public).map(b=>b.id),['affiliate-payout-proofs','delivery-proofs','order-photos','payment-proofs','pickup-proofs']);
+  assert.deepEqual(buckets.filter(b=>b.public).map(b=>b.id),['product-images','website-images']);
   // Real image bytes without contact/order data; synthetic proofs cover both
   // private buckets even when the production buckets contain no objects.
   const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6nFQAAAAASUVORK5CYII=','base64');

@@ -42,15 +42,19 @@ async function make({width=390,capacity=30,session=null,holdCollection=false,red
  });
  await ctx.route('**/*',async route=>{
   const u=new URL(route.request().url());
-  if(u.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:`export function createClient(){const callbacks=[];window.__authChange=(event,next)=>callbacks.forEach(fn=>fn(event,next));return {auth:{initialize:async()=>({}),getSession:()=>window.testAuth({action:'session'}),onAuthStateChange:fn=>{callbacks.push(fn);return {data:{subscription:{unsubscribe(){}}}}},signInWithPassword:()=>window.testAuth({action:'signin'}),signInWithOAuth:async({options})=>{window.__oauthReturn=options.redirectTo;return {data:{},error:null};},signOut:()=>window.testAuth({action:'signout'}),updateUser:()=>window.testAuth({action:'session'}),resetPasswordForEmail:async()=>({}),resend:async()=>({})},rpc:async(n,p)=>window.testRpc({action:p.p_action,payload:p.p_payload}),functions:{invoke:async()=>({data:{status:'not_subscribed'},error:null})}}}`});
-  if(u.pathname==='/auth/v1/settings')return route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"external":{"google":true}}'});
+  if(u.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:`export function createClient(){const callbacks=[];window.__authChange=(event,next)=>callbacks.forEach(fn=>fn(event,next));return {auth:{initialize:async()=>({}),getSession:()=>window.testAuth({action:'session'}),onAuthStateChange:fn=>{callbacks.push(fn);return {data:{subscription:{unsubscribe(){}}}}},signInWithPassword:()=>window.testAuth({action:'signin'}),signInWithOAuth:async({options})=>{window.__oauthReturn=options.redirectTo;window.__oauthPrompt=options.queryParams?.prompt;return {data:{},error:null};},signOut:()=>window.testAuth({action:'signout'}),updateUser:()=>window.testAuth({action:'session'}),resetPasswordForEmail:async()=>({}),resend:async()=>({})},rpc:async(n,p)=>window.testRpc({action:p.p_action,payload:p.p_payload}),functions:{invoke:async()=>({data:{status:'not_subscribed'},error:null})}}}`});
+  if(u.pathname==='/auth/v1/settings'){
+   if(data.googleGate)await data.googleGate;
+   const status=data.failGoogleOnce?503:200;data.failGoogleOnce=false;
+   return route.fulfill({status,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"external":{"google":true}}'});
+  }
   if(u.pathname==='/rest/v1/rpc/shop_api'){const body=route.request().postDataJSON();if(body.p_action==='flavor_collection'){if(data.collectionGate)await data.collectionGate;return route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(data.collection)});}return route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{}'});}
   if(u.origin!==origin)return route.abort();const file=resolve(root,'.'+u.pathname);if(!file.startsWith(root+sep))return route.abort();
   try{return route.fulfill({body:await readFile(file),contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.webp':'image/webp','.png':'image/png','.woff2':'font/woff2'})[extname(file)]||'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}
  });
  const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));return {ctx,page,data,errors};
 }
-const menu=async page=>{await page.goto(origin+'/order.html');await page.locator('#product-grid [data-product]').first().waitFor();};
+const menu=async page=>{await page.goto(origin+'/order.html');await page.locator('#product-grid [data-product]').first().waitFor();assert.equal(await page.locator('#fulfillment-date-label').innerText(),'Choose your date');};
 const open=async(page,id='custom')=>{await page.locator('[data-product="'+id+'"]').click();await page.locator('#product-dialog[open]').waitFor();};
 const close=async page=>{await page.locator('[aria-label="Close product"]').click();await page.waitForFunction(()=>!document.querySelector('#product-dialog').open&&!new URL(location.href).searchParams.has('product'));};
 const choose=async(page,values)=>{for(const [id,n] of values)await page.locator('[data-choice="'+id+'"]').fill(String(n));};
@@ -67,7 +71,7 @@ try{
   await page.locator('#cart').scrollIntoViewIfNeeded();await page.screenshot({path:join(out,'basket-'+width+'.png')});await finish(t,'draft restore/revalidate/clear, identical basket merge and repeated keyboard use '+width);
  }
  {
-  const t=await make({capacity:3}),{page}=t;await menu(page);await open(page,'fixed');await add(page);assert.equal(await page.locator('#cart [data-delta="1"]').isDisabled(),true);assert.match(await page.locator('#basket-quantity-limit-0').innerText(),/Vanilla.*Choose another date/);assert.equal(await page.locator('#checkout-button').isDisabled(),false);await page.locator('#cart').scrollIntoViewIfNeeded();await page.screenshot({path:join(out,'stock-limit-explained.png')});await finish(t,'stock limit explained without invalidating checkout');
+  const t=await make({capacity:3}),{page}=t;await menu(page);await open(page,'fixed');assert.doesNotMatch(await page.locator('#product-dialog').innerText(),/\\d+ available on this date/i);assert.equal(await page.locator('[data-product="fixed"] .availability').count(),0);await add(page);assert.equal(await page.locator('#cart [data-delta="1"]').isDisabled(),true);assert.match(await page.locator('#basket-quantity-limit-0').innerText(),/Vanilla.*Choose another date/);assert.equal(await page.locator('#checkout-button').isDisabled(),false);await page.locator('#cart').scrollIntoViewIfNeeded();await page.screenshot({path:join(out,'stock-limit-explained.png')});await finish(t,'stock limit explained without invalidating checkout');
  }
  {
   const t=await make({capacity:6}),{page}=t;await menu(page);await open(page,'fixed');await add(page);await open(page);await choose(page,[['flavor-0',1],['flavor-1',2]]);await add(page);assert.equal(await page.locator('[data-qty="0"][data-delta="1"]').isDisabled(),true);await page.locator('[data-remove="1"]').click();assert.equal(await page.locator('[data-qty="0"][data-delta="1"]').isDisabled(),false);await page.locator('[data-qty="0"][data-delta="1"]').click();assert.equal(await page.locator('[data-qty="0"][data-delta="1"]').isDisabled(),true);assert.equal(await page.evaluate(()=>document.activeElement.dataset.delta),'-1');await finish(t,'shared-flavor stock releases correctly and disabled controls keep usable focus');
@@ -86,7 +90,13 @@ try{
   const t=await make(),{page}=t;await page.goto(origin+'/account.html?next=order.html');await page.locator('#account-submit:not(:disabled)').waitFor();await page.locator('[name="email"]').fill('customer@example.test');await page.locator('[name="password"]').fill('local-test-only');await page.locator('#account-submit').click();await page.waitForURL('**/order.html#your-basket');await finish(t,'password sign-in returns to the shop basket');
  }
  {
-  const t=await make(),{page,data}=t;await page.goto(origin+'/account.html?next=order.html');await page.locator('#google-signin:not(:disabled)').waitFor();await page.locator('#google-signin').click();await page.waitForFunction(()=>window.__oauthReturn);assert.equal(await page.evaluate(()=>window.__oauthReturn),origin+'/account.html');data.session=identity('oauth-customer');await page.goto(origin+'/account.html#access_token=test');await page.waitForURL('**/order.html#your-basket');await finish(t,'OAuth callback keeps its allowlisted URL and resumes the shop intent');
+  const t=await make(),{page,data}=t;await page.goto(origin+'/account.html?next=order.html');await page.locator('#google-signin:not(:disabled)').waitFor();await page.locator('#google-signin').click();await page.waitForFunction(()=>window.__oauthReturn);assert.equal(await page.evaluate(()=>window.__oauthReturn),origin+'/account.html');assert.equal(await page.evaluate(()=>window.__oauthPrompt),'select_account');data.session=identity('oauth-customer');await page.goto(origin+'/account.html#access_token=test');await page.waitForURL('**/order.html#your-basket');await finish(t,'OAuth callback keeps its allowlisted URL and resumes the shop intent');
+ }
+ {
+  const t=await make(),{page,data}=t;let release;data.googleGate=new Promise(resolve=>{release=resolve;});data.failGoogleOnce=true;
+  await page.goto(origin+'/account.html',{waitUntil:'domcontentloaded'});await page.locator('#account-submit:not(:disabled)').waitFor();
+  assert(await page.locator('#google-signin').isHidden());release();data.googleGate=null;
+  await page.locator('#google-signin').waitFor({state:'visible',timeout:9000});await finish(t,'Google stays hidden through an unconfirmed response and recovers after a retry');
  }
  {
   const t=await make({session:identity('customer-1')}),{page}=t;await page.goto(origin+'/account.html?next=https://untrusted.example');await page.locator('.account-order').waitFor();assert.equal(new URL(page.url()).pathname,'/account.html');await finish(t,'untrusted return destinations remain on the account page');

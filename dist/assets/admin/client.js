@@ -101,6 +101,8 @@ async function edge(name, body, options = {}) {
 }
 
 export async function api(action, payload = {}, token = null) {
+  if (action === 'delivery_receipt_url') return edge('proof-url', { kind: 'delivery', order_id: payload.order_id });
+  if (action === 'pickup_proof_url') return edge('proof-url', { kind: 'pickup', order_id: payload.order_id, token });
   if (action === 'proof_url') return signedProofUrl(payload.order_id);
   const client = await connection();
   const { data, error } = await client.rpc('shop_api', { p_action: action, p_payload: payload, p_token: token || null });

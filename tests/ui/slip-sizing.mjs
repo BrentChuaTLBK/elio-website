@@ -68,4 +68,17 @@ try{
   await preview.pdf({path:join(out,order.reference+'.pdf'),preferCSSPageSize:true,printBackground:true});await preview.close();
   console.log('PASS '+order.reference+' uses numbered half-sheet continuations only as needed, retaining every item/detail without prices');
  }
+ await ctx.addInitScript(()=>Object.defineProperty(navigator,'userAgent',{get:()=>'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'}));
+ await page.evaluate(orders=>{window.orders=orders;},[base,{...base,reference:'ELIO-SECOND'}]);
+ const opened=page.waitForEvent('popup');await page.locator('#print').click();const preview=await opened;
+ await preview.setViewportSize({width:390,height:844});await preview.locator('.print-slips:not([disabled])').waitFor();
+ assert.equal(await preview.locator('html').getAttribute('data-orientation'),'portrait');
+ await preview.locator('.print-copies summary').click();
+ const copies=preview.getByRole('spinbutton',{name:'Copies of '+base.reference});await copies.fill('2');await copies.dispatchEvent('change');
+ await preview.getByRole('button',{name:'Print 3 copies',exact:true}).waitFor();
+ assert.equal(await preview.locator('.slip').count(),3);
+ assert.equal(await preview.getByRole('spinbutton',{name:'Copies of ELIO-SECOND'}).inputValue(),'1');
+ await preview.locator('#paper-size').selectOption('letter');assert.match(await preview.locator('#paper-style').textContent(),/Letter portrait/);
+ assert.equal(await preview.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
+ await preview.close();await ctx.close();console.log('PASS independent order copies and iPhone-sized portrait print layout');
 }finally{await browser.close();}

@@ -20,7 +20,7 @@ export const calendarAmount=order=>Number.isSafeInteger(order.total_cents)&&orde
 export function calendarItemLines(order){return (order.items||[]).flatMap(item=>{
  const selections=Array.isArray(item.selection_labels)&&item.selection_labels.length?item.selection_labels:item.flavor_contents||[];
  const details=selections.map(s=>`${s.quantity?`${s.quantity} × `:''}${s.label||s.name||''}`).filter(Boolean);
- return [`${item.quantity} × ${item.name}`,...(details.length?['  '+details.join(', ')]:[])];
+ return [`${item.quantity} × ${item.name}`,...(details.length?['  '+details.join(', ')]:[]),...(item.description?['  '+item.description]:[])];
 });}
 export function calendarSummary(order){
  const delivery=order.method==='delivery',buyer=order.buyer||{};
@@ -29,7 +29,8 @@ export function calendarSummary(order){
   ...(delivery?[...(calendarName(order)!==(buyer.name||calendarName(order))?[`Recipient: ${calendarName(order)}`]:[]),
    ...(calendarPhone(order)&&calendarPhone(order)!==(buyer.phone||calendarPhone(order))?[`Recipient phone: ${calendarPhone(order)}`]:[]),`Delivery address: ${calendarAddress(order)||'Not provided'}`]:[]),
   '', 'Order details:',...calendarItemLines(order),'',`Amount: ${calendarAmount(order)}`,
-  ...(delivery&&order.instructions?['',`Delivery instructions: ${order.instructions}`]:[])].join('\n');
+  ...(order.instructions?['',`${delivery?'Delivery instructions':'Order notes'}: ${order.instructions}`]:[]),
+  ...(order.photo_count>0?[`${order.photo_count} order reference photo${order.photo_count===1?'':'s'}`]:[])].join('\n');
 }
 export function filteredCalendarOrders(orders,filters){
  const query=String(filters.search||'').trim().toLowerCase();

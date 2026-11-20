@@ -27,7 +27,7 @@ try{
   let settings={mode:'off',announce:false,pause_uploads:true,message:'A few improvements for your next Elio order.',starts_at:null,ends_at:null},revision=1,active=false,errors=[],calls=[];
   const emailAlert={id:'email-test',event_type:'order_review_required',status:'skipped',attempts:1,last_error:'Order no longer needs payment review.',reviewed_at:null};
   let pickupOrder={...order,id:'pickup-test',revision:1,fulfillment_date:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila'}).format(new Date()),fulfillment_status:'ready_for_pickup',buyer:{...order.buyer,email:'pickup@example.test'}};
-  const state=()=>({active,uploads_paused:active&&settings.pause_uploads,announce:settings.announce,message:settings.message,starts_at:settings.starts_at,ends_at:settings.ends_at,server_time:new Date().toISOString()});
+  const state=()=>({active,uploads_paused:active&&settings.pause_uploads,announce:settings.announce,message:settings.message,starts_at:settings.starts_at,ends_at:settings.ends_at,server_time:'2026-09-29T08:00:00.000Z'});
   const ctx=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'}),printFailures=[];
   ctx.on('requestfailed',request=>{if(request.url().includes('order-print'))printFailures.push({url:request.url(),error:request.failure()?.errorText});});
   await ctx.route('**/*',async route=>{

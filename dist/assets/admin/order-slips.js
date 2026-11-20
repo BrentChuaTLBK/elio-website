@@ -3,7 +3,10 @@ import { escapeHtml as esc, formatDate } from './client.js';
 const label = value => String(value || '').replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase());
 const text = value => String(value ?? '').trim();
 const lines = values => values.map(text).filter(Boolean).join('\n');
-const previewUrl = new URL('./order-print.html?v=items-only-slips-1', import.meta.url).href;
+const previewUrl = new URL('./order-print.html?v=slip-copies-1', import.meta.url).href;
+
+const paperDimensions = { a4: [297, 210], letter: [279.4, 215.9] };
+const maxCopies = 20;
 
 function photoUrl(value) {
   if (typeof value !== 'string' || !(/^(https?:\/\/|assets\/)/.test(value))) return '';
@@ -15,6 +18,7 @@ function variations(item, product) {
     return item.selection_labels.map(choice => typeof choice === 'string' ? choice :
       `${choice.group ? choice.group + ': ' : ''}${Number(choice.quantity || choice.count) > 1 ? `${choice.quantity || choice.count} × ` : ''}${choice.label || choice.name || ''}`).join(' · ');
   }
+  if (item.flavor_contents?.length) return item.flavor_contents.map(flavor => `${flavor.quantity} × ${flavor.name}`).join(' · ');
   return Object.entries(item.selections || {}).flatMap(([groupId, choices]) => Object.entries(choices)
     .filter(([, count]) => Number(count) > 0).map(([choiceId, count]) => {
       const group = product?.option_groups?.find(entry => entry.id === groupId);
@@ -39,7 +43,7 @@ function printModel(order, products, settings) {
     order.address?.line1, order.address?.line2, [order.address?.locality, order.address?.postal_code].filter(Boolean).join(' '),
   ]) || 'Not recorded' });
   details.push({ title: 'Instructions', value: text(order.instructions) || 'None' });
-  const status = [order.refund_label ? 'Refund label' : '', ['cancelled', 'expired'].includes(order.fulfillment_status) ? label(order.fulfillment_status) : '', `Payment: ${label(order.payment_status) || 'Not recorded'}`].filter(Boolean).join(' | ');
+  const status = [order.refund_label ? 'Refunded' : '', ['cancelled', 'expired'].includes(order.fulfillment_status) ? label(order.fulfillment_status) : ''].filter(Boolean).join(' | ');
   return {
     shop: text(settings.shop_name) || 'Elio Basque Cheesecake', reference: text(order.reference) || 'Order',
     date: formatDate(order.fulfillment_date), method: pickup ? 'Pickup' : 'Delivery', status,
@@ -48,7 +52,7 @@ function printModel(order, products, settings) {
     items: (order.items || []).map((item, index) => {
       const product = products.find(entry => entry.id === item.product_id);
       return { index, name: text(item.name) || product?.name || 'Product', quantity: item.quantity,
-        variation: variations(item, product) || 'Standard', photo: photoUrl(product?.photos?.[0]) };
+        variation: lines([item.description, variations(item, product)]) || 'Standard', photo: photoUrl(product?.photos?.[0]) };
     }),
   };
 }
@@ -193,15 +197,27 @@ function waitForPreview(preview) {
   });
 }
 
-function arrangeSheets(doc, slips, paper) {
-  const host=doc.querySelector('#slips');host.replaceChildren();
-  doc.querySelector('#paper-style').textContent=`@page{size:${paper==='letter'?'Letter':'A4'} landscape;margin:0}`;
-  let sheet=null,used=4,count=0;
+function arrangeSheets(doc, slips, paper, orientation) {
+  const host = doc.querySelector('#slips');
+  host.replaceChildren();
+  doc.querySelector('#paper-style').textContent = `@page{size:${paper === 'letter' ? 'Letter' : 'A4'} ${orientation};margin:0}`;
+  let sheet=null,occupied=[],count=0;
   for(const slip of slips){
-    const span=slip.dataset.size==='half'?2:1;
-    if(span===2&&used%2)used++;
-    if(used+span>4){sheet=doc.createElement('section');sheet.className='print-sheet';sheet.dataset.paper=paper;sheet.setAttribute('aria-label','Sheet '+(++count));host.append(sheet);used=0;}
-    slip.style.gridRow=String(Math.floor(used/2)+1);slip.style.gridColumn=`${used%2+1} / span ${span}`;sheet.append(slip);used+=span;
+    const slots=slip.dataset.size==='half'?2:1;
+    const available=()=>slots===2?[0,2].find(i=>!occupied[i]&&!occupied[i+1]):[0,1,2,3].find(i=>!occupied[i]);
+    let position=available();
+    if(!sheet||position===undefined){
+      sheet=doc.createElement('section');sheet.className='print-sheet';sheet.dataset.paper=paper;
+      sheet.setAttribute('aria-label',`Sheet ${++count}`);
+      const frame = doc.createElement('div');
+      frame.className = 'print-sheet-frame';
+      frame.append(sheet);
+      host.append(frame);
+      occupied=[];position=0;
+    }
+    slip.style.gridRow=String(Math.floor(position/2)+1);
+    slip.style.gridColumn=slots===2?'1 / span 2':String(position%2+1);
+    sheet.append(slip);occupied[position]=true;if(slots===2)occupied[position+1]=true;
   }
   return count;
 }
@@ -230,28 +246,64 @@ export async function printOrderSlips(source, { products = [], settings = {} } =
     const models = orders.map(order => printModel(order, products, settings));
     doc.title = `${models.length === 1 ? models[0].reference : `${models.length} orders`} - preparation slips`;
     status.textContent = 'Preparing order slips…';
-    try { if (localStorage.getItem('order-slip-paper') === 'letter') paperChoice.value = 'letter'; } catch {}
-    const resize = () => doc.documentElement.style.setProperty('--preview-scale', Math.min(1, Math.max(.1, (preview.innerWidth - 24) / ((paperChoice.value === 'letter' ? 279.4 : 297) * 96 / 25.4))));
-    let layoutVersion=0;
-    const arrange=async()=>{
-      const version=++layoutVersion;button.disabled=true;paperChoice.disabled=true;
-      const paper=paperChoice.value==='letter'?'letter':'a4',width=paper==='letter'?279.4:297,height=paper==='letter'?215.9:210;
-      doc.documentElement.style.setProperty('--slip-width',((width-11)/2)+'mm');
-      doc.documentElement.style.setProperty('--slip-height',((height-11)/2)+'mm');
-      doc.querySelector('#slips').replaceChildren();
-      const slips=models.flatMap(model=>paginate(doc,model));
-      await readyImages(doc);if(preview.closed||version!==layoutVersion)return;
-      const count=arrangeSheets(doc,slips,paper),half=slips.filter(s=>s.dataset.size==='half').length;resize();
-      status.textContent=`${orders.length} order${orders.length===1?'':'s'} · ${slips.length-half} quarter-sheet · ${half} half-sheet · ${count} sheet${count===1?'':'s'}. Choose matching paper in the print dialog, landscape, Actual size / 100%, with headers and footers off.`;
-      button.disabled=false;paperChoice.disabled=false;
-    };
-    await arrange();preview.addEventListener('resize',resize);
-    paperChoice.addEventListener('change',async()=>{
-      try{await arrange();try{localStorage.setItem('order-slip-paper',paperChoice.value);}catch{}}
-      catch(error){doc.querySelector('#slips').replaceChildren();status.textContent=error.message;button.disabled=true;paperChoice.disabled=false;}
+    try { if (localStorage.getItem('order-slip-paper') === 'letter') paperChoice.value = 'letter'; } catch { /* Paper choice remains available without storage. */ }
+    const device = preview.navigator;
+    const portrait = /iPhone|iPad|iPod/i.test(device.userAgent) || (device.platform === 'MacIntel' && device.maxTouchPoints > 1);
+    const orientation = portrait ? 'portrait' : 'landscape';
+    for (const option of paperChoice.options) option.textContent = `${option.value === 'letter' ? 'Letter' : 'A4'} ${orientation}`;
+    doc.documentElement.dataset.orientation = orientation;
+    const slipSets = models.map(model => paginate(doc, model));
+    await readyImages(doc);
+    if (preview.closed) return;
+    const copies = doc.querySelector('.print-copies');
+    const counts = models.map(model => {
+      const label = doc.createElement('label');
+      label.textContent = model.reference;
+      const input = doc.createElement('input');
+      Object.assign(input, { type: 'number', min: '1', max: String(maxCopies), step: '1', value: '1', inputMode: 'numeric' });
+      input.setAttribute('aria-label', `Copies of ${model.reference}`);
+      label.append(input);
+      doc.querySelector('#copy-counts').append(label);
+      return input;
     });
-    button.textContent = `Print ${orders.length === 1 ? 'order' : `${orders.length} orders`}`;
-    button.disabled = false;
+    copies.hidden = false;
+    copies.open = models.length === 1;
+    const resize = () => {
+      const [wide, short] = paperDimensions[paperChoice.value] || paperDimensions.a4;
+      const width = (portrait ? short : wide) * 96 / 25.4;
+      const height = (portrait ? wide : short) * 96 / 25.4;
+      const scale = Math.min(1, Math.max(.1, (preview.innerWidth - 24) / width));
+      const style = doc.documentElement.style;
+      style.setProperty('--preview-width', `${width * scale}px`);
+      style.setProperty('--preview-height', `${height * scale}px`);
+      style.setProperty('--preview-scale', scale);
+    };
+    let layoutVersion = 0;
+    const arrange = async () => {
+      const version = ++layoutVersion;
+      button.disabled = true;
+      let copyCount = 0;
+      const slips = slipSets.flatMap((set, index) => {
+        const number = Math.max(1, Math.min(maxCopies, Math.trunc(Number(counts[index].value)) || 1));
+        counts[index].value = String(number);
+        copyCount += number;
+        return Array.from({ length: number }, () => set.map(slip => slip.cloneNode(true))).flat();
+      });
+      const paper = paperChoice.value === 'letter' ? 'letter' : 'a4';
+      const count=arrangeSheets(doc, slips, paper, orientation); resize();
+      const copiesText = copyCount > orders.length ? ` · ${copyCount} copies` : '';
+      status.textContent = `${orders.length} order${orders.length === 1 ? '' : 's'}${copiesText} · ${slips.length} slip${slips.length === 1 ? '' : 's'} · ${count} sheet${count === 1 ? '' : 's'}. Choose matching paper in the print dialog, ${orientation}, Actual size / 100%, with headers and footers off.`;
+      button.textContent = copyCount > orders.length ? `Print ${copyCount} copies` : `Print ${orders.length === 1 ? 'order' : `${orders.length} orders`}`;
+      await readyImages(doc);
+      if (version === layoutVersion) button.disabled = false;
+    };
+    await arrange();
+    preview.addEventListener('resize', resize);
+    for (const input of counts) input.addEventListener('change', arrange);
+    paperChoice.addEventListener('change', () => {
+      arrange();
+      try { localStorage.setItem('order-slip-paper', paperChoice.value); } catch { /* Preferences are optional. */ }
+    });
     paperChoice.disabled = false;
     button.addEventListener('click', () => { preview.focus(); preview.print(); });
     preview.focus();

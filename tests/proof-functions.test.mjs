@@ -19,12 +19,15 @@ globalThis.fetch=async(url,options={})=>{
   if(path==='/rest/v1/rpc/shop_service'){
     assert.equal(options.headers.apikey,'test-service-key');
     const {p_action:action,p_payload:p}=JSON.parse(options.body);
+    if(action==='authorize_pickup_upload')return setup.staffDenied?Response.json({message:'Staff account required.'},{status:403}):Response.json({allowed:true,previous:order+'/old.png'});
+    if(action==='commit_pickup_proof')return Response.json({previous:order+'/old.png'});
+    if(action==='read_pickup_proof')return p.token==='right-order-token'?Response.json({path:order+'/handoff.png'}):Response.json({message:'Order access not authorized.'},{status:403});
     if(action==='authorize_upload')return Response.json({allowed:setup.allowUpload!==false});
     if(action==='commit_proof')return setup.commitFails?Response.json({message:'Order has expired.'},{status:400}):Response.json({id:p.order_id,payment_status:'under_review'});
     if(action==='authorize_proof_read')return setup.staffDenied?Response.json({message:'Staff access required.'},{status:403}):Response.json({path:`${order}/receipt.png`});
     throw Error('Unexpected service action '+action);
   }
-  if(path.includes('/object/sign/'))return Response.json({signedURL:`/object/sign/payment-proofs/${order}/receipt.png?token=temporary`});
+  if(path.includes('/object/sign/'))return Response.json({signedURL:path.slice('/storage/v1'.length)+'?token=temporary'});
   if(path.startsWith('/storage/v1/object/'))return Response.json({});
   throw Error('Unexpected request');
 };
@@ -79,6 +82,17 @@ try{
  });
  await check('authorized staff get a five-minute private signed URL',async()=>{
   const response=await read(readRequest('staff-jwt'));assert.equal(response.status,200);const result=await response.json();assert.equal(result.expires_in,300);assert.match(result.url,/^https:\/\/elio.example.test\/storage\/v1\/object\/sign\/payment-proofs\//);assert.deepEqual(JSON.parse(calls.at(-1).options.body),{expiresIn:300});
+ });
+ await check('pickup proof permits staff uploads, replaces the old photo after saving, and retains order scope on guest reads',async()=>{
+  assert.equal((await upload(request({kind:'pickup'}))).status,401);
+  setup.staffDenied=true;assert((await upload(request({kind:'pickup',bearer:'customer-jwt'}))).status>=400);
+  assert(!calls.some(c=>c.path.startsWith('/storage/')));setup.staffDenied=false;calls=[];
+  assert.equal((await upload(request({kind:'pickup',bearer:'staff-jwt'}))).status,201);
+  const stored=calls.find(c=>c.path.includes('/storage/')&&c.options.method==='POST');
+  assert(stored.path.includes('/pickup-proofs/'+order+'/'));assert.equal(calls.at(-1).options.method,'DELETE');
+  const readPickup=token=>read(new Request('https://elio.example.test/functions/v1/proof-url',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'pickup',order_id:order,token})}));
+  assert((await readPickup('wrong-order')).status>=400);const access=await readPickup('right-order-token');
+  assert.equal(access.status,200);assert((await access.json()).url.includes('/object/sign/pickup-proofs/'+order+'/'));
  });
  console.log(`Passed ${checks} proof endpoint checks; no live files or orders created.`);
 }finally{globalThis.fetch=actualFetch;}
