@@ -2,6 +2,7 @@ import {acceptsReceipt} from './receipt-refresh.js';
 import {temporaryOrderReadFailure} from '../admin/account-return.js';
 import {basketLineKey,mergeBasketItems,basketIncreaseLimit,flavorPickerLimit,productDrafts} from './basket-interactions.js';
 import {productNavigation} from './product-navigation.js';
+import {isCustomTrio,mountTrioBuilder,trioBreakdown} from './trio-builder.js';
 import {mountProductPhotos} from './product-photo-viewer.js?v=icon-only-1';
 import {checkoutNavigation} from './checkout-navigation.js';
 import {watchSections,watchFirstProductRow} from '../store-motion.js?v=selected-1';
@@ -41,7 +42,7 @@ const orderAccessKey=()=>{const p=new URLSearchParams(location.hash.slice(1));re
 let promoRequest=0,promoPending=false,promoQuote=null,promoKey='',promoMessage='',promoTone='';
 let draftStorage;try{draftStorage=window.sessionStorage;}catch{}
 const productDraftStore=productDrafts(draftStorage);
-const productRoutes=productNavigation({dialog:$('#product-dialog'),findProduct:value=>catalog.products.find(p=>p.id===value||p.slug===value),showProduct:openProduct,onUnavailable:()=>toast('This box is not currently listed in the shop.')});
+const productRoutes=productNavigation({dialog:$('#product-dialog'),findProduct:value=>catalog.products.find(p=>p.id===value||p.slug===value)||(value==='your-own'?catalog.products.find(isCustomTrio):null),showProduct:openProduct,onUnavailable:()=>toast('This box is not currently listed in the shop.')});
 const bagTrigger=$('[data-open-quick-cart]'),quickCart=mountQuickCart($('#quick-cart-dialog'),{getBasket:()=>$('#cart'),fallbackTrigger:()=>bagTrigger});
 let checkoutReturn=null;
 function returnCheckoutFocus(){
@@ -93,7 +94,7 @@ function updateFulfillment(){
   if(button){button.disabled=!!reason;button.setAttribute('aria-describedby','fulfillment-notice')}
   if(notice){notice.textContent=customerDateIssue(state.fulfillment_date,catalog.settings,state.method,new Date(),sameDayEligible())||(state.method==='delivery'?reason:'')||issues()[0]||reason;notice.hidden=!notice.textContent}
 }
-function issues(){return [...basketStockIssues(state.items,catalog.products,catalog.inventory,state.fulfillment_date),...state.items.flatMap(line=>{const p=lineProduct(line);if(!p)return [`${line.name||'An item'} is no longer available. Remove it to continue.`];const a=displayAvailability(p);const totalQty=state.items.filter(l=>l.product_id===p.id).reduce((s,l)=>s+l.quantity,0);let issues=[];if(!a.available)issues.push(`${p.name}: ${a.reason}`);else if(totalQty<p.min_quantity)issues.push(`${p.name}: add at least ${p.min_quantity} units across your selected configurations.`);else if(state.fulfillment_date&&totalQty>a.remaining)issues.push(`${p.name}: only ${a.remaining} available on this date.`);try{selectionPrice(p,line.selections)}catch(e){issues.push(`${p.name}: ${e.message}`)}return issues})]}
+function issues(items=state.items){return [...basketStockIssues(items,catalog.products,catalog.inventory,state.fulfillment_date),...items.flatMap(line=>{const p=lineProduct(line);if(!p)return [`${line.name||'An item'} is no longer available. Remove it to continue.`];const a=displayAvailability(p);const totalQty=items.filter(l=>l.product_id===p.id).reduce((s,l)=>s+l.quantity,0);let issues=[];if(!a.available)issues.push(`${p.name}: ${a.reason}`);else if(totalQty<p.min_quantity)issues.push(`${p.name}: add at least ${p.min_quantity} units across your selected configurations.`);else if(state.fulfillment_date&&totalQty>a.remaining)issues.push(`${p.name}: only ${a.remaining} available on this date.`);try{selectionPrice(p,line.selections)}catch(e){issues.push(`${p.name}: ${e.message}`)}return issues})]}
 function displayAvailability(p){
  const result=availability(p,state.fulfillment_date,catalog.settings,catalog.inventory,new Date(),state.method);
  if(!state.fulfillment_date&&!firstAvailableDate([], [p], catalog.settings, catalog.inventory))return {...result,available:false,reason:'No available dates yet'};
@@ -133,7 +134,7 @@ async function renderShop(){
   <div class="shop-layout"><section id="cheesecake-boxes"><div class="section-heading" data-store-section="shop-boxes"><h2>Our Cheesecake Boxes</h2><span class="muted">A box for every craving.</span></div><div id="product-grid" class="product-grid"></div><p class="help-card">One basket, one date. Fixed sets come as shown; build your own box to choose your three flavors.</p></section><aside id="cart" class="panel cart-panel" aria-label="Your basket"></aside></div><button id="mobile-cart" class="mobile-cart" aria-haspopup="dialog" aria-controls="quick-cart-dialog" aria-expanded="false" hidden></button>`;
   boxGrid=mountBoxGrid($('#product-grid'),productRoutes.open);
   renderProducts();renderCart();watchSections(app);
-  customerCalendar=mountCustomerCalendar($('#customer-date-picker'),{value:state.fulfillment_date,settings:catalog.settings,method:state.method,allowSameDay:sameDayEligible(),onSelect:date=>{state.fulfillment_date=date;quote=null;persist();renderProducts();renderCart();if(configured)loadInventory()}});
+  customerCalendar=mountCustomerCalendar($('#customer-date-picker'),{value:state.fulfillment_date,settings:catalog.settings,method:state.method,allowSameDay:sameDayEligible(),onSelect:date=>{state.fulfillment_date=date;quote=null;persist();renderProducts();renderCart();if(configured)void loadInventory();else trioView?.update();}});
   document.querySelectorAll('[data-method]').forEach(b=>b.onclick=()=>{state.method=b.dataset.method;quote=null;persist();renderShop()});
 }
 function renderProducts(){
@@ -174,13 +175,56 @@ function renderCart(focus){const savedFocus=quickCart.captureFocus();customerCal
   if(focus){const index=state.items.findIndex(line=>basketLineKey(line)===focus.key),same=$('[data-qty="'+index+'"][data-delta="'+focus.delta+'"]'),fallback=$('[data-qty="'+index+'"]:not(:disabled)')||$('[data-remove="'+index+'"]');(same&&!same.disabled?same:fallback)?.focus({preventScroll:true});}
   else quickCart.restoreFocus(savedFocus);
 }
-async function loadInventory(){try{const next=await api('catalog',{fulfillment_date:state.fulfillment_date});catalog=prepareCatalog(next);customerCalendar?.update({value:state.fulfillment_date,settings:catalog.settings,method:state.method,allowSameDay:sameDayEligible()});renderProducts();renderCart()}catch(e){toast(e.message,'danger')}}
-let productPhotos=null;
+let inventoryRequest=0,productPhotos=null,trioView=null;
+async function loadInventory(){
+  const date=state.fulfillment_date,request=++inventoryRequest;
+  trioView?.update('loading');
+  try{
+    const next=await api('catalog',{fulfillment_date:date});
+    if(request!==inventoryRequest||state.fulfillment_date!==date)return false;
+    catalog=prepareCatalog(next);
+    customerCalendar?.update({value:date,settings:catalog.settings,method:state.method,allowSameDay:sameDayEligible()});
+    renderProducts();renderCart();
+    if(trioView&&$('#product-dialog').open&&!catalog.products.some(p=>p.id===trioView.productId&&isCustomTrio(p))){productRoutes.close();toast('This trio is no longer listed.');return false;}
+    trioView?.update();return true;
+  }catch(error){if(request===inventoryRequest){trioView?.update('failed');toast(error.message,'danger');}return false;}
+}
+function addConfiguredBox(product,selections,quantity,checkout=false){
+  if(!Number.isInteger(quantity)||quantity<1||quantity>999)throw Error('Choose a whole quantity from 1 to 999.');
+  const current=catalog.products.find(item=>item.id===product.id);
+  if(!current||catalog.settings.paused)throw Error('Ordering is currently unavailable.');
+  const availability=displayAvailability(current);
+  if(!availability.available)throw Error(availability.reason);
+  const price=selectionPrice(current,selections);
+  const nextItems=mergeBasketItems([...state.items,{product_id:current.id,name:current.name,quantity,selections,unit_price_cents:price}]);
+  if(nextItems.some(line=>line.quantity>999))throw Error('Choose no more than 999 boxes per selection.');
+  const problems=checkout?issues(nextItems):basketStockIssues(nextItems,catalog.products,catalog.inventory,state.fulfillment_date);
+  if(problems.length)throw Error(problems[0]);
+  state.items=nextItems;quote=null;persist();productDraftStore.clear(current.id);renderCart();
+  if(checkout){
+    const replaceProduct=productRoutes.leaveForCheckout();
+    openCheckout({replaceProduct});
+  }else{productRoutes.close();toast('Added to your basket.');}
+}
 function openProduct(id){
   quickCart.close({restoreFocus:false});
-  productPhotos?.destroy();
+  productPhotos?.destroy();trioView?.destroy();trioView=null;
   const p=catalog.products.find(p=>p.id===id),dialog=$('#product-dialog'),a=displayAvailability(p);
   const draft=productDraftStore.read(p,state.fulfillment_date,catalog.inventory),selected=draft?.selected||Object.fromEntries((p.option_groups||[]).map(g=>[g.id,{}]));
+  if(isCustomTrio(p)){
+    const details=(p.photos?.length?'<div data-product-gallery></div>':'')+
+      '<p class="muted">'+esc(p.description||'')+'</p><p>'+esc(earliestFor(p))+' · Minimum order: '+esc(p.min_quantity||1)+'</p>'+boxDetails(p);
+    trioView=mountTrioBuilder(dialog,{
+      read:()=>{const current=catalog.products.find(item=>item.id===id)||p;return {product:current,products:catalog.products,items:state.items,inventory:catalog.inventory,date:state.fulfillment_date,paused:catalog.settings.paused,availability:displayAvailability(current)};},
+      draft,details,save:(choices,quantity,slots)=>productDraftStore.save(id,choices,quantity,slots),
+      commit:(choices,quantity,checkout)=>addConfiguredBox(p,choices,quantity,checkout),
+      close:productRoutes.close,chooseDate:button=>customerCalendar?.open(button),retry:loadInventory,verify:()=>configured?loadInventory():true
+    });
+    productPhotos=mountProductPhotos({root:dialog.querySelector('[data-product-gallery]'),parent:dialog,photos:p.photos,name:p.name});
+    if(!dialog.open)dialog.showModal();
+    dialog.scrollTop=0;
+    return;
+  }
   dialog.innerHTML=`<div class="modal-head"><span class="eyebrow">${demo?'Sample product':'Made just for you'}</span><button class="close-button" aria-label="Close product">×</button></div><div class="modal-content"><div class="product-dialog-layout"><div>${p.photos?.length?'<div data-product-gallery></div>':placeholder()}<div class="help-card"><strong>Freshly made, with a little notice</strong>${p.lead_days} full production day${p.lead_days===1?'':'s'} required.<br>Earliest available: ${esc(earliestFor(p))}.<br>Minimum order: ${p.min_quantity} unit${p.min_quantity===1?'':'s'}.</div></div><div><h2 id="product-title">${esc(p.name)}</h2>${allowsSameDay(p)?'<div class="notice">Same-day orders are available before our order cutoff, subject to stock and pickup or delivery availability. Every product in your basket must be eligible for same-day orders.</div>':''}${p.pickup_only===true?'<div class="notice">This product is available for pickup only. Orders containing it must be collected from the kitchen.</div>':''}<p class="muted product-description">${esc(p.description)}</p>${insideBox(p,catalog.flavors)}<div class="product-price" id="detail-price">${money(p.price_cents)}</div>${(p.option_groups||[]).map((g,gi)=>`<fieldset class="option-group"><legend>${esc(g.label)} <small class="muted">· Choose ${g.required_count}</small></legend>${g.choices.filter(c=>c.active!==false&&flavorStock(c,state.fulfillment_date,catalog.inventory)>0).map(c=>`<div class="option-choice">${g.required_count===1?`<label><input type="radio" name="group-${gi}" data-group="${esc(g.id)}" data-choice="${esc(c.id)}" value="1"> ${esc(c.label)}</label>`:`<label for="choice-${esc(g.id)}-${esc(c.id)}">${esc(c.label)}</label>`}<span class="option-choice-controls"><small>${c.surcharge_cents?'+'+money(c.surcharge_cents):money(0)}</small>${g.required_count!==1?`<span class="option-stepper"><button type="button" data-option-delta="-1" aria-label="Decrease ${esc(c.label)} quantity" disabled>&minus;</button><input id="choice-${esc(g.id)}-${esc(c.id)}" class="option-count" type="number" inputmode="numeric" min="0" max="${g.required_count}" value="0" step="1" data-group="${esc(g.id)}" data-choice="${esc(c.id)}" aria-label="${esc(c.label)} quantity"><button type="button" data-option-delta="1" aria-label="Increase ${esc(c.label)} quantity">+</button></span>`:''}</span></div>`).join('')}<div class="muted" data-group-count="${esc(g.id)}" aria-live="polite" aria-atomic="true" style="font-size:11px;margin-top:8px">0 of ${g.required_count} selected</div></fieldset>`).join('')}${a.available && state.fulfillment_date ? '' : `<div class="notice ${a.available?'':'danger'}" style="margin-top:20px">${a.available?'Choose your fulfillment date in the menu to check availability.':esc(a.reason)}</div>`}<div id="product-error" role="alert"></div><div class="product-dialog-bottom"><label class="field no-margin" style="width:max-content">Quantity<input id="product-quantity" type="number" min="1" max="999" step="1" value="1"></label><button id="add-to-cart" class="button" ${!a.available||catalog.settings.paused?'disabled':''}>Add to basket · ${money(p.price_cents)}</button></div>${boxDetails(p)}</div></div></div>`;
   dialog.querySelector('.close-button').onclick=()=>productRoutes.close();
   productPhotos=mountProductPhotos({root:dialog.querySelector('[data-product-gallery]'),parent:dialog,photos:p.photos,name:p.name});
@@ -242,7 +286,7 @@ function openProduct(id){
   $('#product-quantity').oninput=refresh;
   if(draft){dialog.querySelectorAll('input[data-group]').forEach(input=>{const count=selected[input.dataset.group]?.[input.dataset.choice]||0;if(input.type==='radio')input.checked=count>0;else input.value=String(count);});$('#product-quantity').value=String(draft.quantity);if(draft.adjusted){$('#product-error').className='notice';$('#product-error').textContent='Some saved choices are no longer available. Please complete your box with the current selection.';}}
   refresh();
-  $('#add-to-cart').onclick=()=>{try{const price=selectionPrice(p,selected),quantity=Number($('#product-quantity').value);if(!Number.isInteger(quantity)||quantity<1||quantity>999)throw new Error(`Choose a whole quantity from 1 to 999.`);const nextItems=mergeBasketItems([...state.items,{product_id:p.id,name:p.name,quantity,selections:selected,unit_price_cents:price}]);if(nextItems.some(line=>line.quantity>999))throw new Error('Choose no more than 999 boxes per selection.');const stockErrors=basketStockIssues(nextItems,catalog.products,catalog.inventory,state.fulfillment_date);if(stockErrors.length)throw new Error(stockErrors[0]);state.items=nextItems;quote=null;persist();productDraftStore.clear(p.id);renderCart();productRoutes.close();toast('Added to your basket.')}catch(e){$('#product-error').className='notice danger';$('#product-error').textContent=e.message}};
+  $('#add-to-cart').onclick=()=>{try{addConfiguredBox(p,selected,Number($('#product-quantity').value));}catch(e){$('#product-error').className='notice danger';$('#product-error').textContent=e.message;}};
   if(!dialog.open)dialog.showModal();
 }
 function inputField(label,name,value='',type='text',required=true,extra=''){return `<label class="field">${label}<input name="${name}" type="${type}" value="${esc(value||'')}" ${required?'required':''} ${extra}></label>`}
@@ -291,7 +335,7 @@ async function applyPromoCode(form){
     if(request===promoRequest){promoPending=false;if(form===$('#checkout-form'))updatePromoUi();}
   }
 }
-function openCheckout(){
+function openCheckout({replaceProduct=false}={}){
   if(checkoutRoutes.navigating)return;
   if(checkoutRoutes.step==='review'&&!checkoutRoutes.restoring){checkoutRoutes.back();return;}
   const dialog=$('#checkout-dialog'),s=catalog.settings;
@@ -330,13 +374,13 @@ function openCheckout(){
       busy=false;if(form===$('#checkout-form'))reviewButton.textContent='Review order →';updatePromoUi();
     }
   };
-  checkoutRoutes.enter('details');if(!dialog.open)dialog.showModal();
+  checkoutRoutes.enter('details',replaceProduct);if(!dialog.open)dialog.showModal();
   if(state.voucher_selected&&state.promo_code&&!promoQuote)void applyPromoCode(form);
 }
 function checkoutError(message){const el=$('#checkout-error');el.className='notice danger';el.textContent=message;el.scrollIntoView({block:'nearest'})}
 function renderReview(){
   checkoutRoutes.enter('review');
-  const dialog=$('#checkout-dialog');dialog.innerHTML=`<div class="modal-head"><div><span class="eyebrow">${demo?'Design preview only':'Please check everything'}</span><h2 id="checkout-title">Ready for a little sweetness?</h2></div><button class="close-button" aria-label="Close review">×</button></div><div class="modal-content"><div class="checkout-grid"><div><div class="notice">${demo?'This is a sample review. No order will be saved and no email will be sent.':'Your stock and any promo use are reserved only when you submit this order.'}</div><h3>${formatDate(state.fulfillment_date)} · ${statusLabel(state.method)}</h3>${reviewWindow(state.method,catalog.settings,esc)}<p>${esc(state.buyer.name)}<br>${esc(state.buyer.email)} · ${esc(state.buyer.phone)}</p>${state.method==='delivery'?`<p><strong>Recipient:</strong> ${esc(state.recipient.name)} · ${esc(state.recipient.phone)}<br>${esc([state.address.line1,state.address.line2,state.address.locality,state.address.postal_code].filter(Boolean).join(', '))}</p>${zoneDescription(quote.delivery_zone_description)}`:`<p class="pickup-text">${esc(catalog.settings.pickup_address||'')}</p>`}${quote.items.map(l=>`<div class="cart-line"><div><strong>${l.quantity} × ${esc(l.name)}</strong><div class="cart-options">${esc(labelsText(l.selection_labels?.length?l.selection_labels:(l.flavor_contents||[]).map(f=>({label:f.name,quantity:f.quantity}))))}</div></div><strong>${money(l.line_total_cents??l.unit_price_cents*l.quantity)}</strong></div>`).join('')}${state.instructions?`<p style="margin-top:18px">Note: ${esc(state.instructions)}</p>`:''}</div><aside class="checkout-aside"><h3>Your final total</h3>${amountLines(quote)}${state.promo_code?`<p class="notice success promo-status"><strong>${esc(state.promo_code)} applied</strong><br>${quote.discount_cents>0?`You saved ${money(quote.discount_cents)}.`:'This code gives no discount on this basket.'}</p>`:''}${reviewPayment()}</aside></div><div id="checkout-error" role="alert"></div><div class="dialog-actions"><button class="button-quiet" id="edit-checkout">Edit details</button><button class="button" id="place-order" ${demo?'disabled':''}>Place order · ${money(quote.total_cents)}</button></div>${demo?'<p class="muted" style="font-size:12px;margin-top:16px">Once the backend is configured, this step will save the order, reserve the selected date’s quantities, and display your manual payment details.</p>':''}</div>`;
+  const dialog=$('#checkout-dialog');dialog.innerHTML=`<div class="modal-head"><div><span class="eyebrow">${demo?'Design preview only':'Please check everything'}</span><h2 id="checkout-title">Ready for a little sweetness?</h2></div><button class="close-button" aria-label="Close review">×</button></div><div class="modal-content"><div class="checkout-grid"><div><div class="notice">${demo?'This is a sample review. No order will be saved and no email will be sent.':'Your stock and any promo use are reserved only when you submit this order.'}</div><h3>${formatDate(state.fulfillment_date)} · ${statusLabel(state.method)}</h3>${reviewWindow(state.method,catalog.settings,esc)}<p>${esc(state.buyer.name)}<br>${esc(state.buyer.email)} · ${esc(state.buyer.phone)}</p>${state.method==='delivery'?`<p><strong>Recipient:</strong> ${esc(state.recipient.name)} · ${esc(state.recipient.phone)}<br>${esc([state.address.line1,state.address.line2,state.address.locality,state.address.postal_code].filter(Boolean).join(', '))}</p>${zoneDescription(quote.delivery_zone_description)}`:`<p class="pickup-text">${esc(catalog.settings.pickup_address||'')}</p>`}${quote.items.map(l=>`<div class="cart-line"><div><strong>${l.quantity} × ${esc(l.name)}</strong><div class="cart-options">${trioBreakdown(l,lineProduct(l))||esc(labelsText(l.selection_labels?.length?l.selection_labels:(l.flavor_contents||[]).map(f=>({label:f.name,quantity:f.quantity}))))}</div></div><strong>${money(l.line_total_cents??l.unit_price_cents*l.quantity)}</strong></div>`).join('')}${state.instructions?`<p style="margin-top:18px">Note: ${esc(state.instructions)}</p>`:''}</div><aside class="checkout-aside"><h3>Your final total</h3>${amountLines(quote)}${state.promo_code?`<p class="notice success promo-status"><strong>${esc(state.promo_code)} applied</strong><br>${quote.discount_cents>0?`You saved ${money(quote.discount_cents)}.`:'This code gives no discount on this basket.'}</p>`:''}${reviewPayment()}</aside></div><div id="checkout-error" role="alert"></div><div class="dialog-actions"><button class="button-quiet" id="edit-checkout">Edit details</button><button class="button" id="place-order" ${demo?'disabled':''}>Place order · ${money(quote.total_cents)}</button></div>${demo?'<p class="muted" style="font-size:12px;margin-top:16px">Once the backend is configured, this step will save the order, reserve the selected date’s quantities, and display your manual payment details.</p>':''}</div>`;
   dialog.querySelector('.close-button').onclick=()=>checkoutRoutes.close();$('#edit-checkout').onclick=openCheckout;
   let needsReview=false;
   const refreshReview=async()=>{

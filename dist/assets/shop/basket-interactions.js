@@ -65,9 +65,10 @@ export function productDrafts(storage,now=()=>Date.now()) {
         selected[group.id]=choices;
       }
       const quantity=Number.isInteger(draft.quantity)?Math.max(1,Math.min(999,draft.quantity)):1;
-      return {selected,quantity,adjusted:selectionKey(selected)!==selectionKey(original)||quantity!==draft.quantity};
+      const slots=Array.isArray(draft.slots)&&draft.slots.length===3?draft.slots.map(id=>typeof id==='string'?id:null):undefined;
+      return {selected,quantity,...(slots?{slots}:{}),adjusted:selectionKey(selected)!==selectionKey(original)||quantity!==draft.quantity};
     },
-    save(id,selections,quantity){prune();drafts[id]={selections:structuredClone(selections),quantity:Number(quantity)||1,saved_at:now()};persist();},
+    save(id,selections,quantity,slots){prune();drafts[id]={selections:structuredClone(selections),quantity:Number(quantity)||1,...(slots?{slots:[...slots]}:{}),saved_at:now()};persist();},
     clear(id){delete drafts[id];persist();}
   };
 }

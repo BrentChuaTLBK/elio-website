@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {choose} from './trio-controls.mjs';
 import {createRequire} from 'node:module';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {resolve,join,extname,sep} from 'node:path';
@@ -64,6 +65,7 @@ const productClosed=async page=>page.waitForFunction(()=>!document.querySelector
 const menu=async page=>{await page.goto(origin+'/order.html');await page.locator('#product-grid [data-product]').first().waitFor();};
 const check=label=>{results.push(label);console.log('PASS '+label);};
 async function fit(page,name,mode='cover'){
+ const info=page.locator('.ep-details:not([open])>summary');if(await info.count())await info.click();
  await page.waitForFunction(({name,mode})=>{const img=document.querySelector('#detail-photo');return img?.complete&&img.naturalWidth>0&&img.currentSrc.endsWith('/'+name+'.svg')&&getComputedStyle(img).objectFit===mode;},{name,mode});
  assert.equal(await page.locator('[data-open-photo]').getAttribute('aria-pressed'),String(mode==='contain'));
  assert.equal(await page.locator('#product-photo-viewer').count(),0,'Photo display must never create a separate popup');
@@ -73,7 +75,7 @@ async function fit(page,name,mode='cover'){
 async function snapshot(page){
  return page.evaluate(()=>{
   const box=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};};
-  return {url:location.href,history:history.length,scroll:document.querySelector('#product-dialog').scrollTop,pageScroll:scrollY,frame:box('.product-photo-frame'),image:box('#detail-photo'),dialog:box('#product-dialog'),quantity:document.querySelector('#product-quantity').value,choices:[...document.querySelectorAll('[data-choice]')].map(el=>[el.dataset.choice,el.value]),focused:document.activeElement.matches('[data-open-photo]')};
+  return {url:location.href,history:history.length,scroll:document.querySelector('#product-dialog').scrollTop,pageScroll:scrollY,frame:box('.product-photo-frame'),image:box('#detail-photo'),dialog:box('#product-dialog'),quantity:document.querySelector('#product-quantity').value,choices:[...document.querySelectorAll('[data-trio-add]')].map(el=>[el.dataset.trioAdd,el.dataset.count]),focused:document.activeElement.matches('[data-open-photo]')};
  });
 }
 async function finish(t){
@@ -105,10 +107,12 @@ async function checkBoxCards(width,touch){
  assert.equal(await card.locator('.elio-menu-prep').innerText(),'3 production days');
  assert.match(await page.locator('[data-product="gallery"] .elio-menu-price').innerText(),/From\s+₱800\.00/);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ const chip=await add.boundingBox(),target=await card.boundingBox();
+ assert.ok(chip.width<=78&&chip.height<=36,'The visible Add label stays compact');
+ assert.ok(target.width>=44&&target.height>=44,'The whole card is the tap target');
  const opacity=()=>add.evaluate(el=>getComputedStyle(el).opacity);
  if(touch){
   assert.equal(await opacity(),'1');
-  assert.ok((await add.boundingBox()).height>=44);
  }else{
   await page.mouse.move(0,0);
   assert.equal(await opacity(),'0');
@@ -139,9 +143,9 @@ async function checkBoxCards(width,touch){
   await productClosed(page);
  }
  await openProduct(page,'gallery');
- assert.ok(await page.locator('[data-choice]').count()>0);
+ assert.ok(await page.locator('[data-trio-add]').count()>0);
  assert.equal(await page.locator('#cart .cart-line').count(),0);
- await page.locator('[data-choice="flavor-0"]').fill('3');
+ await choose(page,[['flavor-0',3]]);
  await page.locator('#add-to-cart').click();
  await productClosed(page);
  assert.equal(await page.locator('#cart .cart-line').count(),1);
@@ -153,9 +157,9 @@ try{
  for(const [width,touch] of [[320,true],[390,true],[768,true],[1440,false]])await checkBoxCards(width,touch);
  for(const width of [320,390,1440]){
   const t=await make(width),{page}=t;await menu(page);await openProduct(page);await fit(page,'landscape');
-  await page.locator('[data-choice="flavor-0"]').fill('2');await page.locator('[data-choice="flavor-1"]').fill('1');await page.locator('#product-quantity').fill('2');
+  await choose(page,[['flavor-0',2]]);await choose(page,[['flavor-1',1]]);await page.locator('#product-quantity').fill('2');
   const trigger=page.locator('[data-open-photo]');assert.equal(await trigger.evaluate(el=>el.tagName),'BUTTON');assert.equal(await trigger.getAttribute('type'),'button');
-  await trigger.focus();await page.locator('#product-dialog').evaluate(el=>{el.scrollTop=45;});
+  await trigger.scrollIntoViewIfNeeded();await trigger.focus();
   const before=await snapshot(page);
   await page.keyboard.press('Enter');await fit(page,'landscape','contain');assert.deepEqual(await snapshot(page),before,'Enter fits photo in place without moving or replacing the product');
   await page.keyboard.press('Space');await fit(page,'landscape');assert.deepEqual(await snapshot(page),before,'Space returns to cropped view without changing the product');
@@ -169,7 +173,7 @@ try{
   assert.equal(await page.locator('[data-photo="2"]').getAttribute('aria-pressed'),'true');
   if(width<600){await swipe(page,-100);await fit(page,'landscape','contain');await swipe(page,100);await fit(page,'square','contain');await swipe(page,-20);await fit(page,'square','contain');await swipe(page,-80,150);await fit(page,'square','contain');}
   await trigger.focus();await page.keyboard.press('Enter');await fit(page,'square');await page.locator('[data-photo-next]').click();await fit(page,'landscape');
-  assert.equal(await page.locator('#product-quantity').inputValue(),'2');assert.equal(await page.locator('[data-choice="flavor-0"]').inputValue(),'2');
+  assert.equal(await page.locator('#product-quantity').inputValue(),'2');assert.equal(await page.locator('[data-trio-add="flavor-0"]').getAttribute('data-count'),'2');
   check('Buttons, thumbnails, arrow keys and swipe keep selected fit mode and product choices '+width);
   await page.keyboard.press('Escape');await productClosed(page);assert.equal(await page.locator('dialog[open]').count(),0);
   check('One Escape closes the product; there is no second photo dialog '+width);
@@ -181,10 +185,10 @@ try{
   check('Single-photo toggle and photo-less fallback '+width);await finish(t);
  }
 
- const t=await make(390),{page}=t;await page.goto(origin+'/story.html');await menu(page);await openProduct(page);
- await page.locator('[data-choice="flavor-0"]').fill('2');await page.locator('#product-quantity').fill('3');await page.locator('[data-open-photo]').click();await fit(page,'landscape','contain');
+ const t=await make(390),{page}=t;await page.goto(origin+'/story.html');await menu(page);await openProduct(page);await fit(page,'landscape');
+ await choose(page,[['flavor-0',2]]);await page.locator('#product-quantity').fill('3');await page.locator('[data-open-photo]').click();await fit(page,'landscape','contain');
  await page.goBack();await productClosed(page);assert.equal(new URL(page.url()).pathname,'/order.html');assert.equal(await page.locator('dialog[open]').count(),0);
- await page.goForward();await page.locator('#product-dialog[open]').waitFor();await fit(page,'landscape');assert.equal(await page.locator('#product-quantity').inputValue(),'3');assert.equal(await page.locator('[data-choice="flavor-0"]').inputValue(),'2');
+ await page.goForward();await page.locator('#product-dialog[open]').waitFor();await fit(page,'landscape');assert.equal(await page.locator('#product-quantity').inputValue(),'3');assert.equal(await page.locator('[data-trio-add="flavor-0"]').getAttribute('data-count'),'2');
  await page.keyboard.press('Escape');await productClosed(page);await page.goBack();assert.equal(new URL(page.url()).pathname,'/story.html');
  check('Browser Back/Forward preserves product draft and has no added photo history');await finish(t);
 

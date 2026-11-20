@@ -82,12 +82,13 @@ export function availability(product,date,settings,inventory,now=new Date(),meth
   const remaining=pieces;
   return {available:remaining>=Number(product.min_quantity||1),remaining,reason:remaining>0?`${remaining} available on this date`:'Sold out for this date',earliest};
 }
-export function selectionPrice(product,selections){
+export function selectionPrice(product,selections,{allowIncomplete=false}={}){
   if(product.kind==='set'&&Object.keys(selections||{}).length)throw new Error('Fixed-set flavors cannot be changed.');
   let price=Number(product.price_cents);
   for(const group of product.option_groups||[]){
     const selected=selections[group.id]||{};
-    if(Object.values(selected).reduce((a,b)=>a+Number(b),0)!==group.required_count)throw new Error(`Choose exactly ${group.required_count} for ${group.label}.`);
+    const count=Object.values(selected).reduce((a,b)=>a+Number(b),0);
+    if(count>group.required_count||(!allowIncomplete&&count!==group.required_count))throw new Error(`Choose exactly ${group.required_count} for ${group.label}.`);
     for(const [id,count] of Object.entries(selected)){
       if(!Number.isInteger(Number(count))||Number(count)<0)throw new Error('Please use whole quantities.');
       const choice=group.choices.find(c=>c.id===id&&c.active!==false);
