@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {choose} from './trio-controls.mjs';
 import {createRequire} from 'node:module';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {resolve,join,extname,sep} from 'node:path';
@@ -60,7 +61,6 @@ async function make({width=Number(process.env.AUDIT_WIDTH||390),capacity=30,sess
 const menu=async page=>{await page.goto(origin+'/order.html');await page.locator('#product-grid [data-product]').first().waitFor();};
 const open=async(page,id='custom')=>{await page.locator('[data-product="'+id+'"]').click();await page.locator('#product-dialog[open]').waitFor();};
 const close=async page=>{await page.locator('[aria-label="Close product"]').click();await page.waitForFunction(()=>!document.querySelector('#product-dialog').open&&!new URL(location.href).searchParams.has('product'));};
-const choose=async(page,values)=>{for(const [id,n] of values)await page.locator('[data-choice="'+id+'"]').fill(String(n));};
 const add=async page=>{await page.locator('#add-to-cart').click();await page.waitForFunction(()=>!document.querySelector('#product-dialog').open&&!new URL(location.href).searchParams.has('product'));};
 const finish=async(test,name)=>{assert.deepEqual(test.errors,[]);assert.equal(await test.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);results.push(name);console.log('PASS '+name);await test.ctx.close();};
 const checkout=async page=>{await page.locator('#checkout-button').click();for(const [name,value]of Object.entries({buyer_name:'Sample customer',buyer_email:'sample@example.test',buyer_phone:'09170000000'}))await page.locator('[name='+name+']').fill(value);await page.locator('[name=social_platform]').selectOption('na');await page.locator('#review-order').click();await page.locator('#place-order').waitFor();};

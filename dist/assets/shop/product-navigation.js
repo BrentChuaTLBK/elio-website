@@ -32,7 +32,13 @@ export function productNavigation({dialog,findProduct,showProduct,onUnavailable=
     if(owned){closing=true;history.back();}
     else history.replaceState({...history.state,elioProduct:null},'',shopUrl());
   }
+  function leaveForCheckout(){
+    const replace=Boolean(history.state?.elioProduct?.fromShop&&requested());
+    hide();
+    history.replaceState({...history.state,elioProduct:null},'',shopUrl());
+    return replace;
+  }
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
   window.addEventListener('popstate',restore);
-  return {open,close,restore};
+  return {open,close,restore,leaveForCheckout};
 }

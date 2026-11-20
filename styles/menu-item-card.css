@@ -23,21 +23,21 @@
   color: var(--brown);
 }
 .elio-menu-add {
-  @apply absolute inline-flex items-center justify-center font-bold uppercase;
+  @apply absolute inline-flex items-center justify-center font-semibold uppercase;
   z-index: 1;
   left: 50%;
   bottom: 14px;
   transform: translateX(-50%);
-  min-width: 94px;
-  min-height: 44px;
-  padding: 0 20px;
+  min-width: 76px;
+  min-height: 34px;
+  padding: 0 14px;
   border: 1px solid #fff8;
-  border-radius: 9px;
+  border-radius: 7px;
   background: #fffcf6f5;
-  box-shadow: 0 2px 10px #271b1129;
+  box-shadow: 0 1px 5px #271b111f;
   color: var(--ink);
-  font-size: 12px;
-  letter-spacing: .065em;
+  font-size: 11px;
+  letter-spacing: .05em;
   transition: opacity .18s ease, transform .2s ease, background-color .18s ease, color .18s ease;
 }
 .elio-menu-price {

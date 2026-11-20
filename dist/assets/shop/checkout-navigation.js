@@ -5,12 +5,13 @@ export function checkoutNavigation({dialog,showDetails,showReview,canReview,canN
  const owned=value=>value?.id===id&&Number.isInteger(value.depth)&&value.depth>0;
  const clean=()=>({...history.state,elioCheckout:null});
  const hide=()=>{step='';depth=0;if(dialog.open)dialog.close();onClose();};
- function enter(next){
+ function enter(next,replace=false){
   if(restoring||pending)return;
   if(step===next&&owned(entry()))return;
   if(next==='details'&&step==='review'){back();return;}
   depth=owned(entry())?entry().depth+1:1;step=next;
-  history.pushState({...history.state,elioCheckout:{id,depth,step}},'',location.href);
+  const value={...history.state,elioCheckout:{id,depth,step}};
+  if(replace)history.replaceState(value,'',location.href);else history.pushState(value,'',location.href);
  }
  function back(){if(!pending&&canNavigate()&&owned(entry()))history.back();}
  function close(){

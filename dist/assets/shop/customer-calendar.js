@@ -78,6 +78,7 @@ export function mountCustomerCalendar(container, { value = '', settings = {}, me
   let month;
   let destroyed = false;
   let returnFocus = true;
+  let opener;
   let clockTimer;
   let clockKey;
   const trigger = ownerDocument.createElement('button');
@@ -151,19 +152,21 @@ export function mountCustomerCalendar(container, { value = '', settings = {}, me
     close();
     onSelect?.(date);
   };
-  trigger.addEventListener('click', () => {
+  const open = (anchor=trigger) => {
     if (popup.open) return;
+    opener=anchor;
     month = undefined;
     render();
     popup.showModal();
     trigger.setAttribute('aria-expanded', 'true');
     render({ focus: true });
     refreshClock();
-  }, listener);
+  };
+  trigger.addEventListener('click', () => open(), listener);
   popup.addEventListener('close', () => {
     clearTimeout(clockTimer);
     trigger.setAttribute('aria-expanded', 'false');
-    if (!destroyed && returnFocus && trigger.isConnected) trigger.focus();
+    if (!destroyed && returnFocus) (opener?.isConnected?opener:trigger).focus({preventScroll:true});
   }, listener);
   popup.addEventListener('cancel', event => {
     event.preventDefault();
@@ -196,6 +199,7 @@ export function mountCustomerCalendar(container, { value = '', settings = {}, me
   }, listener);
   updateTrigger();
   return {
+    open,
     update(changes = {}) {
       for (const key of ['value', 'settings', 'method', 'allowSameDay']) if (Object.hasOwn(changes, key)) state[key] = changes[key];
       updateTrigger();

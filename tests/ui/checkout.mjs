@@ -5,6 +5,7 @@ import {readFile,readdir,mkdir,writeFile} from 'node:fs/promises';
 import {resolve,join,extname,sep} from 'node:path';
 import {makeHarness} from '../backend/helpers.mjs';
 import {accountingFixture} from '../backend/accounting-fixture.mjs';
+import {verifyTrio} from './trio-checkout-flow.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(join(process.env.PLAYWRIGHT_PACKAGE_ROOT,'playwright'));
 const dep=createRequire(join(process.env.PGLITE_PACKAGE_ROOT,'package.json')),{PGlite}=dep('@electric-sql/pglite'),{pgcrypto}=dep('@electric-sql/pglite/contrib/pgcrypto');
 const db=new PGlite({extensions:{pgcrypto}}),project=resolve(import.meta.dirname,'../..'),root=join(project,'dist'),origin='https://checkout.test',out=join(project,'test-results/checkout');await mkdir(out,{recursive:true});
@@ -22,7 +23,7 @@ try{
   const fixture=await accountingFixture(h),flavor=fixture.product.box_flavors[0];
   await db.query('update elio.inventory set available=false where product_id=$1 and date<>$2',[flavor,fixture.date]);
   const user=guest?null:h.ids.customer,calls=[],errors=[],uploads=[];let created,failNewsletter=width===1440,loseCreateReply=width===1440;
-  const ctx=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'});
+  const ctx=await browser.newContext({viewport:{width,height:1000},hasTouch:width<=390,serviceWorkers:'block'});
   await ctx.exposeBinding('checkoutRpc',async(_,{action,payload,token})=>serial(async()=>{try{calls.push(action);const data=await h.api(action,payload,user,token);if(action==='create_order'){created=data;if(loseCreateReply){loseCreateReply=false;return {data:null,error:{message:'Failed to fetch'}};}}return {data,error:null};}catch(e){return {data:null,error:{message:e.message}};}}));
   await ctx.addInitScript(()=>localStorage.setItem('elio-newsletter-popup-v1',JSON.stringify({state:'submitted',firstVisit:Date.now(),updatedAt:Date.now()})));
   await ctx.exposeBinding('checkoutNewsletter',async(_,body)=>serial(async()=>{if(failNewsletter){failNewsletter=false;return {error:{message:'Connection interrupted'}};}try{return {data:await h.service('newsletter_subscribe',{...body,consent_version:'elio-newsletter-v2-single-opt-in',ip_hash:createHash('sha256').update(randomUUID()).digest('hex')})};}catch(e){return {error:{message:e.message}};}}));
@@ -81,6 +82,7 @@ try{
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
   await page.screenshot({path:join(out,`paid-${width}-${method}.png`),fullPage:true});
   results.push({width,method,guest,total_cents:created.total_cents,receipt:uploads[0].type,checks:'Checkout, promo, totals, stock, payment methods, PNG-to-WebP proof, approval'});console.log('PASS browser checkout '+width+'px '+method+' '+(guest?'guest':'verified account'));
+  if(width===320)await verifyTrio(ctx,h,origin,fixture.product,fixture.date);
   await ctx.close();
  }
 }finally{await browser.close();await db.close();await writeFile(join(out,'report.json'),JSON.stringify(results,null,2));}

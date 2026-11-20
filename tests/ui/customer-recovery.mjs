@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {choose} from './trio-controls.mjs';
 import {createRequire} from 'node:module';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {resolve,join,extname,sep} from 'node:path';
@@ -59,7 +60,6 @@ async function make({width=Number(process.env.AUDIT_WIDTH||390),capacity=30,sess
 const menu=async page=>{await page.goto(origin+'/order.html');await page.locator('#product-grid [data-product]').first().waitFor();};
 const open=async(page,id='custom')=>{await page.locator('[data-product="'+id+'"]').click();await page.locator('#product-dialog[open]').waitFor();};
 const close=async page=>{await page.locator('[aria-label="Close product"]').click();await page.waitForFunction(()=>!document.querySelector('#product-dialog').open&&!new URL(location.href).searchParams.has('product'));};
-const choose=async(page,values)=>{for(const [id,n] of values)await page.locator('[data-choice="'+id+'"]').fill(String(n));};
 const add=async page=>{await page.locator('#add-to-cart').click();await page.waitForFunction(()=>!document.querySelector('#product-dialog').open&&!new URL(location.href).searchParams.has('product'));};
 const finish=async(test,name)=>{assert.deepEqual(test.errors,[]);assert.equal(await test.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);results.push(name);console.log('PASS '+name);await test.ctx.close();};
 const checkout=async page=>{await page.locator('#checkout-button').click();for(const [name,value]of Object.entries({buyer_name:'Sample customer',buyer_email:'sample@example.test',buyer_phone:'09170000000'}))await page.locator('[name='+name+']').fill(value);await page.locator('[name=social_platform]').selectOption('na');await page.locator('#review-order').click();await page.locator('#place-order').waitFor();};
@@ -67,9 +67,9 @@ try{
  for(const width of [390,1440]){
   {
    const t=await make({width}),{page,data}=t;data.catalog.inventory[0].remaining=1;data.catalog.inventory[0].capacity=1;
-   await menu(page);await open(page);await choose(page,[['flavor-0',1]]);assert(await page.getByRole('button',{name:'Increase Vanilla quantity',exact:true}).isDisabled());assert.match(await page.locator('[data-flavor-stock]').first().innerText(),/Vanilla: 1 available/);
-   await choose(page,[['flavor-0',9],['flavor-1',2]]);assert.equal(await page.locator('[data-choice="flavor-0"]').inputValue(),'1');await page.locator('#product-quantity').fill('2');assert(await page.locator('#add-to-cart').isDisabled());assert.match(await page.locator('#product-error').innerText(),/Vanilla/);assert.equal(await page.locator('[data-choice="flavor-0"]').inputValue(),'1');await page.locator('#product-quantity').fill('1');assert(await page.locator('#add-to-cart').isEnabled());
-   await page.locator('.option-group').screenshot({path:join(out,'stock-'+width+'.png')});await add(page);await open(page);await choose(page,[['flavor-0',1]]);assert.equal(await page.locator('[data-choice="flavor-0"]').inputValue(),'0');await finish(t,'CF14 stock cap, typing, box quantity and existing basket demand '+width);
+   await menu(page);await open(page);await choose(page,[['flavor-0',1]]);assert(await page.locator('[data-trio-add="flavor-0"]').isDisabled());assert.match(await page.locator('[data-trio-add="flavor-0"]').innerText(),/Stock limit/);
+   await choose(page,[['flavor-0',9],['flavor-1',2]]);assert.equal(await page.locator('[data-trio-add="flavor-0"]').getAttribute('data-count'),'1');await page.locator('#product-quantity').fill('2');assert(await page.locator('#add-to-cart').isDisabled());assert.match(await page.locator('#product-error').innerText(),/Vanilla/);assert.equal(await page.locator('[data-trio-add="flavor-0"]').getAttribute('data-count'),'0');await page.locator('#product-quantity').fill('1');await choose(page,[['flavor-0',1]]);assert(await page.locator('#add-to-cart').isEnabled());
+   await page.locator('.ep-grid').screenshot({path:join(out,'stock-'+width+'.png')});await add(page);await open(page);await choose(page,[['flavor-0',1]]);assert.equal(await page.locator('[data-trio-add="flavor-0"]').getAttribute('data-count'),'0');await finish(t,'CF14 stock cap, repeat taps, box quantity and existing basket demand '+width);
   }
   {
    const t=await make({width,capacity:6}),{page}=t;await menu(page);await open(page);await choose(page,[['flavor-0',1],['flavor-1',2]]);await page.locator('#product-quantity').fill('2');await add(page);await page.locator('[data-remove="0"]').click();await page.locator('#undo-remove').click();let saved=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('elio-checkout-v1')));assert.equal(saved.items[0].quantity,2);assert.deepEqual(saved.items[0].selections.flavors,{'flavor-0':1,'flavor-1':2});
