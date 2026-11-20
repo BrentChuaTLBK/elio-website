@@ -159,7 +159,27 @@ function reviewPaymentText(total){
  const received=draft.payment.cash_received_cents;
  return received==null||received<total?'Enter the full cash amount received.':'Cash received '+money(received)+' · Change '+money(received-total);
 }
-function renderReview(){const q=pending.quote;return `<section class="panel pending-review"><h2>${pending.attempted?'Confirming your saved request':'Review before recording'}</h2><p>${mode==='in_person'?esc(event?.name):'Direct order'} · ${esc(draft.method)} · ${esc(draft.fulfillment_date)}</p><div class="table-wrap"><table><thead><tr><th>Item</th><th>Quantity</th><th class="num">Amount</th></tr></thead><tbody>${q.items.map(i=>`<tr><td>${esc(i.name)}${i.description?`<small>${esc(i.description)}</small>`:''}</td><td>${i.quantity}</td><td class="num">${money(i.line_total_cents)}</td></tr>`).join('')}</tbody></table></div><div class="totals"><div><span>Products</span><strong>${money(q.subtotal_cents)}</strong></div>${q.discount_cents?`<div><span>Discount</span><span>−${money(q.discount_cents)}</span></div>`:''}<div><span>Delivery</span><span>${esc(deliveryFeeSummary({...q,method:draft.method},money))}</span></div><div class="grand"><span>Total</span><strong>${money(q.total_cents)}</strong></div></div>${mode==='direct'&&draft.method==='delivery'&&!draft.address?.line1?.trim()?'<p class="notice">Add the delivery address to the order before arranging a courier.</p>':''}${mode==='direct'&&!editing?directPaymentReview():''}<p data-review-payment aria-live="polite">${esc(reviewPaymentText(q.total_cents))}</p><p class="muted">${pending.attempted?'The same request will be retried safely. Stay on this screen if the connection drops.':'Recording this sale updates inventory and saves the order.'}</p><div class="row">${!pending.attempted?button('back-review','Back'):''}${button('save-sale',pending.attempted?'Retry saving this request':editing?'Save changes':'Record sale','class="primary"')}</div></section>`;}
+function reviewItemDetails(item){
+ const flavors=item.flavor_contents||[];
+ const details=flavors.length
+  ? ['Flavors per box · '+flavors.map(flavor=>`${flavor.quantity} × ${flavor.name}`).join(', ')]
+  : [];
+ for(const choice of item.selection_labels||[]){
+  if(typeof choice==='string'){
+   if(choice)details.push(choice);
+   continue;
+  }
+  const name=choice?.label||choice?.name;
+  if(!name)continue;
+  const isFlavor=choice.group_id==='flavors'||(!choice.group_id&&choice.group==='Flavors per box');
+  if(flavors.length&&isFlavor)continue;
+  const quantity=Number(choice.quantity??choice.count??1);
+  const count=isFlavor||choice.group==='Includes'||quantity>1?quantity+' × ':'';
+  details.push([choice.group,count+name].filter(Boolean).join(' · '));
+ }
+ return details.map(detail=>`<small>${esc(detail)}</small>`).join('');
+}
+function renderReview(){const q=pending.quote;return `<section class="panel pending-review"><h2>${pending.attempted?'Confirming your saved request':'Review before recording'}</h2><p>${mode==='in_person'?esc(event?.name):'Direct order'} · ${esc(draft.method)} · ${esc(draft.fulfillment_date)}</p><div class="table-wrap"><table><thead><tr><th>Item</th><th>Quantity</th><th class="num">Amount</th></tr></thead><tbody>${q.items.map(i=>`<tr><td class="review-item">${esc(i.name)}${i.description?`<small>${esc(i.description)}</small>`:''}${reviewItemDetails(i)}</td><td>${i.quantity}</td><td class="num">${money(i.line_total_cents)}</td></tr>`).join('')}</tbody></table></div><div class="totals"><div><span>Products</span><strong>${money(q.subtotal_cents)}</strong></div>${q.discount_cents?`<div><span>Discount</span><span>−${money(q.discount_cents)}</span></div>`:''}<div><span>Delivery</span><span>${esc(deliveryFeeSummary({...q,method:draft.method},money))}</span></div><div class="grand"><span>Total</span><strong>${money(q.total_cents)}</strong></div></div>${mode==='direct'&&draft.method==='delivery'&&!draft.address?.line1?.trim()?'<p class="notice">Add the delivery address to the order before arranging a courier.</p>':''}${mode==='direct'&&!editing?directPaymentReview():''}<p data-review-payment aria-live="polite">${esc(reviewPaymentText(q.total_cents))}</p><p class="muted">${pending.attempted?'The same request will be retried safely. Stay on this screen if the connection drops.':'Recording this sale updates inventory and saves the order.'}</p><div class="row">${!pending.attempted?button('back-review','Back'):''}${button('save-sale',pending.attempted?'Retry saving this request':editing?'Save changes':'Record sale','class="primary"')}</div></section>`;}
 async function saveSale(){if(!pending)return;
  const paymentForm=$('#direct-payment-review');
  if(paymentForm&&!pending.attempted){
