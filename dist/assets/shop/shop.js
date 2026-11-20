@@ -171,7 +171,7 @@ function renderCart(focus){const savedFocus=quickCart.captureFocus();customerCal
   };
   $('#basket-change-date').onclick=()=>{quickCart.close({restoreFocus:false});$('.fulfillment-bar')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});$('.customer-calendar-trigger')?.focus({preventScroll:true});};
   $('#checkout-button').onclick=()=>{if(!state.fulfillment_date){$('.customer-calendar-trigger')?.focus();toast('Choose a fulfillment date to continue.');return}openCheckout()};
-  const mobile=$('#mobile-cart');mobile.hidden=!count;mobile.innerHTML=`<span>${count} ${count===1?'treat':'treats'} · View basket</span><span>${money(subtotal())}</span>`;mobile.onclick=()=>showBasket(mobile);
+  const mobile=$('#mobile-cart');mobile.hidden=!count;mobile.innerHTML=`<span>${count} ${count===1?'item':'items'} · View basket</span><span>${money(subtotal())}</span>`;mobile.onclick=()=>showBasket(mobile);
   if(focus){const index=state.items.findIndex(line=>basketLineKey(line)===focus.key),same=$('[data-qty="'+index+'"][data-delta="'+focus.delta+'"]'),fallback=$('[data-qty="'+index+'"]:not(:disabled)')||$('[data-remove="'+index+'"]');(same&&!same.disabled?same:fallback)?.focus({preventScroll:true});}
   else quickCart.restoreFocus(savedFocus);
 }
