@@ -2,7 +2,8 @@
   'use strict';
   if (location.hash === '#story') { location.replace('story.html'); return; }
   await window.ELIO_CONTENT_READY;
-  const { flavorMetaHtml, closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
+  const { closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
+  const { createFlavorDialog } = await import('./assets/shop/flavor-dialog.js');
   const { mountHomeBoxes } = await import('./assets/shop/home-boxes.js');
   mountHomeBoxes(window.ELIO_CONTENT);
   const { flavors, featuredOrder, productImage, isAvailable } = window.ELIO_CONTENT;
@@ -40,7 +41,10 @@
   const content = document.querySelector('#dialog-content');
   let trigger = null;
   const heading = (eyebrow, title) => `<p class="eyebrow">${eyebrow}</p><h2 id="dialog-title" tabindex="-1">${title}</h2>`;
-  const flavorView = (flavor) => `<div class="${hasPhoto(flavor) ? 'detail-layout' : ''}">${hasPhoto(flavor) ? photo(flavor) : ''}<div class="dialog-body${hasPhoto(flavor) ? '' : ' simple-dialog'}">${heading('The collection', escape(flavor.name))}${availability(flavor)}<p class="detail-line">${escape(flavor.line)}</p><p class="detail-description">${escape(flavor.description)}</p>${flavorMetaHtml(flavor, escape)}<a class="text-link" href="flavors.html">All flavors <span aria-hidden="true">→</span></a></div></div>`;
+  const flavorDialog = createFlavorDialog(dialog, content, {
+    productImage, status: flavor => isAvailable(flavor) ? '' : 'Currently unavailable',
+    footer: '<a class="text-link" href="flavors.html">All flavors <span aria-hidden="true">→</span></a>'
+  });
   const boxView = () => `<div class="detail-layout"><img data-website-photo="home_gift_detail" class="box-photo" src="assets/gifting-concept.webp" width="1400" height="1000" alt="Concept image of Elio's paper bag and three-piece cheesecake box"><div class="dialog-body">${heading('The Elio box', 'A beautiful gesture.')}<p class="detail-description">Three individual square cheesecakes, nestled in a single row inside a rich brown carton with a cream interior. A little indulgence, beautifully boxed.</p><ul class="box-details"><li>Three individual cheesecakes per box</li><li>Approximately 6 × 6 × 5 cm per cheesecake</li><li>Brown and gold Elio packaging</li></ul><a class="text-link" href="flavors.html">Explore the flavors <span aria-hidden="true">→</span></a><p class="asset-note" data-photo-disclaimer>Concept packaging image. Final photography and available box combinations are still to be confirmed.</p></div></div>`;
   const accountView = () => `<div class="dialog-body simple-dialog service-placeholder">${heading('My account', 'Your own little<br>corner of Elio.')}<p class="dialog-intro">Create your Elio account or sign in to see your account.</p><a class="button" href="account.html">Open my account</a><div class="placeholder-links"><a class="text-link" href="#orders">My orders <span aria-hidden="true">→</span></a><a class="text-link" href="flavors.html">Explore the flavors <span aria-hidden="true">→</span></a></div></div>`;
   function getView(hash) {
@@ -49,29 +53,41 @@
     if (id === 'account') return accountView();
     if (id === 'orders') { location.assign('account.html'); return null; }
     if (id === 'bag') { location.assign('order.html#your-bag'); return null; }
-    if (id.startsWith('flavor-')) { const flavor = byId(id.slice(7)); if (flavor) return flavorView(flavor); }
     return null;
   }
   function syncRoute() {
     if (location.hash === '#story') { location.replace('story.html'); return; }
     if (location.hash === '#flavors') { location.replace('flavors.html'); return; }
     if (location.hash === '#ordering') { location.replace('order.html'); return; }
+    const flavor = location.hash.startsWith('#flavor-') && byId(location.hash.slice(8));
+    if (flavor) {
+      const source = trigger?.hash === location.hash ? trigger.querySelector('.product-photo') : null;
+      flavorDialog.open(flavor, source);
+      return;
+    }
     const view = getView(location.hash);
     if (view) {
+      flavorDialog.reset();
       content.innerHTML = view;
       if (!dialog.open) dialog.showModal();
       dialog.scrollTop = 0;
       document.querySelector('#dialog-title').focus({ preventScroll: true });
     } else if (dialog.open) {
-      dialog.close();
-      if (trigger?.isConnected) {
+      flavorDialog.close(() => {
+        if (!trigger?.isConnected) return;
         const slide = trigger.closest('.flavor-slide');
-        if (slide) goToFlavor(Number(slide.dataset.flavorIndex), false);
+        if (slide) {
+          const index = Number(slide.dataset.flavorIndex);
+          goToFlavor(index, false);
+          trigger = slides[index].querySelector('a');
+        }
         trigger.focus({ preventScroll: true });
-      }
+        trigger = null;
+      });
     }
   }
   function closeDialog() {
+    if (dialog.classList.contains('flavor-detail-leaving')) return;
     const background = history.state?.backgroundHash || '#collection';
     history.replaceState(null, '', location.pathname + location.search + background);
     syncRoute();
@@ -80,16 +96,9 @@
     const link = event.target.closest('a[href^="#"]');
     if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const hash = link.getAttribute('href');
-    if (getView(hash)) {
+    if ((hash.startsWith('#flavor-') && byId(hash.slice(8))) || getView(hash)) {
       event.preventDefault();
-      if (!dialog.open) {
-        const copy = link.closest('[data-carousel-copy]');
-        if (copy) {
-          const index = Number(copy.dataset.flavorIndex);
-          goToFlavor(index, false);
-          trigger = slides[index].querySelector('a');
-        } else trigger = link.closest('#mobile-nav') ? menuToggle : link;
-      }
+      if (!dialog.open) trigger = link.closest('#mobile-nav') ? menuToggle : link;
       const backgroundHash = dialog.open ? history.state?.backgroundHash : location.hash;
       const state = { backgroundHash: backgroundHash || '#home' };
       if (dialog.open) history.replaceState(state, '', hash); else history.pushState(state, '', hash);

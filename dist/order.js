@@ -1,7 +1,8 @@
 (async () => {
   'use strict';
   await window.ELIO_CONTENT_READY;
-  const { flavorMetaHtml, closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
+  const { closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
+  const { createFlavorDialog } = await import('./assets/shop/flavor-dialog.js');
   const { flavors, featuredOrder, productImage, boxCollections, isAvailable } = window.ELIO_CONTENT;
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map((id) => flavors.find((flavor) => flavor.id === id)).filter(Boolean);
@@ -20,40 +21,46 @@
   });
   const dialog = document.querySelector('#order-flavor-dialog');
   const content = document.querySelector('#order-flavor-content');
+  const flavorDialog = createFlavorDialog(dialog, content, {
+    productImage, status: flavor => isAvailable(flavor) ? '' : 'Currently unavailable',
+    footer: '<p class="order-detail-availability">Browse the shop for boxes, current prices, and availability for your selected date.</p>'
+  });
   let trigger = null;
   function syncDialog() {
     const flavor = catalog.find((item) => `#flavor-${item.id}` === location.hash);
     if (location.hash === '#your-bag') (document.querySelector('#cart') || document.querySelector('#your-basket'))?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     if (!flavor) {
       if (dialog.open) {
-        dialog.close();
-        if (trigger?.isConnected) {
+        flavorDialog.close(() => {
+          if (!trigger?.isConnected) return;
           const slide = trigger.closest('.flavor-slide');
-          if (slide) goToFlavor(Number(slide.dataset.flavorIndex), false);
+          if (slide) {
+            const index = Number(slide.dataset.flavorIndex);
+            goToFlavor(index, false);
+            trigger = slides[index].querySelector('a');
+          }
           trigger.focus({ preventScroll: true });
-        }
+          trigger = null;
+        });
       }
       return;
     }
-    content.innerHTML = `<div class="${hasPhoto(flavor) ? 'detail-layout' : ''}">${hasPhoto(flavor) ? photo(flavor) : ''}<div class="dialog-body${hasPhoto(flavor) ? '' : ' simple-dialog'}"><p class="eyebrow">The collection</p><h2 id="dialog-title" tabindex="-1">${escape(flavor.name)}</h2>${availability(flavor)}<p class="detail-line">${escape(flavor.line)}</p><p class="detail-description">${escape(flavor.description)}</p>${flavorMetaHtml(flavor, escape)}<p class="order-detail-availability">Browse the shop for boxes, current prices, and availability for your selected date.</p></div></div>`;
-    if (!dialog.open) dialog.showModal();
-    dialog.scrollTop = 0;
-    document.querySelector('#dialog-title').focus({ preventScroll: true });
+    const source = trigger?.hash === location.hash ? trigger.querySelector('.product-photo') : null;
+    flavorDialog.open(flavor, source);
   }
   document.addEventListener('click', (event) => {
     const link = event.target.closest('a[href^="#flavor-"],a[href="#your-bag"]');
     if (!link || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     event.preventDefault();
-    const copy = link.closest('[data-carousel-copy]');
-    if (copy) {
-      const index = Number(copy.dataset.flavorIndex);
-      goToFlavor(index, false);
-      trigger = slides[index].querySelector('a');
-    } else trigger = link;
+    trigger = link;
     history.pushState(null, '', link.getAttribute('href'));
     syncDialog();
   });
-  function closeDialog() { history.replaceState(null, '', `${location.pathname}${location.search}${location.hash === '#your-bag' ? '' : '#catalog'}`); syncDialog(); }
+  function closeDialog() {
+    if (dialog.classList.contains('flavor-detail-leaving')) return;
+    history.replaceState(null, '', `${location.pathname}${location.search}${location.hash === '#your-bag' ? '' : '#catalog'}`);
+    syncDialog();
+  }
   dialog.querySelector('.dialog-close').addEventListener('click', closeDialog);
   closeFlavorOnBackdrop(dialog, closeDialog, () => location.hash.startsWith('#flavor-'));
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(); });

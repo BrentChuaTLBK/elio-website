@@ -56,7 +56,7 @@ try{
  }
  for(const hash of ['#collection-panel','#flavor-speculoos']){
   const {ctx,page,release}=await scenario({hash});release();await page.waitForFunction(()=>!document.querySelector('.flavors-shell').hasAttribute('data-loading'));
-  if(hash==='#collection-panel')assert.equal(await page.locator('#collection-tab').getAttribute('aria-selected'),'true');else assert.equal(await page.evaluate(()=>document.activeElement.dataset.flavor),'speculoos');await ctx.close();results.push(hash+': deep link preserved after loading.');
+  if(hash==='#collection-panel')assert.equal(await page.locator('#collection-tab').getAttribute('aria-selected'),'true');else {await page.getByRole('dialog',{name:'Speculoos',exact:true}).waitFor();assert.equal(await page.evaluate(()=>document.activeElement.id),'dialog-title');}await ctx.close();results.push(hash+': deep link preserved after loading.');
  }
  const {ctx,page,calls}=await scenario({javaScriptEnabled:false});await page.locator('.flavors-shell noscript p').waitFor();assert.equal(await page.locator('.flavor-skeleton:visible').count(),0);assert.equal(await page.locator('#filter-status').isVisible(),false);assert.match(await page.locator('.flavors-shell noscript p').innerText(),/Enable JavaScript/);assert.equal(calls(),0);await ctx.close();results.push('No JavaScript: no permanent loading state; fallback and shop link remain.');
  assert.deepEqual(errors,[]);await writeFile(join(out,'checks.json'),JSON.stringify({results,errors},null,2));console.log(`PASS ${results.length} flavor-loading scenarios, real content loader, zero page errors.`);
