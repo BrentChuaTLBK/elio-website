@@ -28,7 +28,7 @@ try{
   const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await loaded();assert.equal(await page.locator('#monthly-title').textContent(),'September 2026');assert.equal(await page.locator('#next-month-title').textContent(),'October 2026');assert.equal(await page.locator('#monthly-label').textContent(),'This month’s favorites');
   assert.equal(await page.locator('#monthly-flavors .flavor-tile:visible').count(),4);assert.equal(await page.locator('#next-month-flavors .flavor-tile:visible').count(),4);
-  assert.equal(await page.locator('#monthly-flavors .flavor-month-badge').count(),0);assert.equal(await page.getByText('Discover flavor',{exact:true}).count(),0);assert.equal(await page.locator('#flavor-dialog').count(),0);
+  assert.equal(await page.locator('#monthly-flavors .flavor-month-badge').count(),0);assert.equal(await page.getByText('Discover flavor',{exact:true}).count(),0);assert.equal(await page.locator('#flavor-dialog').isVisible(),false);
   assert.equal(await page.locator('#monthly-flavors [data-flavor=vanilla] .flavor-brief').textContent(),data.flavors[0].description);
   assert.match(await page.locator('#monthly-flavors [data-flavor=vanilla] .detail-meta').innerText(),/Keep chilled/);
   const size=await page.locator('#monthly-flavors .flavor-tile-image').first().boundingBox();assert.ok(size.width<=126);
@@ -40,16 +40,61 @@ try{
   await page.getByRole('searchbox',{name:'Find a flavor'}).fill('speculoos');assert.equal(await page.locator('#monthly-flavors .flavor-tile:visible').count(),0);assert.equal(await page.locator('#next-month-flavors .flavor-tile:visible').count(),1);assert.equal(await page.locator('#monthly-empty').isVisible(),true);
   await page.getByRole('searchbox').fill('');await page.getByRole('button',{name:'Tea',exact:true}).click();assert.equal(await page.locator('#monthly-panel .flavor-tile:visible').count(),2);assert.match(await page.locator('#filter-status').textContent(),/2 flavors/);
   await page.getByRole('button',{name:'All flavors',exact:true}).click();await page.getByRole('tab',{name:'Full collection',exact:true}).click();assert.equal(await page.locator('#other-flavors-grid .flavor-tile:visible').count(),7);await fits();await page.screenshot({path:join(out,`collection-${width}.png`),fullPage:true});
-  await page.getByRole('searchbox').fill('vanilla');assert.deepEqual(await page.locator('#other-flavors-grid .flavor-tile:visible').evaluateAll(nodes=>nodes.map(node=>node.dataset.flavor)),['vanilla']);await page.getByRole('searchbox').fill('');await page.getByRole('tab',{name:'Full collection',exact:true}).focus();
+  const grid = page.locator('#other-flavors-grid'), dialog = page.locator('#flavor-dialog');
+  const vanilla = grid.locator('[data-flavor=vanilla]');
+  assert.equal(await vanilla.innerText(), 'Vanilla');
+  assert.equal(await vanilla.locator('.product-photo').evaluate(el => getComputedStyle(el).borderRadius), '50%');
+  assert.equal(await grid.locator('.flavor-brief,.detail-meta,.flavor-month-badge').count(), 0);
+  await page.getByRole('searchbox').fill('vanilla');
+  await vanilla.focus(); await page.keyboard.press('Enter');
+  await dialog.waitFor();
+  assert.equal(await dialog.getByRole('heading', {name:'Vanilla'}).textContent(), 'Vanilla');
+  assert.match(await dialog.locator('.detail-meta').innerText(), /Keep chilled/);
+  await page.waitForFunction(() => !document.querySelector('.flavor-flying-photo'));
+  assert.equal(await dialog.locator('.detail-description').innerText(), data.flavors[0].description);
+  await fits();
+  await dialog.screenshot({path:join(out, `detail-${width}.png`)});
+  await page.keyboard.press('Escape'); await dialog.waitFor({state:'hidden'});
+  assert.equal(await vanilla.evaluate(el => document.activeElement === el), true);
+  assert.equal(await page.getByRole('searchbox').inputValue(), 'vanilla');
+  await page.goForward(); await dialog.waitFor();
+  await dialog.getByRole('button', {name:'Close details'}).click(); await dialog.waitFor({state:'hidden'});
+  assert.deepEqual(await page.locator('#other-flavors-grid .flavor-tile:visible').evaluateAll(nodes=>nodes.map(node=>node.dataset.flavor)),['vanilla']);await page.getByRole('searchbox').fill('');await page.getByRole('tab',{name:'Full collection',exact:true}).focus();
   await page.keyboard.press('ArrowLeft');assert.equal(await page.locator('#monthly-tab').getAttribute('aria-selected'),'true');
-  await page.getByRole('searchbox').fill('no matching name');await page.evaluate(()=>{location.hash='#flavor-speculoos'});await page.locator('#next-month-flavors [data-flavor=speculoos]:visible').waitFor();assert.equal(await page.getByRole('searchbox').inputValue(),'');assert.equal(await page.evaluate(()=>document.activeElement.dataset.flavor),'speculoos');
+  await page.getByRole('searchbox').fill('no matching name');await page.evaluate(()=>{location.hash='#flavor-speculoos'});await page.locator('#next-month-flavors [data-flavor=speculoos]:visible').waitFor();assert.equal(await page.getByRole('searchbox').inputValue(),'');await dialog.waitFor();assert.equal(await dialog.getByRole('heading').innerText(),'Speculoos');await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});assert.equal(await page.evaluate(()=>document.activeElement.dataset.flavor),'speculoos');
   data=fixture();data.currentMonth='2026-12-01';data.nextMonth='2027-01-01';await loaded();assert.equal(await page.locator('#monthly-title').textContent(),'December 2026');assert.equal(await page.locator('#next-month-title').textContent(),'January 2027');
   data=fixture();data.nextMenuShown=false;await loaded();assert.equal(await page.locator('#next-month-menu').isVisible(),false);await page.evaluate(()=>{location.hash='#flavor-speculoos'});await page.locator('#other-flavors-grid [data-flavor=speculoos]:visible').waitFor();assert.equal(await page.locator('#collection-tab').getAttribute('aria-selected'),'true');
   data.currentMenuShown=false;await loaded();assert.equal(await page.locator('#monthly-unavailable').isVisible(),true);assert.equal(await page.locator('#monthly-menu').isVisible(),false);await page.getByRole('tab',{name:'Full collection',exact:true}).click();assert.equal(await page.locator('#other-flavors-grid .flavor-tile:visible').count(),7);
   data=fixture();data.flavors[0].image='assets/home-editorial-hero.webp';data.flavors[0].description='<b>Text only</b> — '+data.flavors[0].description.repeat(4);data.flavors[0].collection_details={product_type:'<img src=x onerror=alert(1)>',serving:'Size and serving details'};
   data.flavors.push(...Array.from({length:24},(_,i)=>({id:'seasonal-'+i,name:'Seasonal cheesecake '+(i+1),line:'A longer flavor name, clearly presented',description:'A full description stays visible as the collection grows. '.repeat(3),category:'classic',sort_order:30-i})));
-  await loaded('#collection-panel');assert.equal(await page.locator('#other-flavors-grid .flavor-tile:visible').count(),31);assert.equal(await page.locator('#other-flavors-grid .flavor-brief b').count(),0);assert.equal(await page.locator('#other-flavors-grid .detail-meta img').count(),0);assert.equal(await page.locator('#other-flavors-grid .flavor-brief').first().evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);
+  await page.addInitScript(() => {
+    const animate = Element.prototype.animate;
+    window.revealedFlavors = [];
+    Element.prototype.animate = function(frames, options) {
+      if (this.matches('.flavor-collection-tile')) window.revealedFlavors.push(this.dataset.flavor);
+      return animate.call(this, frames, options);
+    };
+  });
+  await loaded('#collection-panel');assert.equal(await page.locator('#other-flavors-grid .flavor-tile:visible').count(),31);await vanilla.click();await dialog.waitFor();
+  assert.equal(await dialog.locator('.detail-description b,.detail-meta img').count(),0);
+  assert.match(await dialog.locator('.detail-meta').innerText(), /Size and serving details/);
+  assert.match(await dialog.locator('.detail-description').innerText(), /<b>Text only<\/b>/);
+  assert.ok(await dialog.locator('.flavor-detail-surface').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+  await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+  const last = grid.locator('[data-flavor=seasonal-0]');
+  await last.scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => window.revealedFlavors.includes('seasonal-0'));
+  assert.equal(await page.evaluate(() => window.revealedFlavors.filter(id => id === 'seasonal-0').length),1);
+  await last.click(); await dialog.waitFor();
+  assert.equal(await dialog.locator('.flavor-detail-layout .flavor-photo-fallback').count(),1);await page.mouse.click(2,2);await dialog.waitFor({state:'hidden'});
   const firstSeasonal=await page.locator('#other-flavors-grid .flavor-tile').nth(7).getAttribute('data-flavor');assert.equal(firstSeasonal,'seasonal-23');await fits();
+  if (width === 390) {
+    await page.emulateMedia({reducedMotion:'reduce'});await loaded('#collection-panel');
+    await last.scrollIntoViewIfNeeded();await last.click();await dialog.waitFor();
+    assert.deepEqual(await page.evaluate(()=>window.revealedFlavors),[]);
+    assert.equal(await dialog.locator('.flavor-flying-photo').count(),0);
+    await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+  }
   data={...fixture(),flavors:[],monthlyMenu:[],nextMonthlyMenu:[],currentMenuShown:false,nextMenuShown:false,collectionLoaded:false};await loaded();assert.match(await page.locator('#monthly-unavailable').textContent(),/temporarily unavailable/);await page.getByRole('tab',{name:'Full collection',exact:true}).click();assert.equal(await page.locator('#other-flavors-grid .flavor-tile').count(),0);assert.match(await page.locator('#other-empty').textContent(),/temporarily unavailable/);await fits();assert.deepEqual(errors,[]);
   await ctx.close();results.push({width,passed:true});console.log(`PASS flavor lists, published menus, filtering, deep links, full descriptions and large catalog at ${width}px`);
  }

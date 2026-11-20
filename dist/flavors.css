@@ -4,7 +4,7 @@
 .flavors-hero:after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#eee2d2 18%,rgba(238,226,210,.97) 32%,rgba(238,226,210,0) 66%)}
 .flavors-hero-copy{padding:38px var(--gutter);width:62%}.flavors-hero .eyebrow{font-size:10px;letter-spacing:.19em;margin-bottom:15px}.flavors-hero h1{font-size:clamp(42px,4.6vw,66px);line-height:1.03;letter-spacing:-.035em;margin-bottom:15px;white-space:nowrap}.flavors-hero-copy>p:not(.eyebrow):not(.flavors-hero-note){font-size:23px;line-height:1.4;color:var(--brown)}.flavors-hero-note{font-size:14px;color:#705e4d;margin-top:7px}
 
-/* Compact editorial collection: full descriptions, shared monthly filters, no pagination. */
+/* Monthly selections and collection browsing. */
 .flavors-shell{max-width:1144px;margin:0 auto;padding:32px}
 .flavors-toolbar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:20px}
 .flavor-tabs{display:flex;gap:3px;flex-shrink:0;background:#eee4d7;border:1px solid #dccbb6;border-radius:30px;padding:3px}
@@ -25,7 +25,6 @@
 .flavor-tile{min-width:0;display:grid;grid-template-columns:126px minmax(0,1fr);gap:19px;align-items:start;border-bottom:1px solid var(--line);padding:20px 0;scroll-margin-top:150px}
 .flavor-tile-image{position:relative;overflow:hidden;background:#e8ddce}.flavor-tile .product-photo{aspect-ratio:1;margin:0}.flavor-tile .single-photo img{left:0;top:0;width:100%;height:100%;object-fit:cover;transform:none}
 .flavor-tile-copy{min-width:0}.flavor-tile h3{font-size:29px;line-height:1.08;letter-spacing:-.02em;overflow-wrap:anywhere}
-.flavor-month-badge{font:9px/1.5 Arial,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:#795634;margin-bottom:6px}
 .flavor-tile .product-line{font-size:12px;color:#886340;margin-top:5px;line-height:1.5;overflow-wrap:anywhere}
 .flavor-brief{font-size:14px;color:#655345;line-height:1.6;margin-top:9px;white-space:pre-line;overflow-wrap:anywhere}
 .flavor-tile .detail-meta{font-size:12px;line-height:1.6;color:#705e4d;margin-top:10px;white-space:pre-line;overflow-wrap:anywhere}
@@ -60,3 +59,45 @@
 .flavor-skeleton-tagline{height:11px;width:45%;margin-bottom:20px}
 .flavor-skeleton-short{width:68%}
 .flavors-shell[data-loading] :is(.flavors-toolbar,.flavor-filterbar) :is(button,input):disabled{cursor:wait;opacity:.55}
+
+#other-flavors .flavor-section-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+#other-flavors .flavor-section-note { flex-shrink: 0; margin: 0; }
+#other-flavors-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 24px 18px;
+  align-items: start;
+  padding: 12px 0 22px;
+}
+.flavor-tile.flavor-collection-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  padding: 7px 3px;
+  border: 0;
+  border-radius: 14px;
+  text-align: center;
+}
+.flavor-collection-tile .flavor-portrait { max-width: 138px; }
+.flavor-collection-tile h3 { max-width: 100%; font-size: clamp(20px, 2vw, 27px); line-height: 1.15; }
+@media (hover: hover) and (pointer: fine) {
+  .flavor-tile:hover h3 { text-decoration: underline; text-decoration-color: #b99b77; text-underline-offset: .16em; text-decoration-thickness: 1px; }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .flavor-collection-tile .flavor-portrait { transition: transform 240ms ease-out; }
+  .flavor-collection-tile:hover .flavor-portrait { transform: translateY(-3px); }
+}
+@media (max-width: 620px) {
+  #other-flavors-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 10px; padding-top: 14px; }
+  .flavor-tile.flavor-collection-tile { gap: 10px; }
+  .flavor-collection-tile .flavor-portrait { max-width: 110px; }
+  .flavor-collection-tile h3 { font-size: clamp(17px, 4.7vw, 22px); }
+}
+@media (max-width: 359px) {
+  #other-flavors-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

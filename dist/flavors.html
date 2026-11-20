@@ -30,17 +30,18 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/elio-apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="order.css">
-  <link rel="stylesheet" href="flavors.css?v=flavor-loading-1">
+  <link rel="stylesheet" href="flavors.css?v=flavor-portraits-1">
   <noscript><style>#monthly-flavors,#filter-status,[data-flavor-count]{display:none!important}</style></noscript>
   <link rel="stylesheet" href="assets/shop/newsletter.css">
   <script type="module" src="assets/shop/newsletter.js"></script>
   <script src="content.js" defer></script>
-  <script src="flavors.js?v=customer-friction-1" defer></script>
+  <script src="flavors.js?v=flavor-portraits-1" defer></script>
 <link rel="stylesheet" href="assets/site-maintenance.css?v=maintenance-2"><script type="module" src="assets/site-maintenance.js?v=maintenance-2"></script>
 <link rel="stylesheet" href="assets/site-analytics.css"><script type="module" src="assets/site-analytics.js"></script>
   <link rel="stylesheet" href="assets/storefront-footer.css?v=1">
   <script type="module" src="assets/website-photos.js?v=1"></script>
 <link rel="canonical" href="https://eliocheesecakes.com/flavors">
+  <link rel="stylesheet" href="assets/shop/flavor-dialog.css">
 </head>
 <body class="flavors-page" data-newsletter-popup>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -88,7 +89,7 @@
       </div>
       <div id="collection-panel" role="tabpanel" aria-labelledby="collection-tab" tabindex="0" hidden>
       <section class="flavor-section flavor-archive" id="other-flavors" aria-labelledby="other-title">
-        <div class="flavor-section-heading"><h2 id="other-title">The full collection.</h2><div class="flavor-section-note"><p>Familiar favorites. New discoveries.</p><span data-flavor-count></span></div></div>
+        <div class="flavor-section-heading"><h2 id="other-title">The full collection.</h2><div class="flavor-section-note"><span data-flavor-count></span></div></div>
         <div class="flavors-grid" id="other-flavors-grid"></div>
         <p class="flavors-empty" id="other-empty" hidden></p>
       </section>
@@ -101,6 +102,10 @@
       <noscript><p>Enable JavaScript to explore the flavor collection and descriptions.</p></noscript>
     </div>
   </main>
+  <dialog id="flavor-dialog" aria-labelledby="dialog-title">
+    <button class="dialog-close icon-button" type="button" aria-label="Close details"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19"/></svg></button>
+    <div id="flavor-dialog-content"></div>
+  </dialog>
   <footer class="elio-footer">
     <div class="elio-footer-main">
       <div class="elio-footer-brand"><a class="wordmark" href="index.html" aria-label="Elio Basque Cheesecake by TLB Kitchen — home"><span class="wordmark-name">ELIO</span><span class="wordmark-description">Basque Cheesecake</span><span class="wordmark-byline">by TLB Kitchen</span></a><p>Burnt beautifully. Soft within.</p></div>

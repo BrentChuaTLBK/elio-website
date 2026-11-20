@@ -5,7 +5,8 @@
   try {
   await window.ELIO_CONTENT_READY;
   const {responsiveImage}=await import('./assets/responsive-images.js');
-  const { flavorMetaHtml } = await import('./assets/shop/flavor-details.js');
+  const { flavorMetaHtml, closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
+  const { createFlavorDialog, flavorPortrait } = await import('./assets/shop/flavor-dialog.js');
   const data = window.ELIO_CONTENT;
   const { flavors, featuredOrder, productImage } = data;
   const escape = text => String(text ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -17,8 +18,12 @@
     ? `<span class="product-photo${flavor.image ? ' single-photo' : ''}" style="--image-left:-${(parseFloat(flavor.imagePosition) || 0) * 2}%"><img ${flavor.image?responsiveImage(flavor.image,'(max-width:600px) 88px, 116px'):''} src="${escape(flavor.image || productImage)}" width="${flavor.image ? 724 : 2172}" height="724" alt="${escape(flavor.name)} Basque cheesecake" loading="lazy" decoding="async"></span>`
     : `<span class="product-photo product-placeholder" role="img" aria-label="${escape(flavor.name)} — photograph coming soon"><span class="placeholder-brand" aria-hidden="true">ELIO</span><span class="placeholder-name" aria-hidden="true">${escape(flavor.name)}</span><span class="placeholder-note" aria-hidden="true">Photograph coming soon</span></span>`;
   const card = (flavor, kind) => {
-    const badge = kind === 'collection' ? (isFeatured(flavor) ? 'This month' : isNext(flavor) ? 'Next month' : '') : '';
-    return `<article class="flavor-tile" data-flavor="${escape(flavor.id)}" tabindex="-1"><div class="flavor-tile-image">${photo(flavor)}</div><div class="flavor-tile-copy">${badge ? `<p class="flavor-month-badge">${badge}</p>` : ''}<h3>${escape(flavor.name)}</h3>${flavor.line ? `<p class="product-line">${escape(flavor.line)}</p>` : ''}${flavor.description ? `<p class="flavor-brief">${escape(flavor.description)}</p>` : ''}${flavorMetaHtml(flavor, escape)}</div></article>`;
+    const name = escape(flavor.name), id = escape(flavor.id);
+    const link = `href="#flavor-${id}" data-flavor="${id}" aria-haspopup="dialog" aria-label="View ${name} flavor details"`;
+    if (kind === 'collection') {
+      return `<a class="flavor-tile flavor-collection-tile" ${link}>${flavorPortrait(flavor, productImage, '(max-width: 620px) 110px, 144px')}<h3>${name}</h3></a>`;
+    }
+    return `<a class="flavor-tile" ${link}><div class="flavor-tile-image">${photo(flavor)}</div><div class="flavor-tile-copy"><h3>${name}</h3>${flavor.line ? `<p class="product-line">${escape(flavor.line)}</p>` : ''}${flavor.description ? `<p class="flavor-brief">${escape(flavor.description)}</p>` : ''}${flavorMetaHtml(flavor, escape)}</div></a>`;
   };
   const sections = [
     { view: 'monthly', kind: 'current', root: '#monthly-menu', grid: document.querySelector('#monthly-flavors'), empty: document.querySelector('#monthly-empty'), items: catalog.filter(isFeatured), shown: data.currentMenuShown !== false, message: 'This month’s selection is coming soon. Explore the full collection to find your favorite.' },
@@ -104,21 +109,82 @@
     });
   });
   selectView(currentView, false);
-  // Existing home-page and shared flavor links now lead to the full inline description.
-  function followFlavorLink() {
-    const flavor = catalog.find(item => `#flavor-${item.id}` === location.hash);
-    if (!flavor) return;
-    search.value = ''; currentCategory = 'all';
-    const section = sections.find(item => item.shown && item.view === 'monthly' && item.tiles.has(flavor.id)) || sections[2];
-    selectView(section.view, false);
-    const tile = section.tiles.get(flavor.id);
-    tile.scrollIntoView({ block: 'start', behavior: 'instant' });
-    tile.focus({ preventScroll: true });
-    saveBrowse();
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  if ('IntersectionObserver' in window && typeof Element.prototype.animate === 'function') {
+    const observer = new IntersectionObserver(entries => {
+      let index = 0;
+      for (const { target, isIntersecting } of entries) {
+        if (!isIntersecting) continue;
+        observer.unobserve(target);
+        if (reduced.matches || target.matches(':focus') || document.querySelector('dialog[open]')) continue;
+        target.animate([{ opacity: .55, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], {
+          duration: 440, delay: Math.min(index++, 3) * 45, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards'
+        });
+      }
+    }, { threshold: .1 });
+    for (const tile of sections[2].tiles.values()) observer.observe(tile);
+    reduced.addEventListener?.('change', () => {
+      if (reduced.matches) for (const tile of sections[2].tiles.values()) tile.getAnimations().forEach(animation => animation.finish());
+    });
   }
-  window.addEventListener('hashchange', followFlavorLink);
-  window.addEventListener('popstate', followFlavorLink);
-  followFlavorLink();
+
+  const dialog = document.querySelector('#flavor-dialog');
+  const viewer = createFlavorDialog(dialog, document.querySelector('#flavor-dialog-content'), {
+    productImage,
+    status: flavor => data.isAvailable?.(flavor) === false ? 'Currently unavailable' : isFeatured(flavor) ? 'This month' : isNext(flavor) ? 'Next month' : ''
+  });
+  let trigger = null;
+  let closingHistory = false;
+  function syncFlavorLink() {
+    closingHistory = false;
+    const flavor = catalog.find(item => `#flavor-${item.id}` === location.hash);
+    if (!flavor) {
+      if (dialog.open) viewer.close(() => {
+        trigger?.focus({ preventScroll: true });
+        trigger = null;
+      });
+      return;
+    }
+    const sectionKind = history.state?.elioFlavorSection;
+    const chosen = sectionKind && sections.find(section => section.kind === sectionKind && section.shown);
+    if (trigger?.dataset.flavor === flavor.id && trigger.getClientRects().length) {
+      viewer.open(flavor, trigger.querySelector('.product-photo'));
+      return;
+    }
+    const section = chosen || sections.find(item => item.shown && item.view === 'monthly' && item.tiles.has(flavor.id)) || sections[2];
+    trigger = section.tiles.get(flavor.id) || sections[2].tiles.get(flavor.id);
+    if (!chosen || trigger.hidden) { search.value = ''; currentCategory = 'all'; }
+    selectView(section.view, false);
+    trigger.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    saveBrowse();
+    viewer.open(flavor);
+  }
+  shell.addEventListener('click', event => {
+    const tile = event.target.closest('a.flavor-tile');
+    if (!tile || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    trigger = tile;
+    tile.getAnimations?.().forEach(animation => animation.finish());
+    const section = sections.find(item => item.grid.contains(tile));
+    history.pushState({ elioFlavorSection: section.kind }, '', tile.hash);
+    syncFlavorLink();
+  });
+  function closeDetails() {
+    if (closingHistory || !location.hash.startsWith('#flavor-')) return;
+    if (history.state?.elioFlavorSection) {
+      closingHistory = true;
+      history.back();
+    } else {
+      history.replaceState(history.state, '', location.pathname + location.search + (currentView === 'collection' ? '#collection-panel' : '#monthly-panel'));
+      syncFlavorLink();
+    }
+  }
+  dialog.querySelector('.dialog-close').addEventListener('click', closeDetails);
+  dialog.addEventListener('cancel', event => { event.preventDefault(); closeDetails(); });
+  closeFlavorOnBackdrop(dialog, closeDetails);
+  window.addEventListener('hashchange', syncFlavorLink);
+  window.addEventListener('popstate', syncFlavorLink);
+  syncFlavorLink();
   controls().forEach(control => { control.disabled = false; });
   document.querySelector('#filter-status').textContent = data.collectionLoaded === false
     ? 'The flavor collection is temporarily unavailable.'

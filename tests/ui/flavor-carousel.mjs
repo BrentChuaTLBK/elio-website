@@ -62,6 +62,32 @@ try{
   if(path==='order.html'){await page.evaluate(()=>document.querySelector('#checkout-dialog').showModal());await stationary(page,track);await page.evaluate(()=>document.querySelector('#checkout-dialog').close());const checkoutClosed=await left(track);await page.waitForFunction(before=>Math.abs(window.carouselMetrics().left-before)>3,checkoutClosed);}
   await page.evaluate(()=>scrollTo(0,0));await stationary(page,track);await section.scrollIntoViewIfNeeded();const visible=await left(track);await page.waitForFunction(before=>Math.abs(window.carouselMetrics().left-before)>3,visible);
   await page.emulateMedia({reducedMotion:'reduce'});await stationary(page,track);
+  await track.press('Home');await waitIndex(page,0);
+  const vanilla = track.locator('.flavor-slide:not([data-carousel-copy]) a[href="#flavor-vanilla"]');
+  const viewer = page.locator(dialog);
+  await vanilla.click();
+  assert.equal(await viewer.locator('.flavor-flying-photo').count(),0);
+  await page.keyboard.press('Escape');await viewer.waitFor({state:'hidden'});
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  // Inspect the photo at the first frame, then dismiss it mid-flight.
+  const originMatches = await vanilla.evaluate(link => {
+    const source = link.querySelector('.product-photo').getBoundingClientRect();
+    link.click();
+    const ghost = document.querySelector('dialog[open] > .flavor-flying-photo');
+    const animation = ghost?.getAnimations()[0];
+    if (!animation) return false;
+    animation.pause(); animation.currentTime = 0;
+    const first = ghost.getBoundingClientRect();
+    animation.currentTime = 240;
+    return Math.abs(first.x - source.x) < 2 && Math.abs(first.y - source.y) < 2 && Math.abs(first.width - source.width) < 2;
+  });
+  assert.equal(originMatches,true,'Flight starts at the selected cheesecake');
+  await page.keyboard.press('Escape');await viewer.waitFor({state:'hidden'});
+  assert.equal(await page.locator('.flavor-photo-away,.flavor-flying-photo').count(),0);
+  await vanilla.click();await viewer.waitFor();
+  await page.waitForFunction(()=>!document.querySelector('.flavor-flying-photo'));
+  await viewer.getByRole('button',{name:'Close details'}).click();await viewer.waitFor({state:'hidden'});
+  assert.equal(await vanilla.evaluate(link=>link===document.activeElement),true);
   await ctx.close();results.push({path,autoplay:true,automaticWrap:true,dialogPause:true,offscreenPause:true,motionPreferenceChange:true});console.log(`PASS ${path}: gentle automatic loop, seamless wrap, dialog/offscreen pause, resume and live reduced-motion change`);
  }
  for(const path of ['index.html','order.html'])for(const count of [0,1,2]){
