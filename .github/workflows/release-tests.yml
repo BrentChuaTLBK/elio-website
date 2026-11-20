@@ -16,6 +16,8 @@ jobs:
           node-version: '24.19.0'
           cache: npm
       - run: npm ci
+      - run: npm run build:cards
+      - run: git diff --exit-code -- dist/assets/shop/menu-item-card.js dist/assets/shop/menu-item-card.css
       - run: npm ci --prefix tests/backend
       - run: npx playwright install --with-deps chromium
       - run: npm run test:release

@@ -6,7 +6,7 @@ import {mountProductPhotos} from './product-photo-viewer.js?v=icon-only-1';
 import {checkoutNavigation} from './checkout-navigation.js';
 import {watchSections,watchFirstProductRow} from '../store-motion.js?v=selected-1';
 import {mountQuickCart} from './quick-cart.js?v=1';
-import {responsiveImage} from '../responsive-images.js';
+import {responsiveImage, responsiveImageProps} from '../responsive-images.js?v=card-props-1';
 import {checkoutFailure} from './checkout-recovery.js';
 import {reviewWindow,reviewPayment} from './checkout-review.js';
 import {bindReceiptUpload,receiptProgress} from './receipt-progress.js';
@@ -66,7 +66,11 @@ if(selectedVoucher&&/^[A-Za-z0-9-]{1,50}$/.test(selectedVoucher)){
 }
 const labelsText=labels=>(labels||[]).map(l=>typeof l==='string'?l:`${l.quantity} × ${l.label}${l.surcharge_cents ? ` (+${money(l.surcharge_cents)} each; ${money(l.surcharge_cents*l.quantity)} per unit)` : ''}`).join(', ');
 const statusLabel=s=>(s||'').replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
-const safeImage=url=>{try{const u=new URL(url,location.href);return ['https:','http:'].includes(u.protocol)?esc(u.href):''}catch{return ''}};
+function productPhotoUrl(value){
+ if(typeof value!=='string'||!value.trim())return '';
+ try{const url=new URL(value,location.href);return ['https:','http:'].includes(url.protocol)?url.href:''}catch{return ''}
+}
+const safeImage=value=>esc(productPhotoUrl(value));
 const datetime=d=>d?new Intl.DateTimeFormat('en-PH',{timeZone:'Asia/Manila',dateStyle:'medium',timeStyle:'short'}).format(new Date(d))+' PHT':'—';
 const icon='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 8h14l-1 12H6L5 8Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg>';
 function lineProduct(line){return catalog.products.find(p=>p.id===line.product_id)}
@@ -96,13 +100,30 @@ function displayAvailability(p){
  return result;
 }
 function earliestFor(p){if(state.method==='delivery'&&p.pickup_only===true)return 'Pickup only';const lead=earliestLeadDate(p,catalog.settings);if(!lead)return 'No production days configured';if(lead>customerBookingWindow().maxDate)return 'Outside the current booking window';for(let date=lead;date<=customerBookingWindow().maxDate;date=addDays(date,1)){if(availability(p,date,catalog.settings,catalog.inventory,new Date(),state.method).available)return formatDate(date)}return 'No available dates in the current booking window'}
-function productLabelBadge(value){const label=visibleProductLabel(value);return label?`<span class="badge product-label" style="background-color:${label.color};color:${label.textColor}">${esc(label.text)}</span>`:''}
-function productCard(p){
- const a=displayAvailability(p);
- return `<button type="button" class="elio-product-card" data-product="${esc(p.id)}" aria-label="${p.kind==='custom_box'?'Customize':'View'} ${esc(p.name)}" aria-haspopup="dialog"><div class="elio-product-media">${p.photos?.length?'<img '+responsiveImage(p.photos[0])+' src="'+safeImage(p.photos[0])+'" alt="" loading="lazy">':placeholder()}${productLabelBadge(p.label)}</div><div class="elio-product-copy"><h3>${esc(p.name)}</h3><p class="elio-product-description">${esc(p.description||'')}</p><div class="elio-product-bottom"><strong>${p.kind==='custom_box'?'From ':''}${money(p.price_cents)}</strong><span class="elio-product-add" aria-hidden="true">+</span></div>${a.available && state.fulfillment_date ? '' : `<p class="availability ${a.available?'':'unavailable'}">${esc(a.reason)}</p>`}</div></button>`;
+function menuItem(product){
+ const status=displayAvailability(product);
+ const isCustom=product.kind==='custom_box';
+ const pieces=isCustom?product.option_groups?.find(group=>group.id==='flavors')?.required_count
+   :product.flavor_contents?.reduce((total,flavor)=>total+Number(flavor.quantity||0),0);
+ const photo=product.photos?.[0],src=productPhotoUrl(photo);
+ const days=Number(product.lead_days);
+ let prepTime=days>0?`${days} production day${days===1?'':'s'}`:'';
+ if(allowsSameDay(product))prepTime=!state.fulfillment_date&&status.available?status.reason:'Same-day eligible';
+ return {
+   id:product.id,name:product.name,description:product.description,
+   price:money(product.price_cents),fromPrice:isCustom,
+   quantityLabel:pieces>0?`Box of ${pieces}`:'',
+   prepTime,notice:status.available?'':status.reason,label:visibleProductLabel(product.label),
+   photo:src?{src,...responsiveImageProps(photo,'(max-width: 540px) calc(100vw - 32px), (max-width: 800px) 45vw, 300px')}:undefined
+ };
 }
+let boxGrid=null,mountBoxGrid;
+function unmountBoxGrid(){boxGrid?.unmount();boxGrid=null;}
 function placeholder(){return '<div class="empty-state" aria-label="Product photo coming soon"><div class="empty-icon">'+icon+'</div><small>Fresh from our kitchen</small></div>'}
-function renderShop(){
+async function renderShop(){
+  if(!mountBoxGrid)({mountBoxGrid}=await import('./menu-item-card.js?v=1'));
+  if(new URLSearchParams(location.hash.slice(1)).get('order'))return;
+  unmountBoxGrid();
   quickCart.close({restoreFocus:false});
   orderReadId++;orderRefreshing=false;displayedOrder=null;scheduleReceipt=null;
   clearTimeout(refreshTimer);customerCalendar?.destroy();customerCalendar=null;
@@ -110,12 +131,13 @@ function renderShop(){
   app.innerHTML=`${catalog.settings.paused?'<div class="notice" role="status">'+esc(catalog.settings.pause_message||'We’re temporarily pausing new orders. Please check back soon.')+'</div>':''}
   <section class="fulfillment-bar" aria-label="Choose fulfillment"><div class="date-field"><span id="fulfillment-date-label">Choose your date</span><div id="customer-date-picker"></div></div><div class="method-toggle" role="group" aria-label="Pickup or delivery"><button data-method="pickup" class="${state.method==='pickup'?'selected':''}" aria-pressed="${state.method==='pickup'}">Pickup</button><button data-method="delivery" class="${state.method==='delivery'?'selected':''}" aria-pressed="${state.method==='delivery'}">Delivery</button></div></section><div id="fulfillment-notice" class="notice" role="status" hidden></div>
   <div class="shop-layout"><section id="cheesecake-boxes"><div class="section-heading" data-store-section="shop-boxes"><h2>Our Cheesecake Boxes</h2><span class="muted">A box for every craving.</span></div><div id="product-grid" class="product-grid"></div><p class="help-card">One basket, one date. Fixed sets come as shown; build your own box to choose your three flavors.</p></section><aside id="cart" class="panel cart-panel" aria-label="Your basket"></aside></div><button id="mobile-cart" class="mobile-cart" aria-haspopup="dialog" aria-controls="quick-cart-dialog" aria-expanded="false" hidden></button>`;
+  boxGrid=mountBoxGrid($('#product-grid'),productRoutes.open);
   renderProducts();renderCart();watchSections(app);
   customerCalendar=mountCustomerCalendar($('#customer-date-picker'),{value:state.fulfillment_date,settings:catalog.settings,method:state.method,allowSameDay:sameDayEligible(),onSelect:date=>{state.fulfillment_date=date;quote=null;persist();renderProducts();renderCart();if(configured)loadInventory()}});
   document.querySelectorAll('[data-method]').forEach(b=>b.onclick=()=>{state.method=b.dataset.method;quote=null;persist();renderShop()});
 }
 function renderProducts(){
- const grid=$('#product-grid');if(!grid)return;
+ const grid=$('#product-grid');if(!grid||!boxGrid)return;
  const categories=(catalog.categories||[]).filter(c=>c.scope==='boxes'&&catalog.products.some(p=>productCategoryIds(p,catalog.categories).includes(c.id))).sort((a,b)=>a.sort_order-b.sort_order||a.name.localeCompare(b.name));
  if(category!=='all'&&!categories.some(c=>c.id===category))category='all';
  let filters=$('#box-category-filters');if(!filters){filters=document.createElement('div');filters.id='box-category-filters';filters.className='box-category-filters';grid.before(filters);}
@@ -123,8 +145,7 @@ function renderProducts(){
  filters.innerHTML=[{id:'all',name:'All boxes'},...categories].map(c=>`<button type="button" data-box-category="${esc(c.id)}" aria-pressed="${category===c.id}">${esc(c.name)}</button>`).join('');
  filters.querySelectorAll('button').forEach(button=>button.onclick=()=>{category=button.dataset.boxCategory;renderProducts();filters.querySelector(`[data-box-category="${CSS.escape(category)}"]`)?.focus({preventScroll:true});});
  const products=sortProducts(catalog.products,category==='all'?'':category).filter(p=>category==='all'||productCategoryIds(p,catalog.categories).includes(category));
- grid.innerHTML=products.length?products.map(p=>productCard(p)).join(''):'<div class="empty-state"><h3>No boxes are listed right now.</h3><p>Please check back soon.</p></div>';
- grid.querySelectorAll('[data-product]').forEach(b=>b.onclick=()=>productRoutes.open(b.dataset.product));
+ boxGrid.render(products.map(menuItem));
  watchFirstProductRow(grid,'shop','[data-product]');
 }
 
@@ -337,6 +358,7 @@ async function renderOrder(provided=null){
   if(!provided&&busy&&$('#proof-form')?.getAttribute('aria-busy')==='true'&&$('#proof-form').dataset.orderId===new URLSearchParams(location.hash.slice(1)).get('order'))return;
   clearTimeout(refreshTimer);customerCalendar?.destroy();customerCalendar=null;const params=new URLSearchParams(location.hash.slice(1)),id=params.get('order'),token=params.get('token');document.body.classList.add('viewing-order');
   if(!id)return renderShop();
+  unmountBoxGrid();
   quickCart.close({restoreFocus:false});
   if(!configured){app.innerHTML='<div class="panel empty-state"><h1>Order access needs backend setup</h1><p>Your order link will work once the configured shop services are connected.</p><a href="order.html" class="button-secondary">Back to shop</a></div>';return}
   const accessKey=orderAccessKey();if(!provided&&orderRefreshing&&displayedOrder?.key===accessKey)return;
@@ -395,9 +417,9 @@ async function init(){
   if(configured)catalog=prepareCatalog(await api('catalog'));else catalog.settings.paused=true;
   state.items=mergeBasketItems(state.items,999);state.method='pickup';state.fulfillment_date=firstAvailableDate(state.items,catalog.products,catalog.settings,catalog.inventory);persist();
   if(new URLSearchParams(location.hash.slice(1)).has('order'))await renderOrder();
-  else {renderShop();productRoutes.restore();if(basketHash())showBasket();}
+  else {await renderShop();productRoutes.restore();if(basketHash())showBasket();}
  }catch(e){app.innerHTML=`<div class="panel empty-state"><h2>The menu is taking a little longer</h2><p>${esc(e.message)}</p><button class="button" id="retry-menu">Try again</button></div>`;$('#retry-menu').onclick=()=>location.reload();}
  finally{app.removeAttribute('aria-busy');}
 }
-window.addEventListener('hashchange',()=>{if(location.hash.includes('order='))renderOrder();else{if(document.body.classList.contains('viewing-order'))renderShop();if(basketHash())showBasket();}});
+window.addEventListener('hashchange',async()=>{if(location.hash.includes('order='))renderOrder();else{if(document.body.classList.contains('viewing-order'))await renderShop();if(basketHash())showBasket();}});
 init();

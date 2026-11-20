@@ -8,6 +8,8 @@ Run `node server.mjs`, then open http://127.0.0.1:4173. No package installation 
 
 For a static host, the publish directory is `dist` and no compilation is needed. All asset URLs are relative. The storefront and dashboard connect to Elio's separate Supabase project using a publishable browser key. No server secrets belong in the static files.
 
+The shop renders catalog boxes with the React and TypeScript component in `components/ui/menu-item-card.tsx`. Reusable UI components live in `components/ui`, the directory mapped to `@/components/ui` in the shadcn configuration. The card styles live in `styles/menu-item-card.css`. Run `npm ci` and then `npm run build:cards` after editing these sources. Commit the resulting JavaScript and CSS in `dist/assets/shop` so the static preview and deployed shop use the same cards.
+
 ## Elio administration
 
 - `/manage.html?preview=1`: read-only dashboard preview; no private data or backend requests.

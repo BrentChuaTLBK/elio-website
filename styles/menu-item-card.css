@@ -1,0 +1,80 @@
+/* Compile only the utilities used by the shop cards, without a global reset. */
+@reference "tailwindcss";
+
+.elio-menu-card {
+  cursor: pointer;
+  box-shadow: 0 2px 6px #3d251c0a;
+}
+.elio-menu-card .elio-product-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 42%, #271b1110 67%, #271b1157 100%);
+}
+.elio-menu-card .product-label {
+  z-index: 1;
+  left: auto;
+  right: 12px;
+}
+.elio-menu-placeholder {
+  @apply flex h-full flex-col items-center justify-center gap-2;
+  font-size: 12px;
+  color: var(--brown);
+}
+.elio-menu-add {
+  @apply absolute inline-flex items-center justify-center font-bold uppercase;
+  z-index: 1;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  min-width: 94px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid #fff8;
+  border-radius: 9px;
+  background: #fffcf6f5;
+  box-shadow: 0 2px 10px #271b1129;
+  color: var(--ink);
+  font-size: 12px;
+  letter-spacing: .065em;
+  transition: opacity .18s ease, transform .2s ease, background-color .18s ease, color .18s ease;
+}
+.elio-menu-price {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.elio-menu-from, .elio-menu-size, .elio-menu-prep { color: var(--muted); }
+.elio-menu-from { font-size: 12px; font-weight: 500; }
+.elio-menu-size { margin-top: 4px; font-size: 12px; }
+.elio-menu-name {
+  margin-top: 10px;
+  font: 600 16px/1.35 Arial, sans-serif;
+  overflow-wrap: anywhere;
+}
+.elio-menu-prep {
+  @apply flex items-center gap-1.5;
+  margin-top: auto;
+  padding-top: 14px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.elio-menu-prep svg { flex-shrink: 0; }
+.elio-menu-card .availability { font-size: 12px; }
+
+@media (min-width: 701px) and (hover: hover) and (pointer: fine) and (not (any-pointer: coarse)) {
+  .elio-menu-card:not(:hover):not(:focus-visible) .elio-menu-add {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  .elio-menu-add:hover, .elio-menu-card:focus-visible .elio-menu-add {
+    background: var(--brown);
+    color: var(--paper);
+    border-color: var(--brown);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .elio-menu-add { transition: none; }
+}

@@ -8,11 +8,26 @@
     "check": "node scripts/check.mjs",
     "test:backend": "node tests/backend/run.mjs",
     "test:release": "node scripts/run-release-tests.mjs",
-    "build": "node scripts/build-assets.mjs"
+    "build:cards": "tsc --noEmit && esbuild components/shop-box-grid.tsx --bundle --minify --format=esm --target=es2020 --outfile=dist/assets/shop/menu-item-card.js && tailwindcss -i styles/menu-item-card.css -o dist/assets/shop/menu-item-card.css --minify",
+    "build": "npm run build:cards && node scripts/build-assets.mjs"
   },
   "type": "module",
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.23.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.3.0"
+  },
   "devDependencies": {
     "@imagemagick/magick-wasm": "0.0.43",
+    "@tailwindcss/cli": "^4.1.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "esbuild": "^0.25.12",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.9.3",
     "playwright": "1.62.1",
     "exceljs": "4.4.0",
     "jszip": "3.10.2"

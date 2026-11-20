@@ -22,8 +22,8 @@ function fixture(){
  return {catalog,collection:{flavors,categories:[],menus:[],current_month:date.slice(0,7)+'-01',next_month:addDays(date,32).slice(0,7)+'-01'},calls:[],blockedWrites:[],errors:[]};
 }
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
-async function make(width){
- const data=fixture(),ctx=await browser.newContext({viewport:{width,height:900},reducedMotion:'reduce',serviceWorkers:'block',hasTouch:width<600});
+async function make(width,hasTouch=width<600){
+ const data=fixture(),ctx=await browser.newContext({viewport:{width,height:900},reducedMotion:'reduce',serviceWorkers:'block',hasTouch});
  await ctx.addInitScript(()=>{
   localStorage.setItem('elio-newsletter-popup-v1',JSON.stringify({state:'submitted',firstVisit:Date.now(),updatedAt:Date.now()}));
   localStorage.setItem('elio-analytics-choice-v1',JSON.stringify({value:'denied',expires:Date.now()+86400000}));
@@ -85,7 +85,72 @@ async function finish(t){
 async function swipe(page,dx,dy=0){
  await page.locator('[data-open-photo]').evaluate((frame,{dx,dy})=>{const point=(x,y)=>new Touch({identifier:1,target:frame,clientX:x,clientY:y});frame.dispatchEvent(new TouchEvent('touchstart',{touches:[point(200,250)],changedTouches:[point(200,250)],bubbles:true}));frame.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[point(200+dx,250+dy)],bubbles:true}));},{dx,dy});
 }
+async function checkBoxCards(width,touch){
+ const t=await make(width,touch),{page,data}=t;
+ const [custom,fixed]=data.catalog.products;
+ data.catalog.inventory.push(...data.catalog.inventory.map(row=>({...row,date:addDays(date,7)})));
+ data.catalog.products=[
+  {...custom,name:'Build your own box',price_cents:80000,sort_order:2,lead_days:3,description:'Choose your three favorites.',photos:['assets/shop-custom-box-concept.webp']},
+  {...fixed,name:'The Discovery Box',sort_order:3,lead_days:3,description:'Something a little unexpected.',photos:['assets/shop-discovery-box-concept.webp']}
+ ];
+ await menu(page);
+ data.catalog.products.push({...fixed,id:'new-tea',name:'The Tea Collection',sort_order:1,lead_days:3,
+  description:'A little calm. A lovely trio.',photos:['assets/shop-tea-box-concept.webp']});
+ await page.reload();
+ const card=page.getByRole('button',{name:'Add The Tea Collection',exact:true});
+ const add=card.locator('.elio-menu-add');
+ await card.scrollIntoViewIfNeeded();
+ assert.equal(await card.locator('.elio-menu-price').innerText(),'₱900.00');
+ assert.equal(await card.locator('.elio-menu-size').innerText(),'Box of 3');
+ assert.equal(await card.locator('.elio-menu-prep').innerText(),'3 production days');
+ assert.match(await page.locator('[data-product="gallery"] .elio-menu-price').innerText(),/From\s+₱800\.00/);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ const opacity=()=>add.evaluate(el=>getComputedStyle(el).opacity);
+ if(touch){
+  assert.equal(await opacity(),'1');
+  assert.ok((await add.boundingBox()).height>=44);
+ }else{
+  await page.mouse.move(0,0);
+  assert.equal(await opacity(),'0');
+  await card.hover();
+  assert.equal(await opacity(),'1');
+ }
+ await card.locator('img').evaluate(img=>img.decode());
+ if(width===390)await card.screenshot({path:join(out,'box-card-phone.png')});
+ if(width===1440){
+  await page.locator('#product-grid img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));
+  await page.locator('#product-grid').screenshot({path:join(out,'box-cards-desktop.png')});
+ }
+ if(touch)await add.tap();else await add.click();
+ await page.locator('#product-dialog[open]').waitFor();
+ assert.equal(await page.locator('#product-title').innerText(),'The Tea Collection');
+ assert.equal(await page.locator('#cart .cart-line').count(),0);
+ await page.keyboard.press('Escape');
+ await productClosed(page);
+ assert.equal(await card.evaluate(el=>el===document.activeElement),true);
+ if(!touch){
+  await page.mouse.move(0,0);
+  await page.keyboard.press('Tab');
+  await card.focus();
+  assert.equal(await opacity(),'1');
+  await page.keyboard.press('Enter');
+  await page.locator('#product-dialog[open]').waitFor();
+  await page.keyboard.press('Escape');
+  await productClosed(page);
+ }
+ await openProduct(page,'gallery');
+ assert.ok(await page.locator('[data-choice]').count()>0);
+ assert.equal(await page.locator('#cart .cart-line').count(),0);
+ await page.locator('[data-choice="flavor-0"]').fill('3');
+ await page.locator('#add-to-cart').click();
+ await productClosed(page);
+ assert.equal(await page.locator('#cart .cart-line').count(),1);
+ await page.locator('#cart [data-remove]').evaluate(button=>button.click());
+ await finish(t);
+ check('Catalog card price, new box, Add, popup, and basket confirmation at '+width);
+}
 try{
+ for(const [width,touch] of [[320,true],[390,true],[768,true],[1440,false]])await checkBoxCards(width,touch);
  for(const width of [320,390,1440]){
   const t=await make(width),{page}=t;await menu(page);await openProduct(page);await fit(page,'landscape');
   await page.locator('[data-choice="flavor-0"]').fill('2');await page.locator('[data-choice="flavor-1"]').fill('1');await page.locator('#product-quantity').fill('2');
