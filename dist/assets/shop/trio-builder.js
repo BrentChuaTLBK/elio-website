@@ -1,6 +1,7 @@
 import {escapeHtml as esc,money} from '../admin/client.js';
 import {flavorPickerLimit} from './basket-interactions.js';
 import {dateInManila,selectionPrice} from './shop-rules.js';
+import {boxDetails, productPurchaseRow} from './box-details.js';
 
 export function isCustomTrio(product) {
   return product?.kind === 'custom_box' && product.option_groups?.length === 1 &&
@@ -22,19 +23,17 @@ function imageUrl(value) {
 }
 
 function flavorPiece(flavor) {
-  const cutout = imageUrl(flavor.builder_cutout_url), cover = imageUrl(flavor.photos?.[0]);
-  return `<span class="ep-piece">${cutout || cover
-    ? `<img src="${esc(cutout || cover)}" ${cutout ? '' : 'class="framed"'} alt="" data-piece-photo data-cover="${esc(cover)}">`
-    : ''}<span class="ep-fallback" ${cutout || cover ? 'hidden' : ''}>${esc(flavor.label)}</span></span>`;
+  const cover = imageUrl(flavor.photos?.[0]);
+  return `<span class="ep-piece">${cover ? `<img src="${esc(cover)}" class="framed" alt="" data-piece-photo>` : ''}<span class="ep-fallback" ${cover ? 'hidden' : ''}>${esc(flavor.label)}</span></span>`;
 }
 
 function flavorTile(choice, count, limit, full, loading) {
-  const cover = imageUrl(choice.photos?.[0]), cutout = imageUrl(choice.builder_cutout_url);
+  const cover = imageUrl(choice.photos?.[0]);
   const extra = choice.surcharge_cents > 0 ? '+' + money(choice.surcharge_cents).replace(/\.00$/, '') + ' each' : '';
   const unavailable = !limit ? 'Sold out' : count >= limit && !full ? 'Stock limit reached' : '';
   const label = ['Add ' + choice.label, extra || 'included', count ? count + ' selected' : '', unavailable].filter(Boolean).join(', ');
   return `<button type="button" class="ep-tile${count ? ' picked' : ''}${!limit ? ' sold' : ''}" data-trio-add="${esc(choice.id)}" data-count="${count}" aria-label="${esc(label)}" ${loading || full || count >= limit ? 'disabled' : ''}>
-    <span class="ep-thumb">${cover || cutout ? `<img src="${esc(cover || cutout)}" class="${cover ? '' : 'cutout'}" alt="" decoding="async">` : ''}<span class="ep-fallback" ${cover || cutout ? 'hidden' : ''}>${esc(choice.label)}</span>${count ? `<span class="ep-badge">×${count}</span>` : ''}</span>
+    <span class="ep-thumb">${cover ? `<img src="${esc(cover)}" alt="" decoding="async">` : ''}<span class="ep-fallback" ${cover ? 'hidden' : ''}>${esc(choice.label)}</span>${count ? `<span class="ep-badge">×${count}</span>` : ''}</span>
     <span class="ep-tile-footer"><span class="ep-tile-text"><strong>${esc(choice.label)}</strong>${extra ? `<span class="ep-extra">${esc(extra)}</span>` : ''}${unavailable ? `<span class="ep-unavailable">${unavailable}</span>` : ''}</span><span class="ep-plus" aria-hidden="true">+</span></span>
   </button>`;
 }
@@ -54,7 +53,7 @@ export function trioBreakdown(line,product) {
   }).join('')}${row('Box subtotal',money(unit))}${line.quantity>1?row(`${line.quantity} boxes`,money(line.line_total_cents??unit*line.quantity)):''}</dl>`;
 }
 
-export function mountTrioBuilder(dialog, {read, draft, save, commit, close, chooseDate, retry, verify, details}) {
+export function mountTrioBuilder(dialog, {read, draft, save, commit, close, chooseDate, retry, verify, header, preparation}) {
   const group = () => read().product.option_groups[0];
   const initial = draft?.slots || Object.entries(draft?.selected?.flavors || {}).flatMap(([id,count]) => Array(count).fill(id));
   const slots = Array.from({length:3}, (_,i) => initial[i] || null);
@@ -64,25 +63,42 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
   const selected = () => ({flavors: countsOf(slots)});
   const currency = number => money(number).replace(/\.00$/, '');
   dialog.classList.add('trio-dialog');
-  dialog.innerHTML = `<div class="trio-surface"><header class="ep-header"><button type="button" data-trio-close aria-label="Close product">‹ Boxes</button><span class="ep-logo" aria-hidden="true">ELIO</span><button type="button" data-trio-date aria-haspopup="dialog" aria-controls="customer-calendar-popup"></button></header>
-  <div class="ep-main"><h2 id="product-title"></h2><p class="ep-lead"></p><div id="product-error" role="status" aria-live="polite" hidden></div>
-  <div class="ep-layout"><section aria-label="Your box"><div class="ep-box-head"><h3>Your box</h3><span class="ep-count" data-group-count="flavors"></span></div>
-  <div class="ep-scene"><div class="ep-world"><img class="ep-package" src="assets/shop/trio/open-box.webp" alt="Open ELIO box with three spaces"><div data-trio-slots></div><img class="ep-rim" src="assets/shop/trio/open-box.webp" alt=""></div></div><div class="ep-slot-names" aria-hidden="true"></div></section>
-  <div><div class="ep-grid" role="group" aria-label="Choose your flavors"></div><button type="button" data-trio-more class="ep-more" hidden></button></div></div>
-  <div class="ep-order-tools"><label class="field" for="product-quantity">Boxes<input type="number" min="1" max="999" step="1" id="product-quantity" value="${quantity}"></label>
-  <details class="ep-details"><summary>Box photos &amp; details</summary><div>${details}</div></details></div>
-  </div><footer class="ep-bar"><div class="ep-total"><span data-trio-total-label></span><strong id="detail-price"></strong><small data-trio-extra></small></div><div class="ep-actions"><button type="button" id="trio-checkout" class="ep-primary"></button><button type="button" id="add-to-cart" class="ep-continue" hidden>Add and continue shopping</button></div></footer>
-  <div class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-trio-live></div></div>`;
+  const product = read().product;
+  dialog.innerHTML = `${header}<div class="modal-content trio-surface">
+    <div class="product-dialog-layout trio-layout">
+      <div class="trio-visual">
+        <section class="trio-box" aria-label="Your box">
+          <div class="ep-scene"><div class="ep-world">
+            <img class="ep-package" src="assets/shop/trio/open-box.webp" alt="Open ELIO box with three spaces">
+            <div data-trio-slots></div><img class="ep-rim" src="assets/shop/trio/open-box.webp" alt="">
+          </div></div><div class="ep-slot-names" aria-hidden="true"></div>
+        </section>
+        ${preparation}
+      </div>
+      <div class="trio-options">
+        <div class="trio-intro"><h2 id="product-title"></h2>${product.description ? '<p class="muted product-description">' + esc(product.description) + '</p>' : ''}</div>
+        <section class="trio-flavors" aria-labelledby="trio-flavor-heading">
+          <div class="ep-box-head"><h3 id="trio-flavor-heading">Choose your flavors</h3><span class="ep-count" data-group-count="flavors"></span></div>
+          <p class="ep-lead"></p><div class="ep-grid" role="group" aria-label="Choose your flavors"></div>
+          <button type="button" data-trio-more class="ep-more" hidden></button>
+        </section>
+        <div class="ep-total"><span data-trio-total-label></span><strong class="product-price" id="detail-price"></strong><small data-trio-extra></small></div>
+        <div id="product-error" class="notice" role="status" aria-live="polite" hidden></div>
+        ${productPurchaseRow(quantity)}
+        ${boxDetails(product, {gallery: Boolean(product.photos?.length)})}
+      </div>
+    </div><div class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-trio-live></div>
+  </div>`;
   const $ = selector => dialog.querySelector(selector);
   const surface = $('.trio-surface'), grid = $('.ep-grid'), tray = $('[data-trio-slots]');
-  const qtyInput = $('#product-quantity'),error = $('#product-error');
+  const qtyInput = $('#product-quantity'), action = $('#add-to-cart'), error = $('#product-error');
+  $('.close-button').addEventListener('click',close,{signal:closed.signal});
   const limit = (choice, ctx) => flavorPickerLimit(ctx.items,ctx.products,choice,quantity,ctx.inventory,ctx.date).maximum;
   const notice = message => { error.textContent=message || ''; error.hidden=!message; };
   const announce = message => { $('[data-trio-live]').textContent=message; };
   function imageFailed(event) {
     const img=event.target;
     if(img.tagName!=='IMG' || (!img.closest('.ep-piece') && !img.closest('.ep-thumb')))return;
-    if(img.dataset.cover && img.src!==img.dataset.cover){img.className='framed';img.src=img.dataset.cover;return;}
     img.hidden=true;
     const fallback=img.parentElement.querySelector('.ep-fallback');
     if(fallback)fallback.hidden=false;
@@ -134,35 +150,32 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
     const available=ctx.availability.available && Boolean(ctx.date) && !ctx.paused && !loading && !failed && validQty;
     const canAdd=complete&&available&&!committing;
     $('#product-title').textContent=product.name;
-    $('.ep-lead').textContent=complete?'Your trio is ready. Tap a cake in the box to remove it.':'Choose three from this month’s lineup. You can repeat a favorite.';
-    $('[data-trio-date]').textContent=ctx.date?new Intl.DateTimeFormat('en-PH',{weekday:'short',month:'short',day:'numeric',timeZone:'Asia/Manila'}).format(new Date(ctx.date+'T12:00:00+08:00')):'Choose your date';
+    $('.ep-lead').textContent=complete?'Tap a cake in the box to remove it.':'Tap to fill each space. You can repeat a favorite.';
     $('.ep-count').textContent=count+' of 3';
     tray.innerHTML=slots.map((id,i)=>{
       const c=byId.get(id)||choices.find(x=>x.id===id);
-      return c?`<button type="button" class="ep-slot occupied" data-position="${i}" data-trio-remove="${i}" data-trio-flavor="${esc(id)}" aria-label="Remove ${esc(c.label)} from position ${i+1}">${flavorPiece(c)}<span class="ep-remove" aria-hidden="true">×</span></button>`:`<span class="ep-slot" data-position="${i}"><span class="ep-slot-number">${i+1}</span></span>`;
+      return c?`<button type="button" class="ep-slot occupied" data-position="${i}" data-trio-remove="${i}" data-trio-flavor="${esc(id)}" aria-label="Remove ${esc(c.label)} from position ${i+1}">${flavorPiece(c)}<span class="ep-remove" aria-hidden="true">×</span></button>`:`<span class="ep-slot" data-position="${i}" aria-hidden="true"></span>`;
     }).join('');
     $('.ep-slot-names').innerHTML=slots.map(id=>`<span>${id?esc(names.get(id)||''):''}</span>`).join('');
     const visible=showAll?offered:offered.slice(0,9);
     grid.innerHTML=visible.length?visible.map(c=>flavorTile(c,counts[c.id]||0,limit(c,ctx),complete,loading||failed)).join(''):'<p class="ep-empty">No flavors are listed for this date. Choose another date.</p>';
     const more=$('[data-trio-more]');more.hidden=offered.length<=9;more.textContent=showAll?'Show fewer flavors':`See all ${offered.length} flavors`;more.setAttribute('aria-expanded',String(showAll));
     $('[data-trio-total-label]').textContent=quantity>1?`Subtotal for ${quantity} boxes`:count?'Box subtotal':'Trio base price';
-    $('#detail-price').textContent=currency(unit*quantity);
+    $('#detail-price').textContent=money(unit*quantity);
     const extras=unit-Number(product.price_cents);
     $('[data-trio-extra]').textContent=extras>0?`${currency(product.price_cents)} base + ${currency(extras)} extras${quantity>1?' per box':''}`:'';
-    const action=$('#trio-checkout');
-    action.textContent=loading?'Checking stock…':failed?'Retry stock check':!ctx.date?'Choose your date':!ctx.availability.available?'Unavailable this date':ctx.paused?'Ordering paused':complete?'Checkout':`Choose ${3-count} more ${count===2?'flavor':'flavors'}`;
+    action.textContent=loading?'Checking stock…':failed?'Retry stock check':!ctx.date?'Choose your date':!ctx.availability.available?'Unavailable this date':ctx.paused?'Ordering paused':'Add to basket · '+money(unit*quantity);
     action.disabled=(!failed&&Boolean(ctx.date)&&!canAdd)||loading||committing;
-    $('#add-to-cart').hidden=!canAdd;$('#add-to-cart').disabled=!canAdd;
     for(const [n,f] of flights){const dest=position(n);if(dest&&slots[n]===f.id)dest.style.visibility='hidden';else{flights.delete(n);f.animation.cancel();}}
-    if(focus){const el=$(focus);(el&&!el.disabled?el:canAdd?action:$('.ep-tile:enabled')||$('.ep-slot.occupied')||$('[data-trio-date]')).focus({preventScroll:true});}
+    if(focus){const el=$(focus);(el&&!el.disabled?el:canAdd?action:$('.ep-tile:enabled')||$('.ep-slot.occupied')||$('.close-button')).focus({preventScroll:true});}
     if(!loading&&!failed)save(selected(),quantity,slots);
     return {count,total:unit*quantity,canAdd};
   }
-  async function finish(checkout) {
+  async function addToBasket() {
     if(committing)return;
     const before=draw(null,true);if(!before.canAdd)return;
     const original=JSON.stringify([slots,quantity,read().date]);
-    committing=true;$('#trio-checkout').disabled=true;$('#add-to-cart').disabled=true;
+    committing=true;action.disabled=true;
     try {
       if(!await verify()||disposed||!dialog.open)return;
       committing=false;
@@ -170,21 +183,18 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
       if(!fresh.canAdd||original!==JSON.stringify([slots,quantity,read().date]))return;
       if(before.total!==fresh.total){notice('The flavor or box price changed. Review the updated subtotal and confirm again.');return;}
       committing=true;
-      commit(selected(),quantity,checkout);
+      commit(selected(),quantity);
     }catch(e){notice(e.message);}
     finally{committing=false;if(!disposed&&dialog.open)draw();}
   }
   surface.addEventListener('click',event=>{
     const button=event.target.closest('button');if(!button||button.disabled)return;
     const ctx=read(),keyboard=event.detail===0;
-    if(button.hasAttribute('data-trio-close')){close();return;}
-    if(button.hasAttribute('data-trio-date')){chooseDate(button);return;}
-    if(button.id==='trio-checkout'){
+    if(button===action){
       if(failed){retry();return;}
       if(!ctx.date){chooseDate(button);return;}
-      finish(true);return;
+      addToBasket();return;
     }
-    if(button.id==='add-to-cart'){finish(false);return;}
     if(button.hasAttribute('data-trio-more')){showAll=!showAll;draw(keyboard?'[data-trio-more]':null);return;}
     if(button.dataset.trioAdd){
       const id=button.dataset.trioAdd,index=slots.indexOf(null),choice=group().choices.find(c=>c.id===id);

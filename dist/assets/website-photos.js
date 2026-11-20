@@ -1,13 +1,26 @@
 import {config} from './admin/config.js';
 import {websitePhotoUrl} from './website-photo-slots.js';
 
-// Keep the original HTML photos visible if settings or a replacement cannot load.
-// This module never blocks rendering, checkout, or the catalog.
-if(config.supabaseUrl&&config.supabasePublishableKey&&new URLSearchParams(location.search).get('preview')!=='1'){
+// The homepage reserves the banner space but leaves its source unset until the
+// published photo is known. A cached upload can start downloading in parallel.
+const hero = document.querySelector('img[data-website-photo="home_hero"][data-default-src]');
+const online = config.supabaseUrl && config.supabasePublishableKey && new URLSearchParams(location.search).get('preview') !== '1';
+if (!online && hero) hero.src = hero.dataset.defaultSrc;
+if (online) {
  let photos={},loaded=false;
  const checked=new Map(),originals=new WeakMap(),mobile=matchMedia('(max-width:600px)');
- const original=node=>{if(!originals.has(node))originals.set(node,{src:node.getAttribute(node.tagName==='SOURCE'?'srcset':'src'),alt:node.getAttribute('alt'),position:node.style.objectPosition});return originals.get(node);};
- const ready=url=>{if(!checked.has(url))checked.set(url,new Promise(resolve=>{const image=new Image();image.onload=()=>resolve(true);image.onerror=()=>resolve(false);image.src=url;}));return checked.get(url);};
+ const original=node=>{if(!originals.has(node))originals.set(node,{src:node.dataset.defaultSrc || node.getAttribute(node.tagName==='SOURCE'?'srcset':'src'),alt:node.getAttribute('alt'),position:node.style.objectPosition});return originals.get(node);};
+ const ready=(url,priority=false)=>{if(!checked.has(url))checked.set(url,new Promise(resolve=>{const image=new Image();if(priority)image.fetchPriority='high';image.onload=()=>resolve(true);image.onerror=()=>resolve(false);image.src=url;}));return checked.get(url);};
+ const cacheKey='elio-published-home-photo-v1:'+config.supabaseUrl;
+ let lastHero;
+ if(hero){
+  try{lastHero=JSON.parse(localStorage.getItem(cacheKey));}catch{}
+  const cachedUrl=websitePhotoUrl(lastHero?.path,config.supabaseUrl);
+  if(cachedUrl)void ready(cachedUrl,true);
+ }
+ function rememberHero(value){
+  try{if(value)localStorage.setItem(cacheKey,JSON.stringify(value));else localStorage.removeItem(cacheKey);}catch{}
+ }
  function position(img){
   const source=img.parentElement?.tagName==='PICTURE'?[...img.parentElement.querySelectorAll('source[data-website-photo]')].find(s=>matchMedia(s.media).matches):null;
   const saved=photos[(source||img).dataset.websitePhoto],fallback=original(img);
@@ -21,10 +34,11 @@ if(config.supabaseUrl&&config.supabasePublishableKey&&new URLSearchParams(locati
   const fallback=original(node),saved=photos[node.dataset.websitePhoto],url=websitePhotoUrl(saved?.path,config.supabaseUrl);
   const image=node.tagName==='SOURCE'?node.parentElement.querySelector('img'):node;
   if(image)original(image);
-  if(url&&await ready(url)){
+  if(url&&await ready(url,node===hero)){
    node.setAttribute(node.tagName==='SOURCE'?'srcset':'src',url);node.dataset.websitePhotoApplied=url;
+   if(node===hero)rememberHero({path:saved.path,alt:saved.alt,position_x:saved.position_x,position_y:saved.position_y});
    node.closest('.detail-layout')?.querySelector('[data-photo-disclaimer]')?.setAttribute('hidden','');
-  }else{node.setAttribute(node.tagName==='SOURCE'?'srcset':'src',fallback.src);delete node.dataset.websitePhotoApplied;}
+  }else{node.setAttribute(node.tagName==='SOURCE'?'srcset':'src',fallback.src);delete node.dataset.websitePhotoApplied;if(node===hero)rememberHero(null);}
   if(image)position(image);
  }
  function scan(root){
@@ -38,5 +52,9 @@ if(config.supabaseUrl&&config.supabasePublishableKey&&new URLSearchParams(locati
   photos=result?.photos||{};loaded=true;scan(document);
   new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(node=>{if(node.nodeType===1)scan(node);}))).observe(document.body,{childList:true,subtree:true});
   mobile.addEventListener('change',()=>document.querySelectorAll('picture img[data-website-photo]').forEach(position));
- }).catch(()=>{});
+ }).catch(()=>{
+  if(!hero)return;
+  // Prefer the last verified upload if the settings service is unavailable.
+  photos={home_hero:lastHero};loaded=true;void apply(hero);
+ });
 }

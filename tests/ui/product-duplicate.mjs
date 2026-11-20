@@ -25,22 +25,7 @@ const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTAB
 const hold=(options={})=>{let started,release;const began=new Promise(r=>started=r),gate=new Promise(r=>release=r);held={...options,started,gate};return {began,release};};
 try{
  const ctx=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block',reducedMotion:'reduce'});
- await ctx.addInitScript(()=>{
-  window.cutoutGeometry=async file=>{
-   if(!file.name.startsWith('cake-cutout.'))return null;
-   const image=await createImageBitmap(file),canvas=document.createElement('canvas');
-   canvas.width=image.width;canvas.height=image.height;
-   const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);image.close();
-   const {data}=ctx.getImageData(0,0,canvas.width,canvas.height);
-   let left=canvas.width,right=-1,bottom=-1;
-   for(let i=3;i<data.length;i+=4)if(data[i]>24){
-    const pixel=(i-3)/4,x=pixel%canvas.width;
-    left=Math.min(left,x);right=Math.max(right,x);bottom=Math.max(bottom,Math.floor(pixel/canvas.width));
-   }
-   return {width:canvas.width,height:canvas.height,left,right,bottom,cornerAlpha:data[3]};
-  };
- });
- await ctx.exposeBinding('duplicateUpload',(_,{path,type,geometry})=>{if(failUpload){failUpload=false;return {error:{message:'Simulated photo upload failure'}};}uploads.push({path,type,geometry});return {};});
+ await ctx.exposeBinding('duplicateUpload',(_,{path,type})=>{if(failUpload){failUpload=false;return {error:{message:'Simulated photo upload failure'}};}uploads.push({path,type});return {};});
  await ctx.exposeBinding('duplicateRpc',async(_,{action,payload})=>{
   calls.push({action,payload:structuredClone(payload)});let plan;
   if(action==='save_product'&&held){plan=held;held=null;plan.started();await plan.gate;}
@@ -49,7 +34,7 @@ try{
  });
  await ctx.route('**/*',async route=>{
   const u=new URL(route.request().url());
-  if(u.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:`export function createClient(){return {auth:{initialize:async()=>({}),getSession:async()=>({data:{session:{user:{id:'${h.ids.owner}',email:'owner@example.test'}}}}),getUser:async()=>({data:{user:{id:'${h.ids.owner}'}}}),onAuthStateChange:()=>{}},rpc:async(n,p)=>window.duplicateRpc({action:p.p_action,payload:p.p_payload}),storage:{from:()=>({upload:async(path,file)=>window.duplicateUpload({path,type:file.type,geometry:await window.cutoutGeometry(file)}),getPublicUrl:path=>({data:{publicUrl:'${origin}/fixture-photo.png?uploaded='+path}})})}}}`});
+  if(u.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:`export function createClient(){return {auth:{initialize:async()=>({}),getSession:async()=>({data:{session:{user:{id:'${h.ids.owner}',email:'owner@example.test'}}}}),getUser:async()=>({data:{user:{id:'${h.ids.owner}'}}}),onAuthStateChange:()=>{}},rpc:async(n,p)=>window.duplicateRpc({action:p.p_action,payload:p.p_payload}),storage:{from:()=>({upload:async(path,file)=>window.duplicateUpload({path,type:file.type}),getPublicUrl:path=>({data:{publicUrl:'${origin}/fixture-photo.png?uploaded='+path}})})}}}`});
   if(u.origin!==origin)return route.abort();
   if(u.pathname==='/fixture-photo.png')return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV9kAAAAASUVORK5CYII=','base64')});
   const file=resolve(root,'.'+u.pathname);if(!file.startsWith(root+sep))return route.abort();
@@ -62,7 +47,7 @@ try{
  const writes=()=>calls.filter(c=>c.action==='save_product');
  const visible=async p=>(await invoke(p.kind==='flavor'?'flavor_collection':'catalog',{},null))[p.kind==='flavor'?'flavors':'products'].some(x=>x.id===p.id);
  const fits=async()=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),page.viewportSize().width);if(await dialog.isVisible())assert.ok(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1));};
- await copy(fixed);assert.equal(writes().length,0);assert.equal(await form.locator('[name=name]').inputValue(),'Signature trio (copy)');assert.equal(await form.locator('[name=price]').inputValue(),'990.00');assert.equal(await form.locator('[name=active]').count(),0);assert.equal(await form.locator('[name=category_ids]:checked').count(),2);assert.deepEqual(await form.locator('[data-box-flavor]').evaluateAll(nodes=>nodes.map(n=>n.value)),fixed.box_flavors);assert.equal(await form.locator('.photo-tile').count(),2);
+ await copy(fixed);assert.equal(await form.getByLabel('Minimum order label').inputValue(),'box');assert.equal(writes().length,0);assert.equal(await form.locator('[name=name]').inputValue(),'Signature trio (copy)');assert.equal(await form.locator('[name=price]').inputValue(),'990.00');assert.equal(await form.locator('[name=active]').count(),0);assert.equal(await form.locator('[name=category_ids]:checked').count(),2);assert.deepEqual(await form.locator('[data-box-flavor]').evaluateAll(nodes=>nodes.map(n=>n.value)),fixed.box_flavors);assert.equal(await form.locator('.photo-tile').count(),2);
  for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:1000});await fits();await form.getByRole('button',{name:'Save draft',exact:true}).scrollIntoViewIfNeeded();await fits();if(width===390||width===1440)await dialog.screenshot({path:join(out,`copy-editor-${width}.png`)});}
  await form.locator('[name=name]').fill('Discard this copy');await form.getByRole('button',{name:'Remove photo 1',exact:true}).click();await form.getByRole('button',{name:'Cancel',exact:true}).click();await page.locator('.site-dialog').getByRole('button',{name:'Discard changes',exact:true}).click();await closed();assert.equal(writes().length,0);assert.deepEqual(await row(fixed.id),originals.get(fixed.id));
  results.push('Opening and cancelling a copy writes nothing; copied recipe, categories, price and photos are editable at 320/390/768/1440px.');
@@ -70,12 +55,17 @@ try{
  await uploadInput.setInputFiles([{name:'mobile-one.png',mimeType:'image/png',buffer:imageBytes},{name:'mobile-two.png',mimeType:'image/png',buffer:imageBytes}]);await page.waitForFunction(()=>document.querySelector('#photo-order-status').textContent.startsWith('4 photos'));
  assert.equal(uploads.length,2);assert.equal(await form.evaluate(f=>f===window.originalProductForm),true);assert.equal(await form.locator('[name=name]').inputValue(),'Unsaved mobile edit');assert.ok(Math.abs(await uploadInput.evaluate(el=>el.getBoundingClientRect().top)-photoTop)<5);assert.ok(await dialog.evaluate(el=>el.scrollTop)>500);assert.equal(await form.getByRole('button',{name:'Save draft',exact:true}).isVisible(),true);await fits();await dialog.screenshot({path:join(out,'mobile-after-photo-upload.png')});
  photoTop=await uploadInput.evaluate(el=>el.getBoundingClientRect().top);failUpload=true;await uploadInput.setInputFiles({name:'mobile-failed.png',mimeType:'image/png',buffer:imageBytes});await form.locator('.form-error').filter({hasText:'Simulated photo upload failure'}).waitFor();assert.equal(await form.locator('.photo-tile').count(),4);assert.equal(await form.evaluate(f=>f===window.originalProductForm),true);assert.ok(Math.abs(await uploadInput.evaluate(el=>el.getBoundingClientRect().top)-photoTop)<5);await form.getByRole('button',{name:'Cancel',exact:true}).click();await page.locator('.site-dialog').getByRole('button',{name:'Discard changes',exact:true}).click();await closed();assert.equal(writes().length,0);await page.setViewportSize({width:1440,height:1000});results.push('Mobile multi-photo uploads and upload errors preserve the same form, edited fields, thumbnails and scroll position near Save.');
- await copy(fixed);await form.locator('[name=name]').fill('Weekend trio');await form.locator('[name=description]').fill('A new weekend box');await form.locator('[name=price]').fill('1099');await form.getByRole('button',{name:'Remove photo 1',exact:true}).click();
+ await copy(fixed);await form.getByLabel('Minimum order label').fill('gift trays');await form.locator('[name=name]').fill('Weekend trio');await form.locator('[name=description]').fill('A new weekend box');await form.locator('[name=price]').fill('1099');await form.getByRole('button',{name:'Remove photo 1',exact:true}).click();
  let request=hold({fail:true});await form.getByRole('button',{name:'Save draft',exact:true}).click();await request.began;
  assert.equal(await form.getByRole('button',{name:'Publish product',exact:true}).isDisabled(),true);assert.equal(await form.locator('input:enabled,select:enabled,textarea:enabled').count(),0);await page.locator('#dialog-close').click();assert.equal(await dialog.isVisible(),true);const count=writes().length;await form.evaluate(f=>f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));assert.equal(writes().length,count);request.release();await form.locator('.form-error').filter({hasText:'Simulated connection interruption'}).waitFor();assert.equal(await form.locator('[name=name]').inputValue(),'Weekend trio');assert.equal(await form.locator('.photo-tile').count(),1);
  await form.getByRole('button',{name:'Save draft',exact:true}).click();await closed();const draftId=writes().at(-1).payload.product.id;assert.equal(draftId,writes().at(-2).payload.product.id);assert.notEqual(draftId,fixed.id);let draft=await row(draftId);
  assert.equal(draft.active,false);assert.equal(draft.price_cents,109900);assert.deepEqual(draft.box_flavors,fixed.box_flavors);assert.deepEqual(draft.category_ids,boxCats);assert.deepEqual(draft.label,label);assert.equal(draft.min_quantity,2);assert.equal(draft.lead_days,3);assert.equal(draft.pickup_only,true);assert.deepEqual(draft.photos,[photo+'?second']);assert.equal(await visible(draft),false);
- await page.reload();await navigateDashboard(page,'boxes');await edit(draftId);assert.equal(await form.locator('[name=name]').inputValue(),'Weekend trio');await form.locator('[name=name]').fill('Weekend trio revised');await form.getByRole('button',{name:'Save draft',exact:true}).click();await closed();assert.equal((await row(draftId)).active,false);await edit(draftId);await form.getByRole('button',{name:'Publish product',exact:true}).click();await closed();draft=await row(draftId);assert.equal(draft.active,true);assert.equal(draft.name,'Weekend trio revised');assert.equal(await visible(draft),true);assert.deepEqual(await row(fixed.id),originals.get(fixed.id));
+ await page.reload();await navigateDashboard(page,'boxes');await edit(draftId);assert.equal(await form.getByLabel('Minimum order label').inputValue(),'gift trays');assert.equal(await form.locator('[name=name]').inputValue(),'Weekend trio');await form.locator('[name=name]').fill('Weekend trio revised');await form.getByRole('button',{name:'Save draft',exact:true}).click();await closed();assert.equal((await row(draftId)).active,false);await edit(draftId);await form.getByRole('button',{name:'Publish product',exact:true}).click();await closed();draft=await row(draftId);assert.equal(draft.active,true);assert.equal(draft.name,'Weekend trio revised');assert.equal(await visible(draft),true);assert.deepEqual(await row(fixed.id),originals.get(fixed.id));
+ assert.equal((await invoke('catalog',{},null)).products.find(p=>p.id===draftId).minimum_order_unit,'gift trays');
+ const shopper=await ctx.newPage();
+ await shopper.goto(origin+'/order.html?product='+draftId);
+ assert.match(await shopper.locator('#product-dialog .help-card').innerText(),/Minimum order: 2 gift trays\./);
+ await shopper.close();
  results.push('A failed save preserves edits, locks pending controls, and retries one ID; a hidden fixed-box draft persists across reloads, remains editable, and publishes only explicitly.');
  await copy(custom);assert.equal(await form.locator('[name=kind]').inputValue(),'custom_box');request=hold({lostResponse:true});await form.getByRole('button',{name:'Save draft',exact:true}).click();await request.began;request.release();await form.locator('.form-error').filter({hasText:'Simulated lost response'}).waitFor();const lostId=writes().at(-1).payload.product.id;assert.equal((await row(lostId)).active,false);await form.getByRole('button',{name:'Save draft',exact:true}).click();await closed();assert.equal(writes().at(-1).payload.product.id,lostId);assert.equal(await h.scalar("select count(*)::int from elio.products where data->>'name'='Custom trio (copy)'"),1);assert.equal((await row(lostId)).allow_same_day,true);
  await copy(custom);assert.equal(await form.locator('[name=name]').inputValue(),'Custom trio (copy 2)');request=hold({refreshFailure:true});await form.getByRole('button',{name:'Publish product',exact:true}).click();await request.began;request.release();await closed();const directId=writes().at(-1).payload.product.id;assert.equal((await row(directId)).active,true);await page.reload();await navigateDashboard(page,'boxes');assert.equal(await page.locator(`[data-action=edit-product][data-id="${directId}"]`).count(),1);
@@ -91,46 +81,28 @@ try{
  await form.locator('[name=price]').fill('50');
  await form.locator('#product-photos').setInputFiles({name:'cover.png',mimeType:'image/png',buffer:imageBytes});
  await page.waitForFunction(()=>document.querySelector('#photo-order-status').textContent.startsWith('1 photo'));
- const samples=await page.evaluate(()=>{
-  const canvas=document.createElement('canvas');canvas.width=100;canvas.height=80;
-  const ctx=canvas.getContext('2d'),png=()=>canvas.toDataURL('image/png').split(',')[1];
-  const empty=png();ctx.fillStyle='#7a984f';ctx.fillRect(10,12,35,26);
-  const cake=png(),webp=canvas.toDataURL('image/webp',.92).split(',')[1];
-  ctx.fillRect(0,0,100,80);return {empty,cake,webp,opaque:png()};
- });
- const chooseCutout=(editor,key)=>{
-  const extension=key==='webp'?'webp':'png';
-  return editor.locator('[data-cutout-file]').setInputFiles({name:key+'.'+extension,mimeType:'image/'+extension,buffer:Buffer.from(samples[key],'base64')});
- };
- await chooseCutout(form,'empty');await form.locator('[data-cutout-status]').filter({hasText:'empty'}).waitFor();
- await chooseCutout(form,'opaque');await form.locator('[data-cutout-status]').filter({hasText:'solid background'}).waitFor();
- await chooseCutout(form,'cake');await form.locator('[data-cutout-status]').filter({hasText:'Cutout ready'}).waitFor();
- const cutoutUrl=await form.locator('[name=builder_cutout_url]').inputValue();
- const shape=uploads.at(-1).geometry;
- assert.deepEqual([shape.width,shape.height,shape.cornerAlpha],[320,320,0]);
- assert.ok(Math.abs(shape.left-24)<=2&&Math.abs(shape.right-295)<=2&&Math.abs(shape.bottom-275)<=2);
+ assert.equal(await form.locator('[data-cutout-file]').count(),0);
  await form.getByRole('button',{name:'Create flavor',exact:true}).click();await closed();
  const pistachio=(await invoke('admin_bootstrap')).products.find(p=>p.name==='New pistachio trio flavor');
- assert.equal(pistachio.price_cents,5000);assert.equal(pistachio.builder_cutout_url,cutoutUrl);
- assert.equal(pistachio.photos.length,1);assert.notEqual(pistachio.photos[0],cutoutUrl);
- await copy(pistachio);assert.equal(await form.locator('[name=builder_cutout_url]').inputValue(),cutoutUrl);
- await form.locator('[data-remove-cutout]').click();assert.equal(await form.getAttribute('data-dirty'),'true');
+ assert.equal(pistachio.price_cents,5000);assert.equal(pistachio.photos.length,1);
+ await copy(pistachio);assert.equal(await form.locator('.photo-tile').count(),1);
+ await form.getByRole('button',{name:'Remove photo 1',exact:true}).click();
  await form.getByRole('button',{name:'Cancel',exact:true}).click();
  await page.locator('.site-dialog').getByRole('button',{name:'Discard changes',exact:true}).click();await closed();
- assert.equal((await row(pistachio.id)).builder_cutout_url,cutoutUrl);
+ assert.deepEqual((await row(pistachio.id)).photos,pistachio.photos);
  await navigateDashboard(page,'menus');
- const editMenu=async()=>{await page.locator('[data-action=edit-flavor-menu][data-id="'+pistachio.id+'"]').click();return page.locator('[data-form=flavor-menu-editor]');};
- let menuEditor=await editMenu();
- assert.equal(await menuEditor.locator('[name=builder_cutout_url]').inputValue(),cutoutUrl);
+ await page.locator('[data-action=edit-flavor-menu][data-id="'+pistachio.id+'"]').click();
+ const menuEditor=page.locator('[data-form=flavor-menu-editor]');
+ assert.equal(await menuEditor.locator('[data-cutout-file]').count(),0);
  await menuEditor.locator('[name=current_month]').check();
  await menuEditor.locator('[name=next_month]').check();
- await chooseCutout(menuEditor,'webp');
- await menuEditor.locator('[data-cutout-status]').filter({hasText:'Cutout ready'}).waitFor();
- const replacement=await menuEditor.locator('[name=builder_cutout_url]').inputValue();
- assert.notEqual(replacement,cutoutUrl);
+ await menuEditor.locator('#menu-cover-photo').setInputFiles({name:'updated-cover.png',mimeType:'image/png',buffer:imageBytes});
+ await menuEditor.getByAltText('New flavor cover').waitFor();
+ const replacement=JSON.parse(await menuEditor.locator('[name=photos]').inputValue())[0];
+ assert.notEqual(replacement,pistachio.photos[0]);
  await menuEditor.getByRole('button',{name:'Save flavor',exact:true}).click();await closed();
- const guestFlavor=async()=> (await invoke('catalog',{},null)).flavors.find(f=>f.id===pistachio.id);
- assert.equal((await guestFlavor()).builder_cutout_url,replacement);
+ const guestFlavor=(await invoke('catalog',{},null)).flavors.find(f=>f.id===pistachio.id);
+ assert.deepEqual(guestFlavor.photos,[replacement]);assert.equal(guestFlavor.price_cents,5000);
  const orderDate=await h.day(3);
  await invoke('save_inventory',{rows:[{product_id:pistachio.id,date:orderDate,capacity:6,available:true}]});
  await invoke('save_settings',{settings:{paused:false,production_weekdays:[0,1,2,3,4,5,6],fulfillment_weekdays:[0,1,2,3,4,5,6],blocked_dates:[],pickup_blocked_dates:[],
@@ -140,11 +112,7 @@ try{
  assert.equal(quote.subtotal_cents,2*(custom.price_cents+3*pistachio.price_cents));
  await invoke('save_inventory',{rows:[{product_id:pistachio.id,date:orderDate,capacity:5,available:true}]});
  await assert.rejects(()=>invoke('quote',twoBoxes,null),/available|stock|pieces|capacity/i);
- menuEditor=await editMenu();await menuEditor.locator('[data-remove-cutout]').click();
- await menuEditor.getByRole('button',{name:'Save flavor',exact:true}).click();await closed();
- const withoutCutout=await guestFlavor();
- assert.equal(withoutCutout.builder_cutout_url,null);assert.deepEqual(withoutCutout.photos,pistachio.photos);assert.equal(withoutCutout.price_cents,5000);
- results.push('On a phone the owner creates a new paid-extra flavor with a separate cake cutout, gets feedback on empty and opaque uploads, duplicates or discards edits, and replaces or clears the cutout from its monthly lineup editor.');
+ results.push('A new paid flavor uses one ordinary photo. Its monthly menu editor can replace it and checkout uses the saved surcharge and daily stock.');
  await navigateDashboard(page,'boxes');for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:1000});await fits();assert.ok(await page.locator('.product-card-actions').first().evaluate(el=>el.scrollWidth<=el.clientWidth+1));if(width===390||width===1440)await page.screenshot({path:join(out,`product-cards-${width}.png`),fullPage:true});}
  actor=h.ids.staff;await page.reload();await navigateDashboard(page,'boxes');assert.equal(await page.locator('[data-action=duplicate-product]').count(),0);
  for(const user of [h.ids.staff,h.ids.customer,null])await assert.rejects(()=>invoke('save_product',{product:{...draft,id:undefined,name:'Unauthorized copy'}},user),/owner|Authorized/i);
