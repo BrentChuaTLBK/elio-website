@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 export async function verifyTrio(ctx,h,origin,fixed,date) {
   const vanilla=await h.product({kind:'flavor',name:'Tap vanilla',price_cents:0,lead_days:0,sort_order:-2});
   const matcha=await h.product({kind:'flavor',name:'Tap matcha',price_cents:5000,lead_days:0,sort_order:-1,photos:['assets/elio-favicon.png'],builder_cutout_url:'assets/elio-apple-touch-icon.png'});
-  const trio=await h.product({kind:'custom_box',name:'Tap to fill trio',price_cents:80000,lead_days:0});
-  const minimumBox=await h.product({kind:'custom_box',name:'Two box minimum',price_cents:80000,lead_days:0,min_quantity:2});
+  const packaging={id:'pack',label:'Packaging?',required_count:1,choices:[
+    {id:'paper',label:'Paper bag only',surcharge_cents:0},{id:'insulated',label:'Insulated bag + ice',surcharge_cents:2500}
+  ]};
+  const trio=await h.product({kind:'custom_box',name:'Tap to fill trio',price_cents:80000,lead_days:0,box_questions:[packaging]});
+  const minimumBox=await h.product({kind:'set',box_flavors:fixed.box_flavors,name:'Two box minimum',price_cents:80000,lead_days:0,min_quantity:2,box_questions:[packaging]});
   const next=await h.day(3);
   for(const f of [vanilla,matcha])await h.inventory(f,date,12);
   await h.inventory(matcha,next,0);await h.inventory(vanilla,next,12);
@@ -24,7 +27,11 @@ export async function verifyTrio(ctx,h,origin,fixed,date) {
   const dialog=page.locator('#product-dialog');
   const closeProduct=async()=>{await dialog.getByRole('button',{name:'Close product',exact:true}).click();await dialog.waitFor({state:'hidden'});};
   const openProduct=id=>page.locator(`[data-product="${id}"]`).tap();
+  const insulated=dialog.getByRole('radio',{name:/Insulated bag/}),paper=dialog.getByRole('radio',{name:/Paper bag/});
   await openProduct(minimumBox.id);
+  assert.equal(await dialog.locator('#add-to-cart').isDisabled(),true);
+  await insulated.check();assert.equal(await dialog.locator('#detail-price').innerText(),'₱825.00');
+  await paper.check();assert.equal(await dialog.locator('#detail-price').innerText(),'₱800.00');
   assert.match(await dialog.locator('.help-card').innerText(),/Minimum order: 2 boxes\./);
   await closeProduct();
   await page.locator(`[data-product="${fixed.id}"]`).click();
@@ -71,6 +78,10 @@ export async function verifyTrio(ctx,h,origin,fixed,date) {
   await slot(1).locator('.ep-fallback').waitFor({state:'visible'});
   assert.equal(await slot(1).locator('.ep-fallback').innerText(),'Tap vanilla');
   assert.equal(await total.innerText(),'₱900.00');
+  assert.equal(await dialog.locator('#add-to-cart').isDisabled(),true);
+  assert.match(await insulated.getAttribute('value'),/insulated/);assert.match(await insulated.locator('..').innerText(),/\+₱25\.00/);
+  await insulated.check();assert.equal(await total.innerText(),'₱925.00');
+  await paper.check();assert.equal(await total.innerText(),'₱900.00');
   await tapRemove(1,7,0);
   assert.equal(await slot(0).getAttribute('data-trio-flavor'),matcha.id);
   assert.equal(await slot(2).getAttribute('data-trio-flavor'),matcha.id);
@@ -100,9 +111,10 @@ export async function verifyTrio(ctx,h,origin,fixed,date) {
   assert.equal(await page.locator('#cart .cart-line').count(),1);
   await h.inventory(matcha,date,12);await changeDate(date);
   await tile(matcha.id).tap();
+  assert.equal(await paper.isChecked(),true);await insulated.check();
   const add=dialog.getByRole('button',{name:/^Add to basket/});
   assert.equal(await add.count(),1);
-  assert.match(await add.innerText(),/₱1,800\.00/);
+  assert.match(await add.innerText(),/₱1,850\.00/);
   await add.evaluate(button=>{button.click();button.click();});
   await dialog.waitFor({state:'hidden'});
   assert.equal(await page.locator('#checkout-dialog').evaluate(el=>el.open),false);
@@ -120,8 +132,9 @@ export async function verifyTrio(ctx,h,origin,fixed,date) {
   assert.match(review,/Trio base price\s*₱800\.00/);
   assert.match(review,/2 × Tap matcha \(\+₱50\.00 each\)\s*\+₱100\.00/);
   assert.match(review,/1 × Tap vanilla\s*Included/);
-  assert.match(review,/Box subtotal\s*₱900\.00/);
-  assert.match(review,/2 boxes\s*₱1,800\.00/);
+  assert.match(review,/Packaging\? — Insulated bag \+ ice\s*\+₱25\.00/);
+  assert.match(review,/Box subtotal\s*₱925\.00/);
+  assert.match(review,/2 boxes\s*₱1,850\.00/);
   assert.deepEqual(errors,[]);await page.close();
   console.log('PASS touch trio, repeats, hole refill, dated stock, single basket add, explicit checkout and authoritative grouped quote');
 }

@@ -59,7 +59,7 @@ export function productDrafts(storage,now=()=>Date.now()) {
         for(const choice of group.choices){
           const value=Number(original[group.id]?.[choice.id]);
           if(!Number.isInteger(value)||value<=0||choice.active===false)continue;
-          const count=Math.max(0,Math.min(value,remaining,flavorStock(choice,date,inventory)));
+          const count=Math.max(0,Math.min(value,remaining,group.id==='flavors'?flavorStock(choice,date,inventory):Infinity));
           if(count){choices[choice.id]=count;remaining-=count;}
         }
         selected[group.id]=choices;

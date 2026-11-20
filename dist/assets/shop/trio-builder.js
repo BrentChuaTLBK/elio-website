@@ -1,11 +1,12 @@
 import {escapeHtml as esc,money} from '../admin/client.js';
 import {flavorPickerLimit} from './basket-interactions.js';
 import {dateInManila,selectionPrice} from './shop-rules.js';
+import {boxQuestions,boxQuestionFields,validBoxAnswers} from './box-questions.js';
 import {boxDetails, productPurchaseRow} from './box-details.js';
 
 export function isCustomTrio(product) {
-  return product?.kind === 'custom_box' && product.option_groups?.length === 1 &&
-    product.option_groups[0].id === 'flavors' && product.option_groups[0].required_count === 3;
+  return product?.kind === 'custom_box' && product.option_groups?.some(group => group.id === 'flavors' && group.required_count === 3) &&
+    product.option_groups.every(group => group.id === 'flavors' || group.required_count === 1);
 }
 
 function countsOf(slots) {
@@ -42,25 +43,27 @@ export function trioBreakdown(line,product) {
   if(!isCustomTrio(product))return '';
   const quoted=line.selection_labels;
   const parts=Array.isArray(quoted)&&quoted.length&&quoted.every(row=>row&&typeof row==='object')
-    ? quoted : product.option_groups[0].choices.map(choice=>({label:choice.label,quantity:line.selections?.flavors?.[choice.id]||0,surcharge_cents:choice.surcharge_cents})).filter(row=>row.quantity>0);
+    ? quoted : product.option_groups.flatMap(group=>group.choices.map(choice=>({group_id:group.id,group:group.label,label:choice.label,quantity:line.selections?.[group.id]?.[choice.id]||0,surcharge_cents:choice.surcharge_cents})).filter(row=>row.quantity>0));
   if(!parts.length)return '';
   const extras=parts.reduce((sum,row)=>sum+Number(row.quantity)*Number(row.surcharge_cents||0),0);
   const unit=Number(line.unit_price_cents);
   const row=(label,value)=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`;
   return `<dl class="trio-breakdown">${row('Trio base price',money(unit-extras))}${parts.map(part=>{
     const extra=Number(part.surcharge_cents||0);
+    if(part.group_id&&part.group_id!=='flavors')return row(part.group+' — '+part.label,extra?'+'+money(extra):'Included');
     return row(`${part.quantity} × ${part.label}${extra?' (+'+money(extra)+' each)':''}`,extra?'+'+money(extra*part.quantity):'Included');
   }).join('')}${row('Box subtotal',money(unit))}${line.quantity>1?row(`${line.quantity} boxes`,money(line.line_total_cents??unit*line.quantity)):''}</dl>`;
 }
 
 export function mountTrioBuilder(dialog, {read, draft, save, commit, close, chooseDate, retry, verify, header, preparation}) {
-  const group = () => read().product.option_groups[0];
+  const group = () => read().product.option_groups.find(g=>g.id==='flavors');
   const initial = draft?.slots || Object.entries(draft?.selected?.flavors || {}).flatMap(([id,count]) => Array(count).fill(id));
   const slots = Array.from({length:3}, (_,i) => initial[i] || null);
   let quantity = draft?.quantity || 1, loading = false, failed = false, committing = false, showAll = false, disposed=false;
   const names = new Map(), flights = new Map();
   const closed = new AbortController();
-  const selected = () => ({flavors: countsOf(slots)});
+  let answers=validBoxAnswers(boxQuestions(read().product),draft?.selected),questionVersion='';
+  const selected = () => ({flavors: countsOf(slots),...answers});
   const currency = number => money(number).replace(/\.00$/, '');
   dialog.classList.add('trio-dialog');
   const product = read().product;
@@ -82,6 +85,7 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
           <p class="ep-lead"></p><div class="ep-grid" role="group" aria-label="Choose your flavors"></div>
           <button type="button" data-trio-more class="ep-more" hidden></button>
         </section>
+        <div class="trio-questions" data-box-questions hidden></div>
         <div class="ep-total"><span data-trio-total-label></span><strong class="product-price" id="detail-price"></strong><small data-trio-extra></small></div>
         <div id="product-error" class="notice" role="status" aria-live="polite" hidden></div>
         ${productPurchaseRow(quantity)}
@@ -129,7 +133,13 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
   }
   function draw(focus, reconcile=false) {
     const ctx=read(), product=ctx.product;
-    const choices=product.option_groups[0].choices;
+    const choices=group().choices,questions=boxQuestions(product);
+    answers=validBoxAnswers(questions,answers);
+    const questionsPane=$('[data-box-questions]'),version=JSON.stringify(questions);
+    if(version!==questionVersion){
+      questionsPane.innerHTML=boxQuestionFields(questions,answers,{esc,money});
+      questionsPane.hidden=questions.length===0;questionVersion=version;
+    }
     const month=(ctx.date||dateInManila()).slice(0,7)+'-01';
     const offered=choices.filter(c=>c.active!==false&&(!Array.isArray(c.available_months)||c.available_months.includes(month)));
     const byId=new Map(offered.map(c=>[c.id,c]));
@@ -145,10 +155,10 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
       if(removed.length)notice('Please replace '+removed.join(', ')+'. The available stock or lineup has changed.');
     }
     const counts=countsOf(slots), count=slots.filter(Boolean).length;
-    const unit=selectionPrice(product,{flavors:counts},{allowIncomplete:true});
+    const unit=selectionPrice(product,selected(),{allowIncomplete:true});
     const complete=count===3, validQty=Number.isInteger(Number(qtyInput.value))&&Number(qtyInput.value)>=1&&Number(qtyInput.value)<=999;
     const available=ctx.availability.available && Boolean(ctx.date) && !ctx.paused && !loading && !failed && validQty;
-    const canAdd=complete&&available&&!committing;
+    const canAdd=complete&&Object.keys(answers).length===questions.length&&available&&!committing;
     $('#product-title').textContent=product.name;
     $('.ep-lead').textContent=complete?'Tap a cake in the box to remove it.':'Tap to fill each space. You can repeat a favorite.';
     $('.ep-count').textContent=count+' of 3';
@@ -174,13 +184,13 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
   async function addToBasket() {
     if(committing)return;
     const before=draw(null,true);if(!before.canAdd)return;
-    const original=JSON.stringify([slots,quantity,read().date]);
+    const original=JSON.stringify([slots,answers,quantity,read().date]);
     committing=true;action.disabled=true;
     try {
       if(!await verify()||disposed||!dialog.open)return;
       committing=false;
       const fresh=draw(null,true);
-      if(!fresh.canAdd||original!==JSON.stringify([slots,quantity,read().date]))return;
+      if(!fresh.canAdd||original!==JSON.stringify([slots,answers,quantity,read().date]))return;
       if(before.total!==fresh.total){notice('The flavor or box price changed. Review the updated subtotal and confirm again.');return;}
       committing=true;
       commit(selected(),quantity);
@@ -207,6 +217,11 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
       const result=draw(keyboard?`[data-trio-add="${CSS.escape(id)}"]`:null);
       announce(`${names.get(id)} removed. ${result.count} of 3. Subtotal ${currency(result.total)}.`);
     }
+  });
+  surface.addEventListener('change',event=>{
+    const radio=event.target.closest('.box-question input[type="radio"]');
+    if(!radio)return;
+    answers[radio.dataset.group]={[radio.dataset.choice]:1};draw();
   });
   qtyInput.addEventListener('input',()=>{
     const n=Number(qtyInput.value);

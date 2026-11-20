@@ -12,7 +12,7 @@ for(const name of (await readdir(join(project,'supabase/migrations'))).filter(n=
 const h=await makeHarness(db),fixture=await accountingFixture(h),day=await h.day(0);await h.inventory({id:fixture.product.box_flavors[0]},day,100);
 await db.query("update elio.settings set data=data||$1::jsonb",[JSON.stringify({site_url:origin,paused:false,payment_options:[{label:'GCash',account_name:'Test',account_number:'09170000000',note:''},{label:'BDO',account_name:'Test',account_number:'0012',note:''},{label:'EastWest',account_name:'Test',account_number:'0013',note:''}]})]);
 const pickerFlavor=await h.product({kind:'flavor',name:'Picker Chocolate',price_cents:1500,lead_days:0});
-const pickerBox=await h.product({kind:'custom_box',name:'Picker custom box',min_quantity:2,price_cents:10000,lead_days:0});
+const pickerBox=await h.product({kind:'custom_box',name:'Picker custom box',min_quantity:2,price_cents:10000,lead_days:0,box_questions:[{id:'packing',label:'Packaging?',required_count:1,choices:[{id:'paper',label:'Paper bag only',surcharge_cents:0},{id:'cold',label:'Insulated bag + ice',surcharge_cents:2500}]}]});
 let dropNextSaleResponse=false;let chain=Promise.resolve();const invoke=(a,p,t)=>{const result=chain.then(()=>h.api(a,p,h.ids.owner,t));chain=result.catch(()=>{});return result;};
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 try{
@@ -62,19 +62,20 @@ try{
  for(const width of [1440,390,320]){
   await page.setViewportSize({width,height:1000});if(await page.getByRole('button',{name:'Back to items'}).isVisible())await page.getByRole('button',{name:'Back to items'}).click();await page.locator('[data-add="'+pickerBox.id+'"]').click();const picker=page.locator('.flavor-picker'),add=picker.getByRole('button',{name:'Add box',exact:true}),plus=picker.locator('[data-flavor-plus]'),minus=picker.locator('[data-flavor-minus]');
   assert.equal(await add.isDisabled(),true);assert.equal(await picker.locator('[data-flavor-minus]:not(:disabled)').count(),0);
-  const first=picker.locator('[data-flavor-plus="'+fixture.product.box_flavors[0]+'"]'),second=picker.locator('[data-flavor-plus="'+pickerFlavor.id+'"]'),removeFirst=picker.locator('[data-flavor-minus="'+fixture.product.box_flavors[0]+'"]');await first.click();await first.click();await second.click();assert.equal(await add.isEnabled(),true);assert.equal(await picker.locator('[data-flavor-plus]:not(:disabled)').count(),0);
+  const first=picker.locator('[data-flavor-plus="'+fixture.product.box_flavors[0]+'"]'),second=picker.locator('[data-flavor-plus="'+pickerFlavor.id+'"]'),removeFirst=picker.locator('[data-flavor-minus="'+fixture.product.box_flavors[0]+'"]');await first.click();await first.click();await second.click();assert.equal(await add.isEnabled(),false);
+  await picker.getByRole('radio',{name:/Insulated bag/}).check();assert.equal(await add.isEnabled(),true);assert.equal(await picker.locator('[data-flavor-plus]:not(:disabled)').count(),0);
   await second.evaluate(el=>el.click());assert.equal(await picker.locator('[role=status]').textContent(),'3 of 3 selected · Remove a piece to change flavors.');
   await removeFirst.click();assert.equal(await add.isDisabled(),true);assert(await first.isEnabled());assert(await second.isEnabled());
   await second.click();await page.locator('#dialog').screenshot({path:join(out,'flavor-picker-'+width+'.png')});assert.equal(await picker.evaluate(el=>el.scrollWidth>el.clientWidth),false);
   assert.equal(await picker.getByLabel('Boxes',{exact:true}).inputValue(),'1');await add.click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
   if(width<=650)await page.getByRole('button',{name:'View basket'}).click();
-  assert.match(await page.locator('#cart').textContent(),/Picker custom box/);assert.equal(await page.locator('[data-qty="0"]').inputValue(),'1');await chooseDate('fulfillment_date',fixture.date);
+  assert.match(await page.locator('#cart').textContent(),/Packaging\? — Insulated bag \+ ice/);assert.match(await page.locator('#cart').textContent(),/Picker custom box/);assert.equal(await page.locator('[data-qty="0"]').inputValue(),'1');await chooseDate('fulfillment_date',fixture.date);
   await page.getByRole('button',{name:'Review sale',exact:true}).click();await page.getByRole('heading',{name:'Review before recording'}).waitFor({timeout:5000}).catch(async e=>{throw Error(e.message+' PAGE: '+await page.locator('#page-error').textContent());});await page.getByRole('button',{name:'Back',exact:true}).click();await page.locator('[data-remove]').click();
  }
  console.log('PASS flavor picker: +/- controls, zero minimum, aggregate three-piece maximum, re-enabled additions after removal, valid backend quote, and desktop/mobile layout.');
  // Make two differently configured boxes in one selection, then record payment from review.
  await page.setViewportSize({width:390,height:844});if(await page.locator('[data-action="back-to-items"]').isVisible())await page.locator('[data-action="back-to-items"]').click();await page.locator('[data-add="'+pickerBox.id+'"]').click();
- const picker=page.locator('.flavor-picker');await picker.getByLabel('Boxes',{exact:true}).fill('2');
+ const picker=page.locator('.flavor-picker');await picker.getByLabel('Boxes',{exact:true}).fill('2');await picker.getByRole('radio',{name:/Paper bag/}).check();
  for(const id of [fixture.product.box_flavors[0],pickerFlavor.id])for(let n=0;n<3;n++)await picker.locator('[data-flavor-plus="'+id+'"]').click();
  await picker.getByRole('button',{name:'Add box',exact:true}).click();await page.getByRole('button',{name:'View basket'}).click();
  assert.equal(await page.locator('#cart [data-qty]').count(),2);await chooseDate('fulfillment_date',fixture.date);

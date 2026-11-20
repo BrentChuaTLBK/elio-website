@@ -1,3 +1,4 @@
+import {boxQuestions} from './box-questions.js';
 // Display helpers only. PostgreSQL revalidates all customer checkout rules.
 const manilaDateFormatter = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'});
 const manilaTimeFormatter = new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
@@ -83,10 +84,12 @@ export function availability(product,date,settings,inventory,now=new Date(),meth
   return {available:remaining>=Number(product.min_quantity||1),remaining,reason:remaining>0?`${remaining} available on this date`:'Sold out for this date',earliest};
 }
 export function selectionPrice(product,selections,{allowIncomplete=false}={}){
-  if(product.kind==='set'&&Object.keys(selections||{}).length)throw new Error('Fixed-set flavors cannot be changed.');
+  if(product.kind==='set'&&Object.hasOwn(selections||{},'flavors'))throw new Error('Fixed-set flavors cannot be changed.');
+  const groups=product.option_groups||[];
+  if(Object.keys(selections||{}).some(id=>!groups.some(group=>group.id===id)))throw new Error('A selected option is unavailable. Please update your selection.');
   let price=Number(product.price_cents);
   for(const group of product.option_groups||[]){
-    const selected=selections[group.id]||{};
+    const selected=selections?.[group.id]||{};
     const count=Object.values(selected).reduce((a,b)=>a+Number(b),0);
     if(count>group.required_count||(!allowIncomplete&&count!==group.required_count))throw new Error(`Choose exactly ${group.required_count} for ${group.label}.`);
     for(const [id,count] of Object.entries(selected)){
@@ -98,9 +101,14 @@ export function selectionPrice(product,selections,{allowIncomplete=false}={}){
   }
   return price;
 }
-export function selectionLabels(product,selections){
-  if(product.kind==='set')return (product.flavor_contents||[]).map(f=>`${f.quantity} × ${f.name}`);
-  return (product.option_groups||[]).flatMap(group=>group.choices.filter(c=>Number(selections[group.id]?.[c.id])>0).map(c=>`${selections[group.id][c.id]} × ${c.label}${c.surcharge_cents ? ` (+PHP ${(c.surcharge_cents/100).toFixed(2)} each; PHP ${(c.surcharge_cents*selections[group.id][c.id]/100).toFixed(2)} per unit)` : ''}`));
+export function selectionLabels(product,selections={}){
+  const recipe=product.kind==='set'?(product.flavor_contents||[]).map(f=>`${f.quantity} × ${f.name}`):[];
+  const choices=(product.option_groups||[]).flatMap(group=>group.choices.filter(c=>Number(selections?.[group.id]?.[c.id])>0).map(c=>{
+    const count=selections[group.id][c.id];
+    if(group.id!=='flavors'&&group.required_count===1)return group.label+' — '+c.label+(c.surcharge_cents?' (+₱'+(c.surcharge_cents/100).toFixed(2)+' per box)':'');
+    return `${count} × ${c.label}${c.surcharge_cents ? ` (+PHP ${(c.surcharge_cents/100).toFixed(2)} each; PHP ${(c.surcharge_cents*count/100).toFixed(2)} per unit)` : ''}`;
+  }));
+  return [...recipe,...choices];
 }
 
 export function flavorStock(flavor,date,inventory){
@@ -149,5 +157,5 @@ export function firstAvailableDate(items,products,settings,inventory,now=new Dat
 
 export function prepareCatalog(catalog){
   const flavors=catalog.flavors||[];
-  return {...catalog,products:catalog.products.map(p=>p.kind==='set'?{...p,flavor_contents:(p.flavor_contents||[]).map(f=>({...f,...(flavors.find(x=>x.id===f.product_id)||{active:false})}))}:p.kind==='custom_box'?{...p,option_groups:[{id:'flavors',label:'Flavors per box',required_count:3,choices:flavors.map(f=>({...f,label:f.name,surcharge_cents:f.price_cents,active:f.active&&f.in_rotation&&!f.collection_hidden}))}]}:p)};
+  return {...catalog,products:catalog.products.map(p=>p.kind==='set'?{...p,flavor_contents:(p.flavor_contents||[]).map(f=>({...f,...(flavors.find(x=>x.id===f.product_id)||{active:false})}))}:p.kind==='custom_box'?{...p,option_groups:[{id:'flavors',label:'Flavors per box',required_count:3,choices:flavors.map(f=>({...f,label:f.name,surcharge_cents:f.price_cents,active:f.active&&f.in_rotation&&!f.collection_hidden}))},...boxQuestions(p)]}:p)};
 }
