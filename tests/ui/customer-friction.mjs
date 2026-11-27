@@ -16,12 +16,15 @@ function fixture(capacity=30){
  return {catalog,collection,session:null,orderError:null,orderGate:null,collectionGate:null,calls:[]};
 }
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
-async function make({width=390,capacity=30,session=null,holdCollection=false,reducedMotion='reduce',motionProbe=false}={}){
+async function make({width=390,capacity=30,session=null,holdCollection=false,reducedMotion='reduce',motionProbe=false,newsletterPopup=false}={}){
  const data=fixture(capacity);data.session=session;
  if(motionProbe)for(let i=0;i<3;i++)data.catalog.products.push({...data.catalog.products[1],id:'row-fixture-'+i,name:'Extra box '+i,sort_order:i+1});
  if(holdCollection)data.collectionGate=new Promise(r=>data.releaseCollection=r);
  const ctx=await browser.newContext({viewport:{width,height:900},reducedMotion,serviceWorkers:'block'}),errors=[];
- await ctx.addInitScript(()=>{localStorage.setItem('elio-newsletter-popup-v1',JSON.stringify({state:'submitted',firstVisit:Date.now(),updatedAt:Date.now()}));localStorage.setItem('elio-analytics-choice-v1',JSON.stringify({value:'denied',expires:Date.now()+86400000}));});
+ await ctx.addInitScript(showPopup=>{
+  if(!showPopup)localStorage.setItem('elio-newsletter-popup-v1',JSON.stringify({state:'submitted',firstVisit:Date.now(),updatedAt:Date.now()}));
+  localStorage.setItem('elio-analytics-choice-v1',JSON.stringify({value:'denied',expires:Date.now()+86400000}));
+ },newsletterPopup);
  if(motionProbe)await ctx.addInitScript(()=>{
   const animate=Element.prototype.animate;window.__selectedMotion=[];
   Element.prototype.animate=function(frames,options){
@@ -36,14 +39,14 @@ async function make({width=390,capacity=30,session=null,holdCollection=false,red
   if(action==='catalog')return {data:structuredClone(data.catalog),error:null};
   if(action==='my_orders'){const id=data.session?.user.id;if(data.orderGate)await data.orderGate;if(data.orderError)return {data:null,error:data.orderError};return {data:[{id:'order-'+id,reference:'ELIO-'+id,fulfillment_date:date,method:'pickup',payment_status:'paid',total_cents:10000}],error:null};}
   if(action==='my_vouchers')return {data:{vouchers:[],total:0,counts:{available:0,used:0,expired:0}},error:null};
-  if(action==='newsletter_settings')return {data:{enabled:false,own_status:'unsubscribed'},error:null};
+  if(action==='newsletter_settings')return {data:newsletterPopup?{enabled:true,popup_delay_ms:50}:{enabled:false,own_status:'unsubscribed'},error:null};
   if(action==='account_access')return {data:{role:'customer'},error:null};
   if(action==='affiliate_status')return {data:{assigned:false},error:null};
   return {data:{},error:null};
  });
  await ctx.route('**/*',async route=>{
   const u=new URL(route.request().url());
-  if(u.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:`export function createClient(){const callbacks=[];window.__authChange=(event,next)=>callbacks.forEach(fn=>fn(event,next));return {auth:{initialize:async()=>({}),getSession:()=>window.testAuth({action:'session'}),onAuthStateChange:fn=>{callbacks.push(fn);return {data:{subscription:{unsubscribe(){}}}}},signInWithPassword:()=>window.testAuth({action:'signin'}),signInWithOAuth:async({options})=>{window.__oauthReturn=options.redirectTo;window.__oauthPrompt=options.queryParams?.prompt;return {data:{},error:null};},signOut:()=>window.testAuth({action:'signout'}),updateUser:()=>window.testAuth({action:'session'}),resetPasswordForEmail:async()=>({}),resend:async()=>({})},rpc:async(n,p)=>window.testRpc({action:p.p_action,payload:p.p_payload}),functions:{invoke:async()=>({data:{status:'not_subscribed'},error:null})}}}`});
+  if(u.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:`export function createClient(){const callbacks=[];window.__authChange=(event,next)=>callbacks.forEach(fn=>fn(event,next));return {auth:{initialize:async()=>({}),getSession:()=>window.testAuth({action:'session'}),onAuthStateChange:fn=>{callbacks.push(fn);return {data:{subscription:{unsubscribe(){}}}}},signInWithPassword:()=>window.testAuth({action:'signin'}),signInWithOAuth:async({options})=>{window.__oauthReturn=options.redirectTo;window.__oauthPrompt=options.queryParams?.prompt;return {data:{},error:null};},signOut:()=>window.testAuth({action:'signout'}),updateUser:()=>window.testAuth({action:'session'}),resetPasswordForEmail:async()=>({}),resend:async()=>({})},rpc:async(n,p)=>window.testRpc({action:p.p_action,payload:p.p_payload}),functions:{invoke:async(name,{body})=>({data:name==='newsletter'&&body?.action==='subscribe'?{accepted:true}:{status:'not_subscribed'},error:null})}}}`});
   if(u.pathname==='/auth/v1/settings'){
    if(data.googleGate)await data.googleGate;
    const status=data.failGoogleOnce?503:200;data.failGoogleOnce=false;
@@ -61,6 +64,51 @@ const close=async page=>{await page.locator('[aria-label="Close product"]').clic
 const add=async page=>{await page.locator('#add-to-cart').click();await page.waitForFunction(()=>!document.querySelector('#product-dialog').open&&!new URL(location.href).searchParams.has('product'));};
 const finish=async(test,name)=>{assert.deepEqual(test.errors,[]);assert.equal(await test.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);results.push(name);console.log('PASS '+name);await test.ctx.close();};
 try{
+ for(const scenario of [
+  {path:'index.html',width:1440,close:'Escape'},
+  {path:'order.html',width:390,close:'X'},
+  {path:'flavors.html',width:390,close:'Continue exploring'},
+  {path:'index.html',width:320,close:'X',reduce:true},
+ ]){
+  const {path,width,close,reduce}=scenario;
+  const test=await make({width,newsletterPopup:true,reducedMotion:reduce?'reduce':'no-preference'});
+  const {page}=test;await page.goto(origin+'/'+path);
+  const popup=page.locator('#elio-newsletter-dialog');
+  await popup.waitFor();
+  assert(parseFloat(await popup.evaluate(el=>getComputedStyle(el).borderRadius))>=18);
+  if(close==='Continue exploring'){
+   await popup.getByLabel('Email address').fill('reader@example.test');
+   await popup.getByRole('button',{name:'Join',exact:true}).click();
+   await popup.getByRole('button',{name:close}).waitFor();
+  }
+  await popup.evaluate(el=>Promise.allSettled(el.getAnimations({subtree:true}).map(a=>a.finished)));
+  // Sample the middle of the actual exit, independently of browser frame rate.
+  await popup.evaluate(el=>{
+   const sample=()=>queueMicrotask(()=>{
+    const transitions=el.getAnimations({subtree:true}).filter(a=>a instanceof CSSTransition);
+    for(const a of transitions){a.pause();a.currentTime=a.effect.getTiming().duration/2;}
+    window.newsletterExit={open:el.open,opacity:Number(getComputedStyle(el).opacity),
+     backdrop:Number(getComputedStyle(el,'::backdrop').opacity),scale:new DOMMatrixReadOnly(getComputedStyle(el).transform).a};
+    transitions.forEach(a=>a.play());
+   });
+   el.addEventListener('click',sample,{once:true});
+   el.addEventListener('cancel',sample,{once:true});
+  });
+  if(close==='Escape')await page.keyboard.press('Escape');
+  else await popup.getByRole('button',{name:close==='X'?'Close newsletter signup':close}).click();
+  await popup.waitFor({state:'hidden'});
+  const frame=await page.evaluate(()=>window.newsletterExit);
+  if(reduce)assert.equal(frame.open,false);
+  else{
+   assert.equal(frame.open,true,'The popup remains modal during the fade');
+   assert(frame.opacity>.1&&frame.opacity<.9&&frame.backdrop>.1&&frame.backdrop<.9,'Card and backdrop fade together');
+   assert(frame.scale<1&&frame.scale>=.98,'The card recedes slightly');
+  }
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('elio-newsletter-popup-v1')).state);
+  assert.equal(saved,close==='Continue exploring'?'submitted':'dismissed');
+  await page.reload();assert.equal(await page.locator('#elio-newsletter-dialog[open]').count(),0);
+  await finish(test,'Newsletter dismissal via '+close+' at '+width+'px');
+ }
  for(const width of [320,390,1440]){
   const t=await make({width}),{page,data}=t;
   data.catalog.settings.delivery_blocked_dates=[date];

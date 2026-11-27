@@ -20,6 +20,7 @@ import { createNewsletterAdmin } from './newsletter-admin.js';
 import { deliveryTrackingUrl } from '../delivery-tracking.js';
 import {faqView,bindFaqView} from './faqs.js';
 import { flavorVideoField, bindFlavorVideoField } from './flavor-video-field.js';
+import { boxInformation } from '../shop/box-details.js';
 import { flavorDetailFields, readFlavorDetails } from './flavor-details.js';
 import { productCategoryIds, sortProducts, categoryFields } from './catalog-ordering.js';
 import { mountCatalogOrder } from './catalog-order.js';
@@ -599,7 +600,7 @@ function duplicateProduct(id) {
   const source = state.products.find(p => p.id === id && !p.deleted_at);
   if (!source) return;
   // Copy editable catalog details only. Identity, stock, menus and history belong to the original.
-  const fields = ['kind','description','category_id','category_ids','price_cents','min_quantity','minimum_order_unit','lead_days','pickup_only','allow_same_day','photos','box_questions','box_flavors','tagline','collection_details','texture_video_path','label'];
+  const fields = ['kind','description','box_details','care_instructions','category_id','category_ids','price_cents','min_quantity','minimum_order_unit','lead_days','pickup_only','allow_same_day','photos','box_questions','box_flavors','tagline','collection_details','texture_video_path','label'];
   productDraft = clone(Object.fromEntries(fields.filter(key => source[key] !== undefined).map(key => [key,source[key]])));
   const names = new Set(state.products.map(p => p.name.toLocaleLowerCase()));
   let name, number = 1;
@@ -618,6 +619,9 @@ function captureProduct() {
     productDraft.active = !productDraft.collection_hidden;
   }
   if (productDraft.kind !== 'flavor') {
+    productDraft.box_details = fieldValue(form, 'box_details').trim();
+    productDraft.care_instructions = fieldValue(form, 'care_instructions').trim();
+    productDraft.minimum_order_unit = fieldValue(form, 'minimum_order_unit').trim() || 'box';
     for (const [gi, question] of (productDraft.box_questions || []).entries()) {
       if (question.id === INSULATED_BAG_QUESTION_ID) {
         productDraft.box_questions[gi] = insulatedBagQuestion(cents(fieldValue(form, 'insulated_price_' + gi)));
@@ -630,7 +634,6 @@ function captureProduct() {
       }
     }
   }
-  if (productDraft.kind !== 'flavor') productDraft.minimum_order_unit = fieldValue(form, 'minimum_order_unit').trim() || 'box';
   if (productDraft.kind === 'set') productDraft.box_flavors = $$('[data-box-flavor]', form).map(select => select.value).filter(Boolean);
   if (productDraft.kind === 'flavor') Object.assign(productDraft, { tagline: fieldValue(form,'tagline'), collection_details: readFlavorDetails(form), texture_video_path: fieldValue(form,'texture_video_path') || null, min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
   productDraft.option_groups = [];
@@ -714,6 +717,7 @@ function renderProductDialog() {
   const p = productDraft;
   const kind = p.kind || 'set';
   const flavor = kind === 'flavor';
+  const info = flavor ? null : boxInformation(p);
   const draftPublication = Boolean(productCopy || (p.id && (flavor ? p.collection_hidden : !p.active)));
   const editingFlavor = flavor && p.id && !productCopy;
   const names = { flavor: 'flavor', set: 'fixed box', custom_box: 'custom box' };
@@ -725,6 +729,9 @@ function renderProductDialog() {
     ${input('name', flavor ? 'Flavor name' : 'Box name', p.name, 'text', 'required maxlength="160"')}
     ${flavor ? input('tagline', 'Tagline', p.tagline ?? window.ELIO_CONTENT?.flavors.find(f=>f.id===p.slug)?.line ?? '', 'text', 'maxlength="100"', 'For example: Classic and creamy. Shown on the flavor card and popup.') : ''}
     ${textarea('description', flavor ? 'Brief description' : 'Description', p.description, 'Describe the flavor or what makes this box special.', 'maxlength="6000"')}
+    ${info ? `<section class="subsection"><h3>Shop popup details</h3><p class="help-text">Clear a field to hide that section in this box’s shop popup.</p>
+      ${textarea('box_details', 'What’s in the box', info.box_details, '', 'rows="4" maxlength="6000" ' + ownerLocked())}
+      ${textarea('care_instructions', 'Care & serving', info.care_instructions, '', 'rows="3" maxlength="6000" ' + ownerLocked())}</section>` : ''}
     <div class="field-row">${input('price', flavor ? 'Surcharge per piece · PHP' : kind === 'set' ? 'Fixed price per box · PHP' : 'Base price per box · PHP', amount(p.price_cents), 'number', 'required min="0" max="1000000" step="0.01"', flavor ? 'Use 0 for flavors included in the base box price.' : kind === 'set' ? 'The full set price. Flavor surcharges apply only to custom boxes.' : '')}</div>
     ${flavor && !productCopy ? `<section class="subsection"><h3>Visibility</h3>${check('collection_hidden', 'Hide flavor', p.collection_hidden === true, ownerLocked())}<p class="help-text">Hiding removes this flavor from all public collections and monthly lineups. To offer it again, unhide it and add it to a lineup.</p></section>` : ''}
     ${flavor || draftPublication ? '' : check('active', 'Show this product in shop', p.active)}

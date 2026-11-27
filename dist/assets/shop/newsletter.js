@@ -101,14 +101,17 @@ function bindForm(form) {
   form.dataset.newsletterBound = 'true';
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (form.dataset.busy === 'true' || !form.reportValidity()) return;
+    const dialog = form.closest('#elio-newsletter-dialog');
+    if (form.dataset.busy === 'true' || dialog?.classList.contains('is-closing') || !form.reportValidity()) return;
     const button = form.querySelector('[type="submit"]'), status = form.querySelector('[data-newsletter-status]');
     const label = button.textContent;
     form.dataset.busy = 'true';button.disabled = true;button.textContent = 'Joining…';status.textContent = '';status.classList.remove('is-error');
     try {
       status.textContent = await subscribeNewsletter(form.elements.email.value, form.dataset.newsletterSource, form.elements.website?.value || '');
-      const dialog = form.closest('#elio-newsletter-dialog');
-      if (dialog) { showWelcome(dialog);return; }
+      if (dialog) {
+        if (dialog.open && !dialog.classList.contains('is-closing')) showWelcome(dialog);
+        return;
+      }
       form.querySelectorAll('input').forEach(input => { input.disabled = true; });
       button.textContent = 'Joined';
     } catch (error) {
@@ -136,13 +139,27 @@ function schedulePopup(settings) {
   const firstVisit = popupState()?.firstVisit || startedAt;
   if (!popupState()) { memoryState = { firstVisit };try { localStorage.setItem(popupKey, JSON.stringify(memoryState)); } catch { /* Use in-memory state for this visit. */ } }
   let dialog, timer, interrupted = false;
+  function closePopup() {
+    const panel = dialog;
+    if (!panel?.open || panel.classList.contains('is-closing')) return;
+    panel.classList.add('is-closing');
+    const finish = () => {
+      panel.close();
+      panel.classList.remove('is-closing');
+    };
+    // Keep the native modal and its backdrop together until the fade finishes.
+    const transitions = panel.getAnimations?.() || [];
+    if (transitions.length) Promise.allSettled(transitions.map(transition => transition.finished)).then(finish);
+    else finish();
+  }
   function show() {
     clearTimeout(timer);
-    if(document.body.classList.contains('site-under-maintenance')){if(dialog?.open)dialog.close();return;}
+    if (dialog?.classList.contains('is-closing')) return;
+    if (document.body.classList.contains('site-under-maintenance')) { closePopup();return; }
     const saved = popupState();
     const anotherModal = [...document.querySelectorAll('dialog[open]')].some(item => item !== dialog) || document.querySelector('#mobile-nav:not([hidden])');
     if (dialog?.open) {
-      if (anotherModal) { interrupted = true;dialog.close(); }
+      if (anotherModal) { interrupted = true;closePopup(); }
       return;
     }
     if (saved?.state === 'submitted' || activeSettings?.enabled !== true || excludedVisit()) return;
@@ -159,7 +176,12 @@ function schedulePopup(settings) {
     dialog = document.createElement('dialog');dialog.id = 'elio-newsletter-dialog';dialog.className = 'elio-newsletter-dialog';dialog.setAttribute('aria-labelledby', 'elio-newsletter-title');
     dialog.innerHTML = `<button class="elio-newsletter-close" type="button" aria-label="Close newsletter signup"><span aria-hidden="true">×</span></button><div class="elio-newsletter-layout"><div class="elio-newsletter-photo"><img data-website-photo="home_box" data-default-src="assets/trio-story-concept.webp" width="1440" height="960" alt="An Elio box of three square Basque cheesecakes"></div><div class="elio-newsletter-copy"><p class="elio-newsletter-eyebrow">Elio Newsletter</p><h2 id="elio-newsletter-title" class="elio-newsletter-offer"><span>Get</span> <strong>${newsletterOffer(activeSettings).discount_percent}% OFF</strong> <span>your next order.</span></h2><p class="elio-newsletter-intro">Join the Elio Newsletter for news, special offers, and exclusive promo codes.</p>${formMarkup('elio-popup', 'home_popup')}</div></div>`;
     document.body.append(dialog);bindForm(dialog.querySelector('form'));
-    const dismiss = () => { rememberPopup(popupState()?.state === 'submitted' ? 'submitted' : 'dismissed');dialog.close();show(); };
+    const dismiss = () => {
+      if (dialog.classList.contains('is-closing')) return;
+      interrupted = false;
+      rememberPopup(popupState()?.state === 'submitted' ? 'submitted' : 'dismissed');
+      closePopup();
+    };
     dialog.querySelector('.elio-newsletter-close').addEventListener('click', dismiss);
     dialog.addEventListener('cancel', event => { event.preventDefault();dismiss(); });
     // Clicking the backdrop is deliberately not a dismissal action.
@@ -168,7 +190,11 @@ function schedulePopup(settings) {
   refreshPopup = show;
   const observer = new MutationObserver(show);observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open', 'hidden'] });
   document.addEventListener('visibilitychange', show);window.addEventListener('hashchange', show);
-  window.addEventListener('storage', event => { if (event.key === popupKey) { if (dialog?.open && popupState()?.state) dialog.close();show(); } });
+  window.addEventListener('storage', event => {
+    if (event.key !== popupKey) return;
+    if (popupState()?.state) { interrupted = false;closePopup(); }
+    show();
+  });
   show();
 }
 
