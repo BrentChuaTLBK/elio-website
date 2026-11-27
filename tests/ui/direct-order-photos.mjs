@@ -71,7 +71,7 @@ try{
  await guest.goto(link);await guest.getByRole('heading',{name:order.reference}).waitFor();assert.equal(await guest.locator('[data-pickup-proof],[data-order-photos]').count(),0);
 const email=guest.locator('#order-email-form'),optIn=email.locator('[data-newsletter-option]'),saveEmail=email.getByRole('button',{name:'Save email for order updates'});
  await optIn.waitFor();
- assert.equal(await optIn.getByRole('checkbox').isChecked(),false);
+ assert.equal(await optIn.getByRole('checkbox',{name:'Also join the ELIO newsletter for the latest news on new flavors and exclusive promos.'}).isChecked(),false);
  for(const width of [1440,768,390,320]){
    await guest.setViewportSize({width,height:900});
    const panel=await guest.locator('[aria-labelledby=order-email-title]').boundingBox();

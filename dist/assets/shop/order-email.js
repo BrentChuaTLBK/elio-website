@@ -9,7 +9,7 @@ export function orderEmailMarkup(order, token) {
       <div class="order-email-actions">
         <label class="order-email-opt-in" data-order-email-field data-newsletter-option hidden>
           <input name="newsletter" type="checkbox">
-          <span>Also join the ELIO newsletter for the latest news on new flavors.</span>
+          <span>Also join the ELIO newsletter for the latest news on new flavors and exclusive promos.</span>
         </label>
         <button type="submit" class="button">Save email for order updates</button>
       </div>
