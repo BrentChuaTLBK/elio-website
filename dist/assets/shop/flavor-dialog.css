@@ -64,6 +64,15 @@ a.flavor-tile .flavor-tile-image .product-photo,
   aspect-ratio: 1;
   border-radius: 14%;
 }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :is(.flavor-slide > a, a.flavor-tile) > :is(.product-photo, .flavor-tile-image) {
+    transition: transform 350ms cubic-bezier(.2,.7,.2,1), box-shadow 200ms ease-out;
+  }
+  :is(.flavor-slide > a, a.flavor-tile):is(:hover, :focus-visible) > :is(.product-photo, .flavor-tile-image) {
+    transform: translateY(-2px) scale(1.025);
+    box-shadow: 0 5px 14px rgb(61 37 28 / .12);
+  }
+}
 .flavor-carousel .product-placeholder::after,
 .flavor-tile .product-placeholder::after { border-radius: inherit; }
 .product-photo.flavor-portrait {

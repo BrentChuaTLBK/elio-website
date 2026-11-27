@@ -81,10 +81,19 @@ try{
   await track.press('Home');await waitIndex(page,0);
   const vanilla = track.locator('.flavor-slide:not([data-carousel-copy]) a[href="#flavor-vanilla"]');
   const viewer = page.locator(dialog);
+  await vanilla.hover();
+  assert.equal(await vanilla.locator('.product-photo').evaluate(el=>getComputedStyle(el).transform),'none');
   await vanilla.click();
   assert.equal(await viewer.locator('.flavor-flying-photo').count(),0);
   await page.keyboard.press('Escape');await viewer.waitFor({state:'hidden'});
   await page.emulateMedia({reducedMotion:'no-preference'});
+  await vanilla.hover();
+  await page.waitForFunction(el=>{
+   const m=new DOMMatrixReadOnly(getComputedStyle(el).transform);
+   return Math.abs(m.a-1.025)<.001 && Math.abs(m.f+2)<.1;
+  },await vanilla.locator('.product-photo').elementHandle());
+  await page.mouse.move(0,0);
+  await page.waitForFunction(el=>getComputedStyle(el).transform==='none',await vanilla.locator('.product-photo').elementHandle());
   // Inspect the photo at the first frame, then dismiss it mid-flight.
   const originMatches = await vanilla.evaluate(link => {
     const source = link.querySelector('.product-photo').getBoundingClientRect();
