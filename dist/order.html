@@ -30,7 +30,6 @@
   <title>Shop — Elio Basque Cheesecake</title>
   <link rel="icon" type="image/png" sizes="64x64" href="assets/elio-favicon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/elio-apple-touch-icon.png">
-  <link rel="preload" href="assets/shop-hero-concept.webp" as="image" fetchpriority="high">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="shop.css">
   <link rel="stylesheet" href="fulfillment.css">
@@ -39,7 +38,7 @@
   <script src="order.js?v=flavor-portraits-1" defer></script>
   <script src="calendar.js" defer></script>
 
-<link rel="stylesheet" href="assets/shop/commerce.css"><link rel="stylesheet" href="assets/shop/customer-calendar.css"><link rel="stylesheet" href="assets/shop/elio-commerce.css?v=payment-method-picker-1"><link rel="stylesheet" href="assets/shop/menu-item-card.css?v=2"><link rel="stylesheet" href="assets/shop/trio-builder.css?v=trio-remove-1"><link rel="stylesheet" href="assets/box-questions.css"><link rel="stylesheet" href="assets/store-motion.css?v=selected-1"><script type="module" src="assets/shop/shop.js?v=payment-method-picker-1"></script>
+<link rel="stylesheet" href="assets/shop/commerce.css"><link rel="stylesheet" href="assets/shop/customer-calendar.css"><link rel="stylesheet" href="assets/shop/elio-commerce.css?v=first-photo-1"><link rel="stylesheet" href="assets/shop/menu-item-card.css?v=2"><link rel="stylesheet" href="assets/shop/trio-builder.css?v=trio-remove-1"><link rel="stylesheet" href="assets/box-questions.css"><link rel="stylesheet" href="assets/store-motion.css?v=selected-1"><script type="module" src="assets/shop/shop.js?v=payment-method-picker-1"></script>
 <link rel="stylesheet" href="assets/quantity-stepper.css">
 <link rel="stylesheet" href="assets/shop/shop-loading.css?v=1">
 <script type="module" src="assets/quantity-stepper.js"></script>
@@ -49,11 +48,13 @@
 <link rel="stylesheet" href="assets/site-maintenance.css?v=maintenance-2"><script type="module" src="assets/site-maintenance.js?v=maintenance-2"></script>
 <link rel="stylesheet" href="assets/site-analytics.css"><script type="module" src="assets/site-analytics.js"></script>
   <link rel="stylesheet" href="assets/storefront-footer.css?v=1">
-  <script type="module" src="assets/website-photos.js?v=1"></script>
+  <script type="module" src="assets/website-photos.js?v=published-photos-1"></script>
 <link rel="canonical" href="https://eliocheesecakes.com/order">
   <link rel="stylesheet" href="assets/shop/flavor-dialog.css?v=soft-squares-2">
+  <!--elio-public-photos--><!--/elio-public-photos-->
 </head>
 <body class="shop-page" data-newsletter-popup>
+  <script>if (new URLSearchParams(location.hash.slice(1)).has('order')) document.body.classList.add('viewing-order');</script>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="shop-header">
     <nav class="shop-nav" aria-label="Main navigation"><a href="order.html" aria-current="page">Shop</a><a href="story.html">Our story</a></nav>
@@ -62,7 +63,7 @@
   </header>
   <main id="main">
     <section class="shop-hero" aria-labelledby="shop-title">
-      <img data-website-photo="shop_hero" src="assets/shop-hero-concept.webp" width="1920" height="640" alt="Three individual square Basque cheesecakes in vanilla, chocolate, and matcha on warm stone — concept photograph" fetchpriority="high">
+      <img data-website-photo="shop_hero" data-default-src="assets/shop-hero-concept.webp" width="1920" height="640" alt="Three individual square Basque cheesecakes in vanilla, chocolate, and matcha on warm stone — concept photograph" fetchpriority="high">
       <div class="shop-hero-copy"><p class="eyebrow">A little Elio, just for you</p><h1 id="shop-title">Good things<br>come in threes.</h1><p>Three little cheesecakes.<br>A kinder day awaits.</p><div class="shop-hero-actions"><a class="button" href="#cheesecake-boxes">Explore our boxes <span aria-hidden="true">→</span></a><a class="button button-outline" href="order.html?product=your-own">Make your own <span aria-hidden="true">→</span></a></div></div>
     </section>
     <div class="shop-shell">
@@ -101,7 +102,7 @@
         </div>
       </section>
       <section class="shop-gifting" id="shop-gifting" aria-labelledby="shop-gift-title">
-        <picture><source data-website-photo="shop_gift_mobile" media="(max-width:600px)" srcset="assets/thoughtful-gift-concept.webp"><img data-website-photo="shop_gift" src="assets/thoughtful-gift-wide-concept.webp" width="1920" height="640" alt="Elio's bronze-lettered brown paper bag and closed cheesecake box — concept photograph" loading="lazy"></picture>
+        <picture><source data-website-photo="shop_gift_mobile" media="(max-width:600px)" data-default-srcset="assets/thoughtful-gift-concept.webp"><img data-website-photo="shop_gift" data-default-src="assets/thoughtful-gift-wide-concept.webp" width="1920" height="640" alt="Elio's bronze-lettered brown paper bag and closed cheesecake box — concept photograph" loading="lazy"></picture>
         <div class="shop-gift-copy"><p class="eyebrow">A little box. A lovely gesture.</p><h2 id="shop-gift-title">A sweeter way<br>to show you care.</h2><p>Thoughtful treats for birthdays,<br>thank yous, and everyday moments.</p></div>
       </section>
       <section class="shop-faq" data-shop-faqs aria-labelledby="faq-title" hidden>

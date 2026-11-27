@@ -1,7 +1,7 @@
 import {api,upload,escapeHtml as esc} from './client.js';
 import {config} from './config.js';
 import {preparePhoto,PHOTO_ACCEPT,PHOTO_HELP} from './photo-upload.js';
-import {photoPages,photoSlots,websitePhotoUrl} from '../website-photo-slots.js';
+import {photoPages,photoSlots,websitePhotoUrl,sharePhotoSlots} from '../website-photo-slots.js';
 
 export function mountWebsitePhotos(root,{owner}){
  if(!owner){root.innerHTML='<p class="notice">Sign in as an owner to change website photos.</p>';return {destroy(){}};}
@@ -30,7 +30,7 @@ export function mountWebsitePhotos(root,{owner}){
  root.addEventListener('change',async event=>{
   if(event.target.type!=='file'||busy)return;const form=event.target.closest('form'),slot=slotFor(form),file=event.target.files[0];if(!file)return;
   const d=draftFor(slot);setBusy(true);status(form,'Preparing photo…');
-  try{const converted=await preparePhoto(file);if(!alive)return;dispose(d);Object.assign(d,{file,preview:URL.createObjectURL(converted),uploadedPath:null,position_x:50,position_y:50,dirty:true});paint();}
+  try{const converted=await preparePhoto(file);if(!alive)return;dispose(d);Object.assign(d,{file,preview:URL.createObjectURL(converted),uploadedPath:null,shareUnavailable:false,position_x:50,position_y:50,dirty:true});paint();}
   catch(error){status(form,error.message,true);event.target.value='';}
   finally{setBusy(false);}
  });
@@ -46,9 +46,13 @@ export function mountWebsitePhotos(root,{owner}){
   const form=event.target.closest('[data-photo-slot]');if(!form)return;event.preventDefault();if(busy)return;const slot=slotFor(form),d=draftFor(slot);if(!d.dirty)return;
   setBusy(true);status(form,'Saving photo…');
   try{
-   if(d.file&&!d.uploadedPath)d.uploadedPath=(await upload(d.file,{kind:'website'})).path;
+   if(d.file&&!d.uploadedPath) {
+    const sharePosition=Object.values(sharePhotoSlots).includes(slot.id)?{x:d.position_x,y:d.position_y}:undefined;
+    const result=await upload(d.file,{kind:'website',sharePosition});
+    d.uploadedPath=result.path;d.shareUnavailable=result.shareUnavailable;
+   }
    const result=await api('save_website_photo',{slot:slot.id,revision:d.revision,path:d.file?d.uploadedPath:d.path,alt:d.alt.trim(),position_x:d.position_x,position_y:d.position_y});
-   if(!alive)return;saved[slot.id]=result;dispose(d);drafts.delete(slot.id);paint();status(root.querySelector(`[data-photo-slot="${slot.id}"]`),'Saved. This photo is now published.');
+   if(!alive)return;saved[slot.id]=result;dispose(d);drafts.delete(slot.id);paint();status(root.querySelector(`[data-photo-slot="${slot.id}"]`),d.shareUnavailable?'Website photo published. The previous sharing photo will update with the next site release.':'Saved. This photo is now published.');
   }catch(error){status(form,error.message,true);}finally{setBusy(false);}
  });
  root.innerHTML='<p role="status">Loading website photos…</p>';

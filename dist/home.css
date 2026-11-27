@@ -130,5 +130,3 @@
 }
 @media(max-width:360px){.home-hero .hero-copy{padding-top:28px}.home-hero h1{font-size:53px}.home-boxes,.home-flavors{padding-left:18px;padding-right:18px}.home-section-heading h2{font-size:33px}.home-flavors .product-label h3{font-size:17px}.home-flavors .placeholder-name{font-size:15px}.home-hero .hero-copy>p{font-size:13px}.home-story-copy h2{font-size:44px}.home-sharing-copy h2{font-size:39px}}
 @media(prefers-reduced-motion:reduce){.home-box-photo img{transition:none}.home-box-photo:hover img{transform:none}}
-
-.home-hero .hero-image[data-default-src]:not([src]) { visibility: hidden; }

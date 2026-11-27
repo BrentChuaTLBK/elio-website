@@ -25,15 +25,25 @@ export async function preparePhoto(file,{receipt=false}={}) {
   }).catch(error=>{cached.delete(purpose);throw error;}));
   return cached.get(purpose);
 }
-async function convert(file,purpose) {
-  const result = await new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./photo-worker.js', import.meta.url), { type: 'module' });
+function runWorker(file,purpose,position) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL(purpose === 'share' ? './photo-worker.js?v=sharing-1' : './photo-worker.js', import.meta.url), { type: 'module' });
     const finish = (error, value) => { clearTimeout(timer); worker.terminate(); error ? reject(error) : resolve(value); };
     const timer = setTimeout(() => finish(new Error('Photo conversion took too long. Try a smaller photo.')), 90000);
     worker.onmessage = ({data}) => finish(data.error ? new Error(data.error) : null, data.blob);
     worker.onerror = () => finish(new Error('Photo conversion could not start. Refresh the page and try again.'));
-    worker.postMessage({file,purpose});
+    worker.postMessage({file,purpose,position});
   });
+}
+
+export async function prepareSharePhoto(file,position) {
+  const blob = await runWorker(file,'share',position);
+  if (blob.type !== 'image/jpeg') throw new Error('The sharing photo could not be prepared.');
+  return blob;
+}
+
+async function convert(file,purpose) {
+  const result = await runWorker(file,purpose);
   const bytes = new Uint8Array(await result.slice(0,12).arrayBuffer());
   const marker = (offset, word) => [...word].every((char,i) => bytes[offset+i] === char.charCodeAt(0));
   if (result.type !== 'image/webp' || !marker(0,'RIFF') || !marker(8,'WEBP')) throw new Error('The photo could not be converted to WebP. Please try again.');

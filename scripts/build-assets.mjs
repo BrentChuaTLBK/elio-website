@@ -1,10 +1,11 @@
 import {readFile,writeFile,readdir,mkdir,cp} from 'node:fs/promises';
 import {resolve,join,extname,posix} from 'node:path';
 import {createHash} from 'node:crypto';
+import {buildSharePhotos} from './build-share-photos.mjs';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
 import {initializeImageMagick,ImageMagick,MagickFormat} from '@imagemagick/magick-wasm';
-const root=resolve(import.meta.dirname,'..'),source=join(root,'dist'),out=join(root,'.release');
+const root=resolve(import.meta.dirname,'..'),source=join(root,'dist'),out=resolve(process.argv[2] || join(root,'.release'));
 const require=createRequire(import.meta.url),hash=b=>createHash('sha256').update(b).digest('hex').slice(0,20);
 await mkdir(out,{recursive:true});await cp(source,out,{recursive:true});await mkdir(join(out,'_immutable'),{recursive:true});
 async function walk(dir,prefix=''){const paths=[];for(const f of await readdir(dir,{withFileTypes:true})){if(f.isDirectory())paths.push(...await walk(join(dir,f.name),prefix+f.name+'/'));else paths.push(prefix+f.name);}return paths;}
@@ -57,3 +58,4 @@ await writeFile(join(out,'_headers'),`/*
 await mkdir(join(root,'test-results/asset-build'),{recursive:true});await writeFile(join(root,'test-results/asset-build/manifest.json'),JSON.stringify({mapping:Object.fromEntries(mapping),variants},null,2));
 console.log(`Built ${mapping.size} versioned media/styles and ${Object.keys(variants).length} responsive photo sets. JavaScript/configuration and all APIs remain fresh.`);
 execFileSync(process.execPath,[join(root,'scripts/prepare-launch-seo.mjs'),out],{stdio:'inherit'});
+await buildSharePhotos(out,publish,remote[0]);

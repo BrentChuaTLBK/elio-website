@@ -1,5 +1,6 @@
 import { config } from './config.js';
-import { preparePhoto } from './photo-upload.js?v=original-fallback-1';
+import { preparePhoto, prepareSharePhoto } from './photo-upload.js?v=published-photos-1';
+import { websiteSharePath } from '../website-photo-slots.js';
 import { photoExtension } from '../image-file.js';
 
 const setupMessage = 'Backend setup is pending. Accounts and orders will be available after the shop owner connects the ordering service.';
@@ -138,7 +139,7 @@ export async function calendarConnection(action, payload = {}) {
   return edge('calendar-sync', { ...payload, action });
 }
 
-export async function upload(file, { kind = 'proof', order_id, token, payment_reference, onProgress } = {}) {
+export async function upload(file, { kind = 'proof', order_id, token, payment_reference, onProgress, sharePosition } = {}) {
   if (!(file instanceof File) || !file.size) throw new Error('Choose a photo to upload.');
   if (kind === 'product' || kind === 'website') {
     const client = await connection();
@@ -152,7 +153,15 @@ export async function upload(file, { kind = 'proof', order_id, token, payment_re
     const bucket = kind === 'website' ? 'website-images' : 'product-images';
     const { error } = await client.storage.from(bucket).upload(path, file, { contentType: file.type, upsert: false, cacheControl: '3600' });
     if (error) throw new Error(error.message || 'The photo could not be uploaded.');
-    return { url: client.storage.from(bucket).getPublicUrl(path).data.publicUrl, path };
+    let shareUnavailable = false;
+    if (kind === 'website' && sharePosition) {
+      try {
+        const jpeg = await prepareSharePhoto(file,sharePosition);
+        const result = await client.storage.from(bucket).upload(websiteSharePath(path),jpeg,{contentType:'image/jpeg',upsert:false,cacheControl:'31536000'});
+        if (result.error) throw result.error;
+      } catch { shareUnavailable = true; }
+    }
+    return { url: client.storage.from(bucket).getPublicUrl(path).data.publicUrl, path, shareUnavailable };
   }
   if(typeof onProgress==='function')onProgress('preparing');
   file=await preparePhoto(file,{receipt:true});
