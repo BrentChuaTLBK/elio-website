@@ -42,12 +42,16 @@ export async function readPublishedPhotos(config, {fetcher = fetch, timeout = 50
  });
  if (!response.ok) throw new Error('Website photos unavailable');
  const {photos} = await response.json();
+ return publicPhotoRows(photos,config.supabaseUrl);
+}
+
+export function publicPhotoRows(photos,base) {
  if (!photos || typeof photos !== 'object' || Array.isArray(photos)) throw new Error('Invalid website photos');
  const result = {};
  const position = value => Number.isInteger(value) && value >= 0 && value <= 100 ? value : 50;
  for (const {id} of photoSlots) {
   const saved = photos[id];
-  if (!websitePhotoUrl(saved?.path, config.supabaseUrl)) continue;
+  if (!websitePhotoUrl(saved?.path,base)) continue;
   result[id] = {path:saved.path, alt:String(saved.alt || '').slice(0,240), position_x:position(saved.position_x), position_y:position(saved.position_y)};
  }
  return result;

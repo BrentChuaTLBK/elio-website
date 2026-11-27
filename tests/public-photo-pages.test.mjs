@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
 import {createRequire} from 'node:module';
 import {initializeImageMagick,ImageMagick} from '@imagemagick/magick-wasm';
-import {shareJpeg} from '../scripts/build-share-photos.mjs';
+import {buildSharePhotos,shareJpeg} from '../scripts/build-share-photos.mjs';
 import {createPhotoWorker} from '../worker.mjs';
 import {publicPage,renderPhotoPage} from '../lib/public-photo-page.mjs';
 import {photoSlots,sharePhotoSlots,websitePhotoUrl,websiteSharePath} from '../dist/assets/website-photo-slots.js';
@@ -72,3 +73,16 @@ const jpeg=shareJpeg(sample,80,35);
 assert.deepEqual([...jpeg.subarray(0,3)],[255,216,255]);
 ImageMagick.read(jpeg,img=>assert.deepEqual([img.width,img.height],[1200,630]));
 console.log('PASS share image content and 1200 × 630 JPEG dimensions.');
+
+const buildOut=resolve('test-results/public-photo-release');await mkdir(join(buildOut,'assets'),{recursive:true});
+for(const [page,content] of templates)await writeFile(join(buildOut,page==='/'?'index.html':page.slice(1)+'.html'),content);
+const source=websitePhotoUrl(photos.shop_hero.path,config.supabaseUrl);
+await buildSharePhotos(buildOut,async()=> '/_immutable/fixture.jpg',null,async url=>{
+ if(url.endsWith('/rpc/shop_api')||url===source)return new Response(null,{status:503});
+ if(url.endsWith('/assets/published-photos.json'))return Response.json({photos,shares});
+ return new Response(sample,{headers:{'content-type':'image/webp'}});
+});
+const backup=JSON.parse(await readFile(join(buildOut,'assets/published-photos.json'),'utf8'));
+assert.equal(backup.shares.shop_hero.path,photos.home_hero.path);
+assert.deepEqual(backup.photos,photos);
+console.log('PASS release build retains published photos during an outage and uses a real cake when a source image is missing.');

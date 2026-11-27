@@ -42,7 +42,7 @@ export function createPhotoWorker(fetcher = fetch) {
   async fetch(request, env) {
    const url = new URL(request.url), path = publicPage(url.pathname);
    if (!path || !['GET','HEAD'].includes(request.method)) return env.ASSETS.fetch(request);
-   // The static file's ETag only identifies the template, not today's published photos.
+   // A dashboard photo can change independently of the static file's ETag.
    const headers = new Headers(request.headers);
    for (const h of ['if-none-match','if-modified-since','if-range','range']) headers.delete(h);
    const asset = await env.ASSETS.fetch(new Request(request.url,{method:'GET',headers}));
