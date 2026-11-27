@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="assets/admin/backup.css">
   <link rel="stylesheet" href="assets/admin/elio.css">
   <link rel="stylesheet" href="assets/admin/order-item-details.css">
+  <link rel="stylesheet" href="assets/admin/private-order-link.css">
   <link rel="stylesheet" href="assets/admin/marketing-insights.css">
 <link rel="stylesheet" href="assets/admin/catalog-order.css">
 <link rel="stylesheet" href="assets/quantity-stepper.css">
@@ -44,7 +45,7 @@
           <button class="sidebar-link active" data-view="overview"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10 12 3l9 7M5 9v12h14V9M9 21v-7h6v7"/></svg></span>Overview</button>
           <section class="sidebar-group" aria-labelledby="nav-operations">
             <h2 class="sidebar-group-title" id="nav-operations">Daily operations</h2>
-            <a class="sidebar-link" href="pos.html"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v13H4zM8 8V6a4 4 0 0 1 8 0v2"/></svg></span>POS</a>
+            <button type="button" class="sidebar-link" data-view="pos"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v13H4zM8 8V6a4 4 0 0 1 8 0v2"/></svg></span>POS</button>
             <button class="sidebar-link" data-view="orders"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5v17h14V4h-3M8 2h8v5H8zM8 12h8M8 16h5"/></svg></span>Orders<span id="review-count" class="nav-count" hidden></span></button>
             <button class="sidebar-link" data-view="calendar"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v16H3zM7 2v6M17 2v6M3 10h18M7 14h2M13 14h2M7 18h2"/></svg></span>Calendar</button>
             <button class="sidebar-link" data-view="production"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16v9H4zM2 12h20M7 3v5M12 2v6M17 3v5"/></svg></span><span>Production</span></button>
@@ -88,6 +89,6 @@
   <dialog id="admin-dialog" aria-labelledby="dialog-title"><div class="dialog-shell"><div class="dialog-top"><h2 id="dialog-title"></h2><button type="button" class="icon-button" id="dialog-close" aria-label="Close dialog">×</button></div><div id="dialog-body"></div></div></dialog>
   <noscript><p class="notice">JavaScript is needed to manage your shop. Please enable it and reload.</p></noscript>
   <script src="content.js"></script>
-  <script type="module" src="assets/admin/manage.js?v=gift-order-badges-2"></script>
+  <script type="module" src="assets/admin/manage.js?v=direct-workspace-1"></script>
 </body>
 </html>

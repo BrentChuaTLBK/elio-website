@@ -63,3 +63,63 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .pending-review .review-item small { margin-top: 4px; }
 #direct-payment-review{margin:18px 0}
 #direct-payment-review fieldset{margin:0;padding:0;border:0}
+
+:host {
+  display: block;
+  color-scheme: light;
+  --ink: #38251a;
+  --muted: #786b5c;
+  --line: #dfd1bf;
+  --brown: #754b29;
+  --cream: #faf7f0;
+  --sand: #f1e9db;
+  color: var(--ink);
+  font: 14px/1.5 Arial, sans-serif;
+}
+.pos-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.pos-heading h1 { margin: 0; }
+.pos-source { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--sand); }
+.pos-source button { background: transparent; border: 0; min-height: 38px; }
+.pos-source button[aria-pressed=true] { background: #fffdf9; color: var(--ink); box-shadow: 0 1px 3px #4e332323; }
+.direct-screen .tabs { position: static; margin: 10px 0 20px; padding: 0; border-bottom: 1px solid var(--line); background: transparent; gap: 20px; justify-content: flex-start; }
+.direct-screen .tabs button { flex: none; min-height: 40px; padding: 6px 3px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); }
+.direct-screen .tabs button[aria-pressed=true] { border-bottom-color: var(--brown); color: var(--ink); font-weight: 700; }
+.direct-screen .product { min-height: 104px; gap: 4px; justify-content: flex-start; }
+.direct-screen .checkout-panel { position: static; }
+.direct-screen details[data-fold] { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.direct-screen details[data-fold] > summary { cursor: pointer; font-weight: 600; }
+.direct-screen details[data-fold][open] > summary { margin-bottom: 12px; }
+.direct-screen .checkout-panel h2 { margin-bottom: 6px; }
+.direct-screen .pending-review,.pos-receipt { max-width: 760px; margin: 16px auto; border: 1px solid var(--line); }
+.pos-receipt h2 { font: 1.6rem Georgia,serif; margin: 0; }
+.pos-receipt .totals { padding-bottom: 0; }
+.receipt-status { color: var(--brown); text-transform: capitalize; }
+.receipt-items,.pos-order-list { list-style: none; padding: 0; margin: 0; }
+.receipt-items > li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.receipt-items > li > div { min-width: 0; overflow-wrap: anywhere; }
+.receipt-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 15px; border-top: 1px solid var(--line); }
+.pos-order-list li { display: grid; grid-template-columns: minmax(120px,1fr) minmax(140px,1.2fr) minmax(90px,.8fr) auto auto; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+@media (min-width:651px) and (max-width:1150px) {
+  .direct-screen .sales-grid { grid-template-columns: minmax(0, .9fr) minmax(310px,1.1fr); gap: 12px; }
+  .direct-screen .catalog { grid-template-columns: repeat(auto-fit,minmax(min(135px,100%),1fr)); }
+}
+@media (max-width:760px) {
+  .pos-order-list li { grid-template-columns: minmax(0,1fr) auto; gap: 5px 12px; }
+  .pos-order-list li > div:nth-child(2),.pos-order-list li > div:nth-child(3) { grid-column: 1; }
+  .pos-order-list li > strong { grid-column: 2; grid-row: 1; }
+  .pos-order-list li > button { grid-column: 2; grid-row: 2 / span 2; }
+}
+@media (max-width:650px) {
+  #pos { padding-bottom: calc(106px + env(safe-area-inset-bottom)); }
+  .direct-screen .tabs { flex-wrap: wrap; }
+  .direct-screen .mobile-sale-bar,.direct-screen.checkout-open .mobile-sale-bar { display: flex; bottom: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .direct-screen .direct-dock { justify-content: stretch; gap: 8px; background: #fffdf9; border-top: 1px solid var(--line); }
+  .direct-dock button { flex: 1; min-height: 46px; }
+  .direct-dock button.primary { flex: 2; background: var(--brown); gap: 10px; }
+  .direct-dock button strong { font-size: 14px; }
+  .direct-screen.checkout-open #sale-form > button[type=submit] { display: none; }
+  .pos-receipt { padding: 14px; }
+  .receipt-actions button { flex: 1 1 8rem; }
+  .direct-screen .catalog-panel,.direct-screen .checkout-panel { padding: 14px; }
+  .direct-screen .product { min-height: 100px; }
+}

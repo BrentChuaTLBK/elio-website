@@ -23,8 +23,13 @@ try{
  await ctx.route('**/*',async route=>{const u=new URL(route.request().url());if(u.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:`export function createClient(){return {auth:{initialize:async()=>({}),getSession:async()=>({data:{session:{user:{id:'${h.ids.owner}',email:'owner@example.test'}}}}),onAuthStateChange:()=>{}},rpc:async(name,p)=>window.posRpc({action:p.p_action,payload:p.p_payload,token:p.p_token})}}`});if(u.origin!==origin)return route.abort();const file=resolve(root,'.'+u.pathname);if(!file.startsWith(root+sep))return route.abort();try{return route.fulfill({body:await readFile(file),contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.webmanifest':'application/manifest+json'})[extname(file)]||'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}});
  const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  const reviewItems=page.locator('.pending-review td.review-item');
- const chooseDate=async(name,date)=>{const field=page.locator('.accounting-date-picker').filter({has:page.locator('input[name="'+name+'"]')});await field.locator('summary').click();await field.locator('[data-date-year]').fill(date.slice(0,4));await field.locator('[data-date-year]').dispatchEvent('change');await field.locator('[data-date-month]').selectOption(date.slice(5,7));await field.locator('[data-date-value="'+date+'"]').click();await page.waitForFunction(({name,date})=>document.querySelector('input[name="'+name+'"]').value===date,{name,date});};
- await page.goto(origin+'/pos.html');await page.getByRole('button',{name:'+ Create event'}).click();
+ const chooseDate=async(name,date)=>{const field=page.locator('.accounting-date-picker').filter({has:page.locator('input[name="'+name+'"]')});await field.locator('summary').click();await field.locator('[data-date-year]').fill(date.slice(0,4));await field.locator('[data-date-year]').dispatchEvent('change');await field.locator('[data-date-month]').selectOption(date.slice(5,7));await field.locator('[data-date-value="'+date+'"]').click();assert.equal(await field.locator('input[name="'+name+'"]').inputValue(),date);};
+ await page.goto(origin+'/manage.html');
+ await page.locator('[data-view=pos]').click();
+ await page.getByRole('heading',{name:'Choose products'}).waitFor();
+ const documentStamp=await page.evaluate(()=>performance.timeOrigin);
+ assert.equal(new URL(page.url()).hash,'#pos');
+ await page.getByRole('button',{name:'In-person sales',exact:true}).click();await page.getByRole('button',{name:'+ Create event'}).click();
  await page.getByLabel('Event name').fill('Pop-up test');await page.getByRole('button',{name:'Save event',exact:true}).click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
  for(const name of ['Vanilla','Chocolate','Matcha']){await page.getByRole('button',{name:'+ Add flavor',exact:true}).click();await page.getByLabel('Flavor / stock unit name').fill(name);await page.getByLabel('Available pieces / units now',{exact:true}).fill('12');await page.getByRole('button',{name:'Save stock',exact:true}).click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});}
 
@@ -39,31 +44,50 @@ try{
  await page.setViewportSize({width:1440,height:1000});await page.getByRole('button',{name:'Save stock changes',exact:true}).click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
  await page.getByRole('button',{name:'Build a box recipe'}).click();await page.getByLabel('Item name',{exact:true}).fill('Pop-up Trio');await page.getByLabel('Event price · PHP').fill('750');for(const name of ['Vanilla','Chocolate','Matcha'])await page.getByLabel(name+' units',{exact:true}).fill('1');await page.getByRole('button',{name:'Save item',exact:true}).click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
  await page.getByRole('button',{name:'New sale',exact:true}).click();await page.getByRole('button',{name:'Open cash session',exact:true}).click();await page.getByLabel('Opening cash float · PHP').fill('1000');await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
- await page.locator('[data-add]').click();await page.locator('[data-quantity-plus="0"]').click();assert.match(await page.locator('.cart-line-total').textContent(),/1,500\.00.*for 2/);await page.locator('[data-quantity-minus="0"]').click();assert.equal(await page.locator('[data-quantity-minus="0"]').isDisabled(),true);await page.getByRole('button',{name:'Exact amount',exact:true}).click();assert.equal(await page.getByLabel('Cash received · PHP').inputValue(),'750.00');await page.getByLabel('Cash received · PHP').fill('1');await page.getByRole('button',{name:'Complete sale',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#page-error')?.textContent.includes('Cash received is less'));assert.equal((await invoke('pos_orders',{})).length,0);await page.getByLabel('Cash received · PHP').fill('1000');dropNextSaleResponse=true;assert.equal(await page.locator('[name=method],[name=fulfillment_date],[name=pos_handed_over]').count(),0);await page.getByRole('button',{name:'Complete sale',exact:true}).click();const retry=page.getByRole('button',{name:'Retry saving this request',exact:true});await retry.waitFor();
+ await page.locator('[data-add]').click();await page.locator('[data-quantity-plus="0"]').click();assert.match(await page.locator('.cart-line-total').textContent(),/1,500\.00.*for 2/);await page.locator('[data-quantity-minus="0"]').click();assert.equal(await page.locator('[data-quantity-minus="0"]').isDisabled(),true);await page.getByRole('button',{name:'Exact amount',exact:true}).click();assert.equal(await page.getByLabel('Cash received · PHP').inputValue(),'750.00');await page.getByLabel('Cash received · PHP').fill('1');await page.getByRole('button',{name:'Complete sale',exact:true}).click();await page.locator('#page-error').filter({hasText:'Cash received is less'}).waitFor();assert.equal((await invoke('pos_orders',{})).length,0);await page.getByLabel('Cash received · PHP').fill('1000');dropNextSaleResponse=true;assert.equal(await page.locator('[name=method],[name=fulfillment_date],[name=pos_handed_over]').count(),0);await page.getByRole('button',{name:'Complete sale',exact:true}).click();const retry=page.getByRole('button',{name:'Retry saving this request',exact:true});await retry.waitFor();
  assert.deepEqual((await reviewItems.locator('.order-flavors li').allTextContents()).sort(),['Chocolate','Matcha','Vanilla']);
- await retry.click();await page.getByRole('heading',{name:'Order saved'}).waitFor();const savedEvent=(await invoke('pos_orders',{}));assert.equal(savedEvent.length,1);assert.equal(savedEvent[0].fulfillment_status,'completed');assert.equal(savedEvent[0].fulfillment_date,day);assert.equal(savedEvent[0].delivery_cents,0);assert.match(await page.locator('#dialog-body').textContent(),/250/);await page.getByRole('button',{name:'Next sale',exact:true}).click();await page.getByRole('heading',{name:'Your sale',exact:true}).waitFor();assert.equal(await page.locator('[data-remove]').count(),0);assert.equal(await page.locator('[data-action=new-event],#show-deleted-events').count(),0);
+ await retry.click();await page.getByRole('heading',{name:'Order saved'}).waitFor();const savedEvent=(await invoke('pos_orders',{}));assert.equal(savedEvent.length,1);assert.equal(savedEvent[0].fulfillment_status,'completed');assert.equal(savedEvent[0].fulfillment_date,day);assert.equal(savedEvent[0].delivery_cents,0);assert.match(await page.locator('#pos-dialog-body').textContent(),/250/);await page.getByRole('button',{name:'Next sale',exact:true}).click();await page.getByRole('heading',{name:'Your sale',exact:true}).waitFor();assert.equal(await page.locator('[data-remove]').count(),0);assert.equal(await page.locator('[data-action=new-event],#show-deleted-events').count(),0);
  await page.getByRole('button',{name:'Event report',exact:true}).click();await page.getByRole('heading',{name:'Cash reconciliation'}).waitFor();assert.match(await page.locator('.metrics').textContent(),/750/);await page.screenshot({path:join(out,'event-report-desktop.png'),fullPage:true});
  const event=(await invoke('pos_events',{}))[0],snapshot=await invoke('pos_event_data',{event_id:event.id});assert(snapshot.stock.every(s=>s.remaining===11));
  await page.getByRole('button',{name:'Direct orders',exact:true}).click();await page.locator(`[data-add="${fixture.product.id}"]`).click();await chooseDate('fulfillment_date',fixture.date);await page.getByLabel('Social platform · optional').fill('Instagram');await page.getByLabel('Username / profile · optional').fill('@dmcustomer');
  await page.getByRole('button',{name:'+ Add custom item'}).click();await page.getByLabel('Custom item name').fill('DM custom cake');await page.getByLabel('Item details · optional').fill('Lettering in blue');await page.getByLabel('Unit price · PHP').fill('250');await page.getByRole('button',{name:'Save custom item'}).click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
  await page.getByLabel('Fulfillment',{exact:true}).selectOption('delivery');await page.getByLabel('Delivery fee',{exact:true}).selectOption('true');await page.getByLabel('Customer pays delivery to').selectOption('courier');
- await page.getByRole('button',{name:'Review sale',exact:true}).click();
- await page.getByRole('heading',{name:'Review before recording'}).waitFor();
+ await page.getByRole('button',{name:'Review order',exact:true}).click();
+ await page.getByRole('heading',{name:'Review order'}).waitFor();
  assert.deepEqual(await reviewItems.filter({hasText:fixture.product.name}).locator('.order-flavors li').allTextContents(),['3 × '+fixedFlavorName]);
  assert.equal(await reviewItems.filter({hasText:'DM custom cake'}).locator('small').innerText(),'Lettering in blue');
- await page.getByRole('button',{name:'Record sale',exact:true}).click();await page.getByRole('heading',{name:'Order saved'}).waitFor();assert.match(await page.locator('#dialog-body').textContent(),/350/);await page.getByRole('button',{name:'Copy payment / order link',exact:true}).click();await page.waitForFunction(()=>window.copied.length>0);const link=await page.evaluate(()=>window.copied.at(-1));assert.match(link,/order.html#order=.*token=/);
+ await page.getByRole('button',{name:'Record sale',exact:true}).click();await page.locator('.pos-receipt').waitFor();assert.match(await page.locator('.pos-receipt .grand').innerText(),/350/);await page.getByRole('button',{name:'Copy link',exact:true}).click();await page.waitForFunction(()=>window.copied.length>0);const link=await page.evaluate(()=>window.copied.at(-1));assert.match(link,/order.html#order=.*token=/);
  const direct=(await invoke('pos_orders',{})).find(o=>o.order_source==='direct');assert.equal(direct.payment_deadline,null);assert.equal(direct.buyer.social_username,'@dmcustomer');assert.equal(direct.payment_status,'awaiting_payment');
  const stored=await invoke('get_order',{order_id:direct.id});assert.equal(stored.items.find(i=>i.source==='custom').description,'Lettering in blue');assert.equal(await page.locator('[data-receipt-link]').inputValue(),link);
- await page.locator('#close-dialog').click();await page.getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Customer name',{exact:true}).fill('DM Customer');await page.getByLabel('Reason for the edit').fill('Add customer name');await page.getByRole('button',{name:'Review changes',exact:true}).click();
+ await page.locator('#pos [data-action=view-orders]').click();
+ const row=page.locator('.pos-order-list li').filter({hasText:direct.reference});
+ assert.equal(await row.getByRole('button').count(),1);
+ await row.getByRole('button').click();
+ const receipt=page.locator('.pos-receipt');
+ await receipt.getByRole('button',{name:'Copy link',exact:true}).click();
+ assert.equal(await page.evaluate(()=>window.copied.at(-1)),link);
+ assert(await receipt.locator('.totals + [data-private-order-link]').isVisible());
+ await receipt.getByRole('button',{name:'Order history / status'}).click();
+ const kitchen=page.locator('#admin-dialog');
+ await kitchen.getByRole('button',{name:'Copy link',exact:true}).click();
+ assert.equal(await page.evaluate(()=>window.copied.at(-1)),link);
+ assert(await kitchen.locator('.order-total + [data-private-order-link]').isVisible());
+ await page.emulateMedia({media:'print'});assert.equal(await kitchen.locator('[data-private-order-link]').isVisible(),false);await page.emulateMedia({media:'screen'});
+ await kitchen.getByRole('button',{name:'Edit order',exact:true}).click();
+ 
+ await page.getByLabel('Customer name',{exact:true}).fill('DM Customer');
+ await page.getByRole('button',{name:'Review changes',exact:true}).click();
+ assert.match(await page.locator('.pending-review .totals').innerText(),/Previous total[\s\S]+New total/);
+ assert.equal(await page.getByLabel('Reason for changes · optional').inputValue(),'');
  await page.getByRole('button',{name:'Save changes',exact:true}).waitFor();
  assert.deepEqual(await reviewItems.filter({hasText:fixture.product.name}).locator('.order-flavors li').allTextContents(),['3 × '+fixedFlavorName]);
- await page.getByRole('button',{name:'Save changes',exact:true}).click();await page.getByRole('heading',{name:'Order saved'}).waitFor();await page.locator('#close-dialog').click();
+ await page.getByRole('button',{name:'Save changes',exact:true}).click();await receipt.waitFor();assert.equal(await page.evaluate(()=>performance.timeOrigin),documentStamp);
  assert.equal((await invoke('get_order',{order_id:direct.id})).buyer.name,'DM Customer');
  const feeButton=()=>page.locator('[data-action="delivery-fee"][data-id="'+direct.id+'"]');
  await feeButton().click();await page.getByLabel('Customer pays delivery to').selectOption('elio');await page.getByLabel('Exact delivery fee · PHP').fill('200');await page.getByLabel('Reason / booking reference').fill('Customer chose Elio');await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
  assert.equal((await invoke('get_order',{order_id:direct.id})).total_cents,55000);
  await feeButton().click();await page.getByLabel('Customer pays delivery to').selectOption('courier');await page.getByLabel('Reason / booking reference').fill('Customer chose courier');await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
- await page.locator('[data-action="pay-order"][data-id="'+direct.id+'"]').click();await page.getByLabel('Cash received · PHP').fill('350');await page.getByRole('button',{name:'Record payment received',exact:true}).click();await page.getByRole('heading',{name:'Order saved'}).waitFor();await page.locator('#close-dialog').click();
+ await page.locator('[data-action="pay-order"][data-id="'+direct.id+'"]').click();await page.getByLabel('Cash received · PHP').fill('350');await page.getByRole('button',{name:'Record payment received',exact:true}).click();await receipt.locator('.receipt-status').filter({hasText:'paid'}).waitFor();
  await feeButton().click();await page.getByLabel('Customer pays delivery to').selectOption('elio');await page.getByLabel('Reason / booking reference').fill('Final delivery booking');await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
  await feeButton().click();await page.getByRole('button',{name:'Record delivery payment',exact:true}).click();await page.getByLabel('Payment method',{exact:true}).selectOption('BDO');await page.getByLabel('Full delivery payment received by Elio').check();await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
  assert.equal((await invoke('get_order',{order_id:direct.id})).delivery_charge.state,'paid');
@@ -71,7 +95,7 @@ try{
  assert.equal((await invoke('get_order',{order_id:direct.id})).delivery_charge.state,'quoted');
  for(const width of [1440,768,390,320]){
   await page.setViewportSize({width,height:1000});
-  await page.getByRole('button',{name:'New sale',exact:true}).click();
+  await page.getByRole('button',{name:'Sell',exact:true}).click();
   await page.locator(`[data-add="${fixture.product.id}"]`).click();
   if(width<=650)await page.getByRole('button',{name:'View basket'}).click();
 
@@ -104,7 +128,7 @@ try{
   await page.locator('[data-remove]').click();
  }
  for(const width of [1440,390,320]){
-  await page.setViewportSize({width,height:1000});if(await page.getByRole('button',{name:'Back to items'}).isVisible())await page.getByRole('button',{name:'Back to items'}).click();await page.locator('[data-add="'+pickerBox.id+'"]').click();const picker=page.locator('.flavor-picker'),add=picker.getByRole('button',{name:'Add box',exact:true}),plus=picker.locator('[data-flavor-plus]'),minus=picker.locator('[data-flavor-minus]');
+  await page.setViewportSize({width,height:1000});if(width<=650)await page.locator('.direct-dock [data-action=back-to-items]').click();await page.locator('[data-add="'+pickerBox.id+'"]').click();const picker=page.locator('.flavor-picker'),add=picker.getByRole('button',{name:'Add box',exact:true}),plus=picker.locator('[data-flavor-plus]'),minus=picker.locator('[data-flavor-minus]');
   assert.equal(await add.isDisabled(),true);assert.equal(await picker.locator('[data-flavor-minus]:not(:disabled)').count(),0);
   const first=picker.locator('[data-flavor-plus="'+fixture.product.box_flavors[0]+'"]'),second=picker.locator('[data-flavor-plus="'+pickerFlavor.id+'"]'),removeFirst=picker.locator('[data-flavor-minus="'+fixture.product.box_flavors[0]+'"]');await first.click();await first.click();await second.click();assert.equal(await add.isEnabled(),false);
   await picker.getByRole('radio',{name:/Insulated bag/}).check();assert.equal(await add.isEnabled(),true);assert.equal(await picker.locator('[data-flavor-plus]:not(:disabled)').count(),0);
@@ -114,7 +138,7 @@ try{
   assert.equal(await picker.getByLabel('Boxes',{exact:true}).inputValue(),'1');await add.click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
   if(width<=650)await page.getByRole('button',{name:'View basket'}).click();
   assert.match(await page.locator('#cart').textContent(),/Packaging\? — Insulated bag \+ ice/);assert.match(await page.locator('#cart').textContent(),/Picker custom box/);assert.equal(await page.locator('[data-qty="0"]').inputValue(),'1');await chooseDate('fulfillment_date',fixture.date);
-  await page.getByRole('button',{name:'Review sale',exact:true}).click();await page.getByRole('heading',{name:'Review before recording'}).waitFor({timeout:5000}).catch(async e=>{throw Error(e.message+' PAGE: '+await page.locator('#page-error').textContent());});
+  await page.getByRole('button',{name:'Review order',exact:true}).click();await page.getByRole('heading',{name:'Review order'}).waitFor({timeout:5000}).catch(async e=>{throw Error(e.message+' PAGE: '+await page.locator('#page-error').textContent());});
   const flavors=await reviewItems.locator('.order-flavors li').allTextContents();
   assert.deepEqual(flavors.sort(),[fixedFlavorName,'2 × Picker Chocolate +₱15.00 each'].sort());
   assert.doesNotMatch(await reviewItems.innerText(),/Packaging/);
@@ -129,23 +153,23 @@ try{
  for(const id of [fixture.product.box_flavors[0],pickerFlavor.id])for(let n=0;n<3;n++)await picker.locator('[data-flavor-plus="'+id+'"]').click();
  await picker.getByRole('button',{name:'Add box',exact:true}).click();await page.getByRole('button',{name:'View basket'}).click();
  assert.equal(await page.locator('#cart [data-qty]').count(),2);await chooseDate('fulfillment_date',fixture.date);
- await page.getByLabel('Discount',{exact:true}).selectOption('percent');await page.getByLabel('Percentage',{exact:true}).fill('10');await page.getByLabel('Percentage',{exact:true}).press('Tab');
- await page.getByRole('button',{name:'Review sale',exact:true}).click();await page.getByLabel('Payment status').selectOption('true');
+ await page.getByText('Discount or gift',{exact:true}).click();await page.getByLabel('Discount',{exact:true}).selectOption('percent');await page.getByLabel('Percentage',{exact:true}).fill('10');await page.getByLabel('Percentage',{exact:true}).press('Tab');
+ await page.getByRole('button',{name:'Review order',exact:true}).click();await page.getByLabel('Payment status').selectOption('true');
  const configurations=await reviewItems.locator('.order-flavors li').allTextContents();
  assert.deepEqual(configurations.sort(),['3 × '+fixedFlavorName,'3 × Picker Chocolate +₱15.00 each'].sort());
  console.log('PASS POS review shows the flavor names, counts and saved surcharges for custom, fixed and event boxes.');
  await page.getByLabel('Cash received · PHP').fill('300');await page.getByRole('button',{name:'Record sale',exact:true}).click();
- await page.getByRole('heading',{name:'Order saved'}).waitFor();assert.match(await page.locator('#dialog-body').innerText(),/79\.50/);
- assert(await page.locator('#dialog').getByRole('button',{name:'Reference photos',exact:true}).isVisible());await page.getByRole('button',{name:'Next sale',exact:true}).click();
+ await receipt.waitFor();assert.match(await receipt.innerText(),/79\.50/);
+ assert(await receipt.getByRole('button',{name:'Reference photos',exact:true}).isVisible());await receipt.getByRole('button',{name:'New order',exact:true}).click();
  // The Gift option uses the real POS quote and records no payment.
  await page.locator('[data-add="'+fixture.product.id+'"]').click();
  await page.getByRole('button',{name:'View basket',exact:true}).click();
  await chooseDate('fulfillment_date',fixture.date);
  await page.getByLabel('Fulfillment',{exact:true}).selectOption('delivery');
  await page.getByLabel('Exact delivery fee · PHP').fill('100');
- await page.getByRole('checkbox',{name:'Gift · waive all charges'}).check();
+ await page.getByText('Discount or gift',{exact:true}).click();await page.getByRole('checkbox',{name:'Gift · waive all charges'}).check();
  assert.match(await page.locator('.totals .grand').innerText(),/Gift total\s*₱0\.00/);
- await page.getByRole('button',{name:'Review sale',exact:true}).click();
+ await page.getByRole('button',{name:'Review order',exact:true}).click();
  await page.getByRole('button',{name:'Record gift',exact:true}).waitFor({timeout:5000}).catch(async error=>{
   throw Error(error.message+' '+await page.locator('#page-error').textContent());
  });
@@ -153,13 +177,22 @@ try{
  assert.equal(await page.getByLabel('Payment status').count(),0);
  assert.match(await page.locator('.pending-review .grand').innerText(),/Gift total\s*₱0\.00/);
  await page.getByRole('button',{name:'Record gift',exact:true}).click();
- await page.getByRole('heading',{name:'Order saved'}).waitFor();
- assert.match(await page.locator('#dialog-body .notice').innerText(),/₱0\.00 · Gift/);
+ await receipt.waitFor();assert.match(await receipt.locator('.receipt-status').innerText(),/Paid · Gift/);assert.match(await receipt.locator('.grand').innerText(),/₱0\.00/);
  const savedGift=(await invoke('pos_orders',{})).find(order=>order.gift);
  assert.equal(savedGift.total_cents,0);
  assert.equal(savedGift.discount_cents,0);
  assert.equal(savedGift.fulfillment_status,'confirmed');
- await page.getByRole('button',{name:'Next sale',exact:true}).click();
+await receipt.getByRole('button',{name:'Copy link',exact:true}).click();
+ const giftLink=await receipt.locator('[data-receipt-link]').inputValue();
+ assert.equal(await page.evaluate(()=>window.copied.at(-1)),giftLink);
+ await page.evaluate(()=>{navigator.clipboard.writeText=async()=>{throw Error('Clipboard unavailable');};});
+ await receipt.getByRole('button',{name:'Copy link',exact:true}).click();
+ await receipt.getByText('Link selected. Use Copy on your device.').waitFor();
+ assert(await receipt.locator('[data-receipt-link]').evaluate(input=>input.selectionStart===0&&input.selectionEnd===input.value.length));
+ await receipt.getByRole('button',{name:'Client details'}).click();
+ await kitchen.locator('form[data-form=order-contact]').waitFor();await page.locator('#dialog-close').click();
+ assert.equal(await page.evaluate(()=>performance.timeOrigin),documentStamp);
+ await receipt.getByRole('button',{name:'New order',exact:true}).click();
  // Import flavors first, then boxes, retaining custom event items and independent stock.
  await page.setViewportSize({width:1440,height:1000});await page.getByRole('button',{name:'In-person sales',exact:true}).click();await page.locator('#event-select').selectOption(event.id);await page.locator('[data-add]').first().waitFor();await page.getByRole('button',{name:'Setup',exact:true}).click();
  await page.getByRole('button',{name:'Import flavors',exact:true}).click();
@@ -190,7 +223,7 @@ try{
  await page.getByRole('button',{name:'Edit event',exact:true}).click();await chooseDate('ends_on',await h.day(1));assert.equal(await page.locator('[name=ends_on]').inputValue(),await h.day(1));await page.locator('#close-dialog').click();
  await page.getByRole('button',{name:'Delete event',exact:true}).click();await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});assert.equal(await page.locator('#event-select option[value="'+event.id+'"]').count(),0);
  await page.getByLabel('Show deleted events').check();await page.locator('#event-select option[value="'+event.id+'"]').waitFor({state:'attached'});await page.locator('#event-select').selectOption(event.id);await page.getByRole('button',{name:'Event report',exact:true}).click();await page.getByRole('heading',{name:'Cash reconciliation'}).waitFor();assert.match(await page.locator('.metrics').textContent(),/1,000\.00/);
- await chooseDate('report_date',await h.day(1));await page.waitForFunction(()=>document.querySelector('.metrics')?.textContent.includes('Not opened'));await chooseDate('report_date',day);await page.waitForFunction(()=>document.querySelector('.metrics')?.textContent.includes('1,000.00'));
+ await chooseDate('report_date',await h.day(1));await page.locator('.metrics').filter({hasText:'Not opened'}).waitFor();await chooseDate('report_date',day);await page.locator('.metrics').filter({hasText:'1,000.00'}).waitFor();
  const preserved=await invoke('pos_event_report',{event_id:event.id,date:day});assert.equal(preserved.sales[0].total_cents,100000);
  console.log('PASS event management: imported flavors and quantities, fixed/custom boxes, stock limits, custom pricing, prominent unit/line prices, branded calendars, deletion and retained reports.');
 
@@ -218,7 +251,7 @@ try{
  for(const width of [1440,390,320]){await page.setViewportSize({width,height:900});await page.locator('#dialog').screenshot({path:join(out,'product-flavor-picker-'+width+'.png')});assert.equal(await page.locator('#dialog').evaluate(el=>el.scrollWidth>el.clientWidth),false);}
  await page.setViewportSize({width:1440,height:1000});await page.locator('[data-item-flavor="'+chocolate.id+'"]').click();assert.match(await page.locator('#cart').textContent(),/Chocolate/);assert.match(await page.locator('.cart-price').textContent(),/150\.00/);assert.equal(await page.locator('[data-quantity-plus="0"]').isDisabled(),true);
  await page.locator('[data-add="'+variantProduct.id+'"]').click();assert.equal(await page.locator('[data-item-flavor="'+chocolate.id+'"]').isDisabled(),true);await page.locator('[data-item-flavor="'+classic.id+'"]').click();await page.locator('[data-quantity-plus="1"]').click();assert.equal(await page.locator('[data-add="'+variantProduct.id+'"]').isDisabled(),true);await page.locator('[data-quantity-minus="1"]').click();assert.equal(await page.locator('[data-add="'+variantProduct.id+'"]').isDisabled(),false);await page.locator('[data-quantity-plus="1"]').click();
- await page.getByLabel('Cash received · PHP').fill('500');await page.getByRole('button',{name:'Complete sale',exact:true}).click();await page.getByRole('heading',{name:'Order saved'}).waitFor();assert.match(await page.locator('#dialog-body').textContent(),/70\.00/);await page.getByRole('button',{name:'Next sale',exact:true}).click();
+ await page.getByLabel('Cash received · PHP').fill('500');await page.getByRole('button',{name:'Complete sale',exact:true}).click();await page.getByRole('heading',{name:'Order saved'}).waitFor();assert.match(await page.locator('#pos-dialog-body').textContent(),/70\.00/);await page.getByRole('button',{name:'Next sale',exact:true}).click();
  const afterVariants=await invoke('pos_event_data',{event_id:noriEvent.id});assert.equal(afterVariants.items.find(p=>p.id===variantProduct.id).remaining,0);assert(afterVariants.stock.filter(s=>s.variant_item_id===variantProduct.id).every(s=>s.remaining===0));assert.equal(afterVariants.stock.find(s=>s.name==='Krisp Nori Pouch').remaining,99);
  await page.getByRole('button',{name:'Setup',exact:true}).click();await page.locator('[data-action=edit-event-item][data-id="'+variantProduct.id+'"]').click();assert.equal(await page.locator('[data-variant-row]').count(),3);await page.locator('[data-variant-row="'+chocolate.id+'"] [name^=flavor_stock_]').fill('5');await page.locator('[data-variant-row="'+chocolate.id+'"] [name^=flavor_surcharge_]').fill('15');await page.getByRole('button',{name:'Save product',exact:true}).click();await page.locator('#dialog:not([open])').waitFor({state:'attached'});
  console.log('PASS individual product flavors: three-column setup, own stock, surcharges, tap-to-add, sold-out/cart limits, exact deductions and mobile layouts.');
