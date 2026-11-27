@@ -1,5 +1,5 @@
 import { flavorVideoUrl } from '../flavor-video.js';
-import { escapeHtml, uploadFlavorVideo } from './client.js';
+import { escapeHtml, upload } from './client.js';
 
 function preview(path, disabled) {
   const url = flavorVideoUrl(path);
@@ -43,7 +43,7 @@ export function bindFlavorVideoField(form) {
     controls.forEach(el => { el.disabled = true; });
     status.textContent = 'Uploading video…';
     try {
-      const saved = await uploadFlavorVideo(file);
+      const saved = await upload(file, {kind:'flavor-video'});
       if (form.isConnected) setVideo(saved);
     } catch (error) {
       status.textContent = error.message || 'Video upload failed. Choose the file to retry.';

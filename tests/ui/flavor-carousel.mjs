@@ -60,9 +60,14 @@ try{
   await previous.click();await waitIndex(page,6);await track.press('Home');await waitIndex(page,0);await track.press('ArrowLeft');await waitIndex(page,6);await track.press('ArrowRight');await waitIndex(page,0);await track.press('End');await waitIndex(page,6);
   const copyIndex=await track.locator('[data-carousel-copy]').evaluateAll(nodes=>{const view=nodes[0].parentElement.getBoundingClientRect();return nodes.findIndex(n=>{const r=n.getBoundingClientRect();return r.left+r.width/2>view.left+2&&r.left+r.width/2<view.right-2;});});
   assert(copyIndex>=0,'A loop copy is visible at the end of the catalog');const copy=track.locator('[data-carousel-copy]').nth(copyIndex),flavorIndex=Number(await copy.getAttribute('data-flavor-index'));
-  const expectedName=await originals.nth(flavorIndex).locator('h3').textContent();const before=await copy.boundingBox();await copy.locator('a').click();await page.locator(dialog+'[open]').waitFor();assert.equal(await page.locator(dialog+' h2').textContent(),expectedName);
+  const expectedName=await originals.nth(flavorIndex).locator('h3').textContent();
+  const before=await copy.boundingBox();
+  // Use the visible part of the loop copy, just as a customer would. Locator.click()
+  // scrolls partly visible links fully into view before sending its pointer event.
+  await page.mouse.click(before.x+before.width/2,before.y+before.height/2);
+  await page.locator(dialog+'[open]').waitFor();assert.equal(await page.locator(dialog+' h2').textContent(),expectedName);
   await page.keyboard.press('Escape');await page.locator(dialog+'[open]').waitFor({state:'hidden'});
-  const landed=await originals.nth(flavorIndex).boundingBox();assert(Math.abs(landed.x-before.x)<2,'The same flavor stays at the tapped screen position');
+  const landed=await originals.nth(flavorIndex).boundingBox();assert(Math.abs(landed.x-before.x)<2,`The same flavor stays at the tapped screen position on ${path} at ${width}px (${before.x} to ${landed.x})`);
   assert.deepEqual(await page.evaluate(()=>({index:Number(document.activeElement.closest('.flavor-slide')?.dataset.flavorIndex),copy:Boolean(document.activeElement.closest('[data-carousel-copy]'))})),{index:flavorIndex,copy:false});
   await track.press('End');await waitIndex(page,6);await page.waitForTimeout(200);await page.setViewportSize({width:width===1440?390:1440,height:950});await waitIndex(page,6);
   await page.setViewportSize({width,height:950});await section.scrollIntoViewIfNeeded();await track.press('Home');await waitIndex(page,0);await track.evaluate(el=>el.blur());await page.mouse.move(0,0);await section.screenshot({path:join(out,path.replace('.html','')+'-'+width+'.png')});
@@ -87,6 +92,7 @@ try{
   assert.equal(await viewer.locator('.flavor-flying-photo').count(),0);
   await page.keyboard.press('Escape');await viewer.waitFor({state:'hidden'});
   await page.emulateMedia({reducedMotion:'no-preference'});
+  await track.focus();
   await vanilla.hover();
   await page.waitForFunction(el=>{
    const m=new DOMMatrixReadOnly(getComputedStyle(el).transform);

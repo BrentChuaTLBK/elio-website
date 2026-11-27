@@ -140,7 +140,7 @@ export async function calendarConnection(action, payload = {}) {
   return edge('calendar-sync', { ...payload, action });
 }
 
-export async function uploadFlavorVideo(file) {
+async function uploadFlavorVideo(file) {
   if (!file?.size || file.size > 20 * 1024 * 1024) throw new Error('Choose a video up to 20 MB.');
   const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
   const isWebM = header[0] === 0x1a && header[1] === 0x45 && header[2] === 0xdf && header[3] === 0xa3;
@@ -160,6 +160,7 @@ export async function uploadFlavorVideo(file) {
 }
 
 export async function upload(file, { kind = 'proof', order_id, token, payment_reference, onProgress, sharePosition } = {}) {
+  if (kind === 'flavor-video') return uploadFlavorVideo(file);
   if (!(file instanceof File) || !file.size) throw new Error('Choose a photo to upload.');
   if (kind === 'product' || kind === 'website') {
     const client = await connection();
