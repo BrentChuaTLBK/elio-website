@@ -1,4 +1,5 @@
 // Table layouts and inline styles also work when a mail client strips the head.
+import { flavorName, orderItemDetails } from "../../../dist/assets/admin/order-item-details.js";
 export const escapeEmail = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]!));
 const e = escapeEmail;
 export const emailLines = (value: unknown) => e(value).replace(/\n/g, "<br>");
@@ -32,16 +33,51 @@ export function emailPanel(title: string, content: string, tone: "cream" | "sand
  return `<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin:0 0 20px"><tr><td bgcolor="${bg}" style="padding:20px;border-radius:6px;overflow-wrap:anywhere;word-break:break-word"><h2 style="margin:0 0 16px;font:normal 23px/1.3 Georgia,serif;color:#39251c">${e(title)}</h2>${content}</td></tr></table>`;
 }
 
-export function productPhoto(item: any, photos: any, site: URL): string {
- const value = photos?.[item.product_id];
+type Money = (value: unknown) => string;
+export type EmailFlavorPhoto = { id: string; name: string; photos?: string[] };
+
+function photoUrl(value: unknown, site: URL): string {
  if (typeof value !== "string" || !/^(https:\/\/|assets\/)/.test(value)) return "";
  try { const url = new URL(value, site); return url.protocol === "https:" && !url.username && !url.password ? url.toString() : ""; } catch { return ""; }
 }
 
-export function emailProducts(items: any[], photos: any, site: URL, labels: (item: any) => string[], money: (value: unknown) => string): string {
+export function productPhoto(item: any, photos: any, site: URL): string {
+ return photoUrl(photos?.[item.product_id], site);
+}
+
+function itemDetails(item: any, money: Money) {
+ const extraPrice = (cents: number, count: number) => cents > 0 ? ` +${money(cents)}${count > 1 ? " each" : ""}` : "";
+ const { flavors, insulated, extras } = orderItemDetails(item, undefined, extraPrice);
+ return {
+  flavors: flavors.map(flavor => ({ ...flavor, label: flavorName(flavor) + extraPrice(flavor.surcharge, flavor.quantity) })),
+  notes: [insulated && "Insulated · " + insulated, ...extras].filter(Boolean)
+ };
+}
+
+export function emailProductText(item: any, money: Money): string {
+ const { flavors, notes } = itemDetails(item, money);
+ const total = money(item.line_total_cents ?? item.quantity * item.unit_price_cents);
+ return [`${item.quantity} × ${item.name}`, flavors.map(f => f.label).join(", "), ...notes,
+  item.quantity > 1 ? `${money(item.unit_price_cents)} each · Line total: ${total}` : total].filter(Boolean).join("\n");
+}
+
+export function emailProducts(items: any[], photos: any, site: URL, money: Money, catalog: EmailFlavorPhoto[] = []): string {
  return `<h2 style="margin:0 0 18px;font:normal 23px/1.3 Georgia,serif;color:#39251c">Inside your order</h2>${items.map(item => {
-  const photo = productPhoto(item, photos, site), parts = labels(item);
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px;border-bottom:1px solid #dfd1bd"><tr>${photo ? `<td class="email-photo-cell" width="82" valign="top" style="width:82px;padding:0 14px 18px 0"><img class="email-photo" src="${e(photo)}" width="68" alt="${e(item.name)}" style="display:block;width:68px;max-width:100%;height:auto;border:0;border-radius:5px;background:#f4ecdf"></td>` : ""}<td valign="top" style="padding:0 0 18px;overflow-wrap:anywhere;word-break:break-word"><h3 style="margin:0 0 8px;font:bold 15px/1.5 Arial,sans-serif;color:#39251c">${e(item.quantity)} × ${e(item.name)}</h3>${parts.map(label => `<span style="display:inline-block;max-width:100%;margin:0 4px 4px 0;padding:3px 6px;background:#f2eadc;border:1px solid #e7dac5;border-radius:3px;font:12px/1.5 Arial,sans-serif;color:#63412d">${e(label)}</span>`).join("")}${parts.length ? '<p style="margin:2px 0 8px;font-size:11px;line-height:1.5;color:#786858">Selections per item</p>' : ""}<p style="margin:0 0 4px;font:12px/1.6 Arial,sans-serif;color:#786858">${e(money(item.unit_price_cents))} each</p><p style="margin:0;font:bold 15px/1.5 Arial,sans-serif;color:#39251c">${e(money(item.line_total_cents ?? item.quantity * item.unit_price_cents))}</p></td></tr></table>`;
+  const { flavors, notes } = itemDetails(item, money);
+  const pieces = flavors.map(flavor => {
+   const matches = catalog.filter(f => flavor.productId ? f.id === flavor.productId : f.name === flavor.name);
+   const photo = photoUrl(matches.length === 1 ? matches[0].photos?.[0] : "", site);
+   return { label: flavor.label, photo };
+  });
+  const cover = pieces.some(piece => piece.photo) ? "" : productPhoto(item, photos, site);
+  const flavorRow = pieces.map(piece => `<span style="display:inline-block;max-width:100%;margin:0 10px 5px 0;font:14px/1.55 Arial,sans-serif;color:#39251c">${piece.photo ? `<img src="${e(piece.photo)}" alt="" width="24" height="24" style="width:24px;height:24px;object-fit:cover;border:0;border-radius:4px;vertical-align:middle">&nbsp;` : ""}${e(piece.label)}</span>`).join(" ");
+  const total = money(item.line_total_cents ?? item.quantity * item.unit_price_cents);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border-bottom:1px solid #dfd1bd"><tr>${cover ? `<td class="email-photo-cell" width="82" valign="top" style="width:82px;padding:0 14px 16px 0"><img class="email-photo" src="${e(cover)}" width="68" alt="${e(item.name)}" style="display:block;width:68px;max-width:100%;height:auto;border:0;border-radius:5px"></td>` : ""}<td valign="top" style="padding:0 0 16px;overflow-wrap:anywhere;word-break:break-word">
+   <h3 style="margin:0 0 6px;font:bold 16px/1.4 Arial,sans-serif;color:#39251c">${e(item.quantity)} × ${e(item.name)}</h3>
+   ${flavorRow ? `<div>${flavorRow}</div>` : ""}
+   ${notes.map(note => `<p style="margin:2px 0;font:14px/1.5 Arial,sans-serif;color:#665649">${e(note)}</p>`).join("")}
+   <p style="margin:6px 0 0;font:14px/1.5 Arial,sans-serif;color:#39251c">${item.quantity > 1 ? `${e(money(item.unit_price_cents))} each · ` : ""}<strong>${e(total)}</strong></p>
+  </td></tr></table>`;
  }).join("")}`;
 }
 

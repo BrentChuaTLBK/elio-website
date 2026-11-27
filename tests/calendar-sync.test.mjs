@@ -14,11 +14,17 @@ function fixture(sequence){const calls=[];let tokens=0;const client=createGoogle
 const owned={etag:'old',extendedProperties:{private:{elio_source:'elio-orders',elio_order_id:order.id}}};
 assert.equal(calendarId('https://calendar.google.com/calendar/embed?src=elio.cheesecakes%40gmail.com'),'elio.cheesecakes@gmail.com');
 assert.throws(()=>calendarId('https://evil.test/'),CalendarError);
-const body=eventBody(order,job.event_id);assert.equal(body.end.date,'2026-10-01');assert.equal(body.colorId,'9');assert.match(body.description,/&lt;Recipient&gt;/);assert.deepEqual(body.attendees,[]);assert.equal(body.visibility,'private');
-assert.equal(eventBody({...order,method:'pickup'},job.event_id).colorId,'2');
+const body=eventBody(order,job.event_id);assert.equal(body.end.date,'2026-10-01');assert.equal(body.colorId,'10');assert.match(body.description,/&lt;Recipient&gt;/);assert.deepEqual(body.attendees,[]);assert.equal(body.visibility,'default');
+assert.equal(eventBody({...order,method:'pickup'},job.event_id).colorId,'10');
+for(const method of ['pickup','delivery']){
+ const paid=eventBody({...order,method,payment_status:'paid'},job.event_id);
+ assert.equal(paid.colorId,'10');
+ assert.match(paid.summary,method==='pickup'?/Pickup/:/Delivery/);
+}
 for(const payment_status of ['awaiting_payment','under_review','rejected']){
  const unpaid=eventBody({...order,payment_status,status:'pending_confirmation'},job.event_id);
  assert.equal(unpaid.colorId,'5');
+ assert.equal(unpaid.visibility,'default');
  assert.match(unpaid.summary,/^Unpaid · /);
  assert.match(unpaid.description,/Payment: /);
  assert.equal(unpaid.id,job.event_id);
@@ -29,7 +35,7 @@ for(const payment_status of ['awaiting_payment','under_review','rejected']){
  await f.client.sync('elio@example.test',{...job,desired:{...order,payment_status:'paid'}});
  const update=JSON.parse(f.calls.at(-1).body);
  assert.equal(update.id,job.event_id);
- assert.equal(update.colorId,'9');
+ assert.equal(update.colorId,'10');
  assert.doesNotMatch(update.summary,/Unpaid/);
 }
 const album='a'.repeat(64);
@@ -67,6 +73,7 @@ assert(calendarSummary(referenced).includes('2 order reference photos'));assert(
 for(const method of ['pickup','delivery']){
  const completed=eventBody({...order,method,status:'completed'},job.event_id);
  assert.equal(completed.colorId,'8');assert.match(completed.summary,/^✓ Completed · /);
+ assert.equal(completed.visibility,'default');
  assert.match(completed.summary,method==='pickup'?/Pickup/:/Delivery · Makati/);
  assert.equal(completed.status,'confirmed');assert.equal(completed.start.date,order.date);assert.equal(completed.id,job.event_id);
 }
@@ -123,4 +130,4 @@ assert.equal(filteredCalendarOrders([order],{search:'makati'}).length,1);
  await syncCalendar({changes:async()=>({changes:[],next_sync:'cursor'}),sync:async(id,j)=>{if(j.event_id==='bad')throw new CalendarError('quota');return {etag:'success'};}},dispatch);
  assert(actions.some(a=>a.action==='calendar_ack'));assert.equal(actions.find(a=>a.action==='calendar_fail').payload.error,'quota');assert.equal(actions.at(-1).action,'calendar_finish');
 }
-console.log('PASS calendar: private event data, colors, copy helpers, OAuth scope, empty calendars, expired cursors, duplicate recovery, event ownership, deletion, connection cleanup, retries.');
+console.log('PASS calendar: staff-calendar visibility, payment colors, copy helpers, OAuth scope, empty calendars, expired cursors, duplicate recovery, event ownership, deletion, connection cleanup, retries.');

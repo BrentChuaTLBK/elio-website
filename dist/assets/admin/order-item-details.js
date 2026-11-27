@@ -11,8 +11,10 @@ function normalizeLabel(value) {
   const group = value.slice(0, colon);
   if (colon < 0 || !(flavorGroup(group) || insulatedQuestion(group) || packagingQuestion(group))) return { label: value };
   const answer = value.slice(colon + 1).trim();
-  const count = /^(\d+)\s*×\s*(.+)$/.exec(answer);
-  return { group, label: count ? count[2] : answer, quantity: count ? Number(count[1]) : 1 };
+  const leading = /^(\d+)\s*×\s*(.+)$/.exec(answer);
+  if (leading) return { group, label: leading[2], quantity: Number(leading[1]) };
+  const trailing = /^(.+?)\s+×\s*(\d+)$/.exec(answer);
+  return { group, label: trailing ? trailing[1] : answer, quantity: trailing ? Number(trailing[2]) : 1 };
 }
 
 function savedChoices(item, product) {
@@ -47,7 +49,7 @@ function asFlavor(choice) {
 
 // Names, quantities and surcharges come from the order or quote. The catalog
 // supplies images and helps read older orders that saved only choice IDs.
-export function orderItemDetails(item, product) {
+export function orderItemDetails(item, product, formatSurcharge = (_cents, _quantity) => '') {
   const choices = savedChoices(item, product);
   const recipe = item.flavor_contents?.length ? item.flavor_contents : item.event_recipe || [];
   const isIncluded = choice => !choice.group_id && choice.group === 'Includes';
@@ -62,17 +64,20 @@ export function orderItemDetails(item, product) {
   let insulated = Number(preset?.yes) === 1 ? 'Yes' : Number(preset?.no) === 1 ? 'No' :
     insulation(choices.find(choice => choice.group_id === INSULATED_BAG_QUESTION_ID) || {});
   const extras = [];
+  let insulatedPrice = '';
   for (const choice of choices) {
     if (isFlavor(choice) || isIncluded(choice)) continue;
     const answer = insulation(choice);
+    const extraPrice = formatSurcharge(Number(choice.surcharge_cents || 0), quantityOf(choice));
     if (answer) {
       insulated ||= answer;
+      if (answer === insulated && extraPrice) insulatedPrice = extraPrice;
       continue;
     }
     const name = nameOf(choice);
-    if (name) extras.push([choice.group, flavorName({ name, quantity: quantityOf(choice) })].filter(Boolean).join(' · '));
+    if (name) extras.push([choice.group, flavorName({ name, quantity: quantityOf(choice) }) + extraPrice].filter(Boolean).join(' · '));
   }
-  return { flavors: flavors.filter(flavor => flavor.name && flavor.quantity > 0), insulated, extras };
+  return { flavors: flavors.filter(flavor => flavor.name && flavor.quantity > 0), insulated: insulated + insulatedPrice, extras };
 }
 
 export function flavorName({ name, quantity }) {

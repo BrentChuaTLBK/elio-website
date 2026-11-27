@@ -9,13 +9,41 @@ const site=new URL(settings.site_url+'/');
 const direct=renderEmail({event_type:'order_submitted',order:{...order,order_source:'direct',items:[{name:'Single cookie',quantity:2,unit_price_cents:12000,line_total_cents:24000}]},settings});
 assert(direct.html.includes('₱120.00 each'));
 assert(!direct.html.includes('per box'));
+const trio={
+ name:'Build your own trio',quantity:1,unit_price_cents:112500,line_total_cents:112500,
+ flavor_contents:[{product_id:'ube',name:'Ube',quantity:2},{product_id:'vanilla',name:'Vanilla',quantity:1}],
+ selection_labels:[
+  {group:'Flavors per box',label:'Ube',quantity:2,surcharge_cents:2500},
+  {group_id:'flavors',label:'Vanilla',quantity:1},
+  {group:'Add an insulated bag with ice? Recommended for long trips.',label:'Yes',surcharge_cents:4000},
+  {group:'Greeting',label:'Happy <birthday>',surcharge_cents:1000}
+ ]
+};
+const catalog=[{id:'ube',name:'Renamed Ube',photos:['assets/ube.webp']},{id:'vanilla',name:'Vanilla',photos:['javascript:invalid']}];
+for(const event_type of ['payment_approved','order_review_required']){
+ const sample=renderEmail({event_type,settings,order:{...order,items:[trio]}},catalog);
+ const items=sample.html.split('Inside your order</h2>')[1].split('Payment summary')[0];
+ for(const value of ['2 × Ube +₱25.00 each','Vanilla','Insulated · Yes +₱40.00','₱1,125.00'])assert(items.includes(value)&&sample.text.includes(value));
+ assert(items.includes('https://eliocheesecakes.com/assets/ube.webp" alt=""'));
+ assert(items.includes('Greeting · Happy &lt;birthday&gt; +₱10.00'));
+ assert.equal(items.split('₱1,125.00').length-1,1);
+ assert(!/Selections per item|Flavors per box|long trips|javascript:|Renamed Ube|Vanilla × 1/.test(items));
+ const offline=renderEmail({event_type,settings,order:{...order,items:[trio]}});
+ assert.equal(offline.text,sample.text);
+ assert(!offline.html.includes('assets/ube.webp'));
+}
+const legacy=renderEmail({event_type:'payment_approved',settings,order:{...order,items:[{
+ ...trio,flavor_contents:[],selection_labels:['Flavors per box: Ube × 1','Add an insulated bag with ice?: No']
+}]}},[{id:'ube',name:'Ube',photos:['assets/ube.webp']}]);
+assert(legacy.html.includes('Insulated · No')&&legacy.html.includes('src="https://eliocheesecakes.com/assets/ube.webp"'));
+assert(!direct.html.includes('Insulated ·'));
 let checks=0;
 for(const event_type of ['order_submitted','payment_approved','payment_rejected','order_cancelled','order_expired','fulfillment_reminder','ready_for_pickup','pickup_reminder','out_for_delivery','order_updated','delivery_tracking_updated','order_review_required']){
  const {html,text}=renderEmail({event_type,order,settings,product_photos:{'box-id':'assets/box.webp'}});
  assert(html.includes('bgcolor="#3d251c"'));
  assert(html.includes('src="https://eliocheesecakes.com/assets/box.webp"'));
  assert(html.includes('alt="Box &lt;test&gt;"'));
- assert(html.includes('Vanilla × 2')&&html.includes('Matcha × 1'));
+ assert(html.includes('2 × Vanilla')&&html.includes('Matcha'));
  assert(html.includes('₱1,700.00')&&text.includes('₱1,700.00'));
  assert.equal(html.includes('order.html#order='),event_type!=='order_review_required');
  if(event_type==='order_review_required')assert(!html.includes('private-order-token'));
@@ -48,7 +76,7 @@ for(const [tracking_change,heading] of [['added','Your delivery tracking is read
  assert(rendered.html.includes(heading)&&rendered.text.includes(heading));
  assert(!rendered.html.includes(old)&&!rendered.text.includes(old));
  assert(rendered.html.includes('src="https://eliocheesecakes.com/assets/box.webp"'));
- assert(rendered.html.includes('Vanilla × 2')&&rendered.html.includes('₱1,700.00'));
+ assert(rendered.html.includes('2 × Vanilla')&&rendered.html.includes('₱1,700.00'));
  assert.equal(rendered.html.includes('Track your delivery'),tracking_change!=='removed');
  assert(rendered.html.includes('order.html#order=')&&rendered.text.includes('token=private-order-token'));
  checks++;

@@ -1,6 +1,19 @@
 (async () => {
   'use strict';
   if (location.hash === '#story') { location.replace('story.html'); return; }
+  const menuToggle = document.querySelector('.menu-toggle');
+  const mobileNav = document.querySelector('#mobile-nav');
+  function closeMenu() { menuToggle.setAttribute('aria-expanded', 'false'); menuToggle.setAttribute('aria-label', 'Open navigation'); mobileNav.hidden = true; }
+  menuToggle.addEventListener('click', () => {
+    const opening = menuToggle.getAttribute('aria-expanded') !== 'true';
+    menuToggle.setAttribute('aria-expanded', String(opening));
+    menuToggle.setAttribute('aria-label', opening ? 'Close navigation' : 'Open navigation');
+    mobileNav.hidden = !opening;
+  });
+  mobileNav.addEventListener('click', (event) => { if (event.target.closest('a')) closeMenu(); });
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !mobileNav.hidden) { closeMenu(); menuToggle.focus(); } });
+  matchMedia('(min-width: 1001px)').addEventListener('change', (event) => { if (event.matches) closeMenu(); });
+
   await window.ELIO_CONTENT_READY;
   const { closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
   const { createFlavorDialog } = await import('./assets/shop/flavor-dialog.js?v=texture-1');
@@ -23,19 +36,6 @@
     carouselStatus: document.querySelector('#carousel-status'),
     emptyMessage: window.ELIO_CONTENT.homeLoaded ? 'More little discoveries to come.' : 'Our flavors couldn’t load just now. Please try again shortly.',
   });
-
-  const menuToggle = document.querySelector('.menu-toggle');
-  const mobileNav = document.querySelector('#mobile-nav');
-  function closeMenu() { menuToggle.setAttribute('aria-expanded', 'false'); menuToggle.setAttribute('aria-label', 'Open navigation'); mobileNav.hidden = true; }
-  menuToggle.addEventListener('click', () => {
-    const opening = menuToggle.getAttribute('aria-expanded') !== 'true';
-    menuToggle.setAttribute('aria-expanded', String(opening));
-    menuToggle.setAttribute('aria-label', opening ? 'Close navigation' : 'Open navigation');
-    mobileNav.hidden = !opening;
-  });
-  mobileNav.addEventListener('click', (event) => { if (event.target.closest('a')) closeMenu(); });
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !mobileNav.hidden) { closeMenu(); menuToggle.focus(); } });
-  matchMedia('(min-width: 1001px)').addEventListener('change', (event) => { if (event.matches) closeMenu(); });
 
   const dialog = document.querySelector('#detail-dialog');
   const content = document.querySelector('#dialog-content');

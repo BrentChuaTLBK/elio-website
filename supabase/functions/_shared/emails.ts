@@ -1,5 +1,5 @@
 import { HttpError } from "./server.ts";
-import { emailFrame, emailIntro, emailButton, emailSection, emailColumns, emailProducts, emailTotals, emailPanel, deliveryFeeSummary } from "./email-design.ts";
+import { emailFrame, emailIntro, emailButton, emailSection, emailColumns, emailProducts, emailProductText, type EmailFlavorPhoto, emailTotals, emailPanel, deliveryFeeSummary } from "./email-design.ts";
 
 const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const money = (value: unknown) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format(Number(value || 0) / 100);
@@ -34,10 +34,6 @@ function paymentInstructions(order: any, settings: any): { html: string; text: s
     text: `How to pay\nAmount to pay: ${amount}${deadline ? `\nUpload your payment proof by: ${deadline}` : ""}\n\n${instructions}`,
   };
 }
-const selectionParts = (item: any): string[] => (Array.isArray(item.selection_labels) && item.selection_labels.length ? item.selection_labels : (item.flavor_contents || []).map((f: any) => ({ label: f.name, quantity: f.quantity })))
-  .map((choice: any) => typeof choice === "string" ? choice : `${choice.group ? `${choice.group}: ` : ""}${choice.label || "Option"}${choice.quantity ? ` × ${choice.quantity}` : ""}${Number(choice.surcharge_cents) ? ` (+${money(choice.surcharge_cents)} each)` : ""}`)
-;
-const selections = (item: any): string => selectionParts(item).join(", ");
 
 function deliveryTrackingUrl(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -51,7 +47,7 @@ function deliveryTrackingUrl(value: unknown): string {
   } catch { return ""; }
 }
 
-function renderReviewEmail(order: any, settings: any, site: URL, photos: any): { html: string; text: string } {
+function renderReviewEmail(order: any, settings: any, site: URL, photos: any, catalog: EmailFlavorPhoto[]): { html: string; text: string } {
   const link = new URL("manage.html", site).toString();
   const shop = settings.shop_name || "Elio Basque Cheesecake";
   const heading = "An order is ready for review";
@@ -63,14 +59,14 @@ function renderReviewEmail(order: any, settings: any, site: URL, photos: any): {
   const details = `Order reference: ${order.reference}\nCustomer: ${order.buyer_name || "See the order in the dashboard"}\nFulfillment: ${date(order.fulfillment_date)} · ${order.method}${detailed ? "" : `\nOrder total: ${money(order.total_cents)}`}`;
   const discountLabel = `Discount${order.promo_code ? ` (${order.promo_code})` : ""}`;
   const discount = `${Number(order.discount_cents) > 0 ? "−" : ""}${money(order.discount_cents)}`;
-  const itemText = items.map((item: any) => `${item.quantity} × ${item.name}${selections(item) ? `\n  ${selections(item)}` : ""}\n  ${money(item.unit_price_cents)} each · Line total: ${money(item.line_total_cents)}`).join("\n\n");
+  const itemText = items.map((item: any) => emailProductText(item, money)).join("\n\n");
   const breakdown = detailed ? `\n\nProducts ordered\n${itemText || "See the product details in the dashboard."}\n\nPayment breakdown\nSubtotal: ${money(order.subtotal_cents)}\n${discountLabel}: ${discount}\nDelivery fee: ${deliveryFeeSummary(order,money)}\nOrder total: ${money(order.total_cents)}` : "";
   const footer = "You received this notification because your account is assigned a Staff or Owner role. The dashboard shows the current order status.";
   const text = `${shop}\n${heading}\n\n${message}\n\n${details}${breakdown}\n\nOpen the admin dashboard:\n${link}\n\n${footer}`;
   const reviewDetails = emailPanel("Order details", `<p style="margin:0;font-size:14px;line-height:1.8">${lines(details)}</p>`, "sand");
   const body = emailIntro("For the kitchen", heading, message, order.reference)
     + emailButton("Open orders for review", link)
-    + emailColumns((items.length ? emailProducts(items, photos, site, selectionParts, money) : "") + (detailed ? emailTotals(order, money) : ""), reviewDetails)
+    + emailColumns((items.length ? emailProducts(items, photos, site, money, catalog) : "") + (detailed ? emailTotals(order, money) : ""), reviewDetails)
     + `<p style="margin:18px 0 0;padding-top:20px;border-top:1px solid #dfd1bd;font-size:12px;line-height:1.7;color:#786858">${escape(footer)}</p>`;
 
   const html = emailFrame("Order ready for review", heading + " · " + order.reference, body);
@@ -78,7 +74,7 @@ function renderReviewEmail(order: any, settings: any, site: URL, photos: any): {
   return { html, text };
 }
 
-export function renderEmail(payload: any): { html: string; text: string } {
+export function renderEmail(payload: any, catalog: EmailFlavorPhoto[] = []): { html: string; text: string } {
   const order = payload?.order;
   const settings = { ...payload?.settings };
   // Preserve fulfillment and payment instructions saved with the submitted order.
@@ -95,7 +91,7 @@ export function renderEmail(payload: any): { html: string; text: string } {
   site.search = "";
   site.hash = "";
   site.pathname = `${site.pathname.replace(/\/$/, "")}/`;
-  if (review) return renderReviewEmail(order, settings, site, payload.product_photos);
+  if (review) return renderReviewEmail(order, settings, site, payload.product_photos, catalog);
   const access = new URL("order.html", site);
   access.hash = new URLSearchParams({ order: order.id, token: order.access_token }).toString();
   const link = access.toString();
@@ -189,7 +185,7 @@ export function renderEmail(payload: any): { html: string; text: string } {
     ? [`Delivery window: ${settings.delivery_window || "See your order page"}. Arrival can be anytime within this window; no exact time is guaranteed.`, [order.recipient?.name, order.recipient?.phone, order.address?.line1, order.address?.line2, order.address?.locality, order.address?.postal_code].filter(Boolean).join("\n"), deliveryZone].filter(Boolean).join("\n")
     : [settings.pickup_address, settings.pickup_hours && `Opening hours: ${settings.pickup_hours}`, settings.pickup_instructions].filter(Boolean).join("\n");
   const items = Array.isArray(order.items) ? order.items : [];
-  const itemText = items.map((item: any) => `${item.quantity} × ${item.name}${selections(item) ? ` (${selections(item)})` : ""} — ${money(item.line_total_cents)}`).join("\n");
+  const itemText = items.map((item: any) => emailProductText(item, money)).join("\n\n");
   const totals = `Product subtotal: ${money(order.subtotal_cents)}\nDiscount: ${money(order.discount_cents)}\nDelivery fee: ${deliveryFeeSummary(order,money)}\nCurrent order total: ${money(order.total_cents)}`;
   const trackingText = showTracking ? `${trackingLabel}:\n${trackingMessage}\n${trackingLink}\n\n` : "";
   const text = `${settings.shop_name || "Elio Basque Cheesecake"}\n${heading}\nOrder reference: ${order.reference}\n\n${message}\n\n${instructions ? `${instructions}\n\n` : ""}${trackingText}Fulfillment: ${date(order.fulfillment_date)} · ${order.method}\n${fulfillment}\n\n${itemText}\n\n${totals}\n\nView your order securely:\n${link}\n\nKeep this link private; it grants access to this order.\nThis is an automated update. Please use your order page to upload payment proof and check your status.\nFor changes, cancellations, or payment concerns, contact us${contact ? `: ${contact}` : " using the details on your order page"}.`;
@@ -202,7 +198,7 @@ export function renderEmail(payload: any): { html: string; text: string } {
     : emailButton(payload.event_type === "order_submitted" ? "View order & upload payment proof" : "View your order", link);
   const body = emailIntro("Your Elio order", heading, message, order.reference)
     + action
-    + emailColumns((items.length ? emailProducts(items, payload.product_photos, site, selectionParts, money) : "") + emailTotals(order, money), nextSteps + trackingPanel + detailsHtml)
+    + emailColumns((items.length ? emailProducts(items, payload.product_photos, site, money, catalog) : "") + emailTotals(order, money), nextSteps + trackingPanel + detailsHtml)
     + `<div style="margin-top:18px;padding-top:20px;border-top:1px solid #dfd1bd"><p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#786858">Keep this link private; it grants access to this order.</p><p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#786858">This is an automated update. Please use your order page to upload payment proof and check your status.</p><p style="margin:0;font-size:12px;line-height:1.7;color:#786858">For changes, cancellations, or payment concerns, contact us${contact ? `: ${escape(contact)}` : " using the details on your order page"}.</p></div>`;
 
   const html = emailFrame("Your Elio order", heading + " · " + order.reference, body);

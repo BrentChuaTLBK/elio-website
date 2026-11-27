@@ -76,6 +76,8 @@ export function calendarDescription(order:any){
   ...(delivery?[...(name(order)!==customer?[`Recipient: ${name(order)}`]:[]),...(phone(order)&&phone(order)!==contact?[`Recipient phone: ${phone(order)}`]:[]),`Delivery address: ${address||'Not provided'}`]:[]),
   '', 'Order details:',...items,'',`Amount: ${amount}`,...(unpaidStatus.has(order.payment_status)?[`Payment: ${unpaidStatus.get(order.payment_status)}`]:[]),...(order.instructions?['',`${delivery?'Delivery instructions':'Order notes'}: ${clean(order.instructions)}`]:[])].join('\n');
 }
+// Google event palette: green for active paid ELIO orders, yellow for unpaid, grey for completed.
+const eventColors = { paid: '10', unpaid: '5', completed: '8' };
 export function eventBody(order:any,eventId:string) {
   if(!/^\d{4}-\d{2}-\d{2}$/.test(order?.date)||!['pickup','delivery'].includes(order.method))throw new CalendarError('configuration');
   const start=new Date(`${order.date}T00:00:00Z`);
@@ -90,8 +92,8 @@ export function eventBody(order:any,eventId:string) {
   const album = typeof order.photo_share === 'string' && /^[0-9a-f]{64}$/.test(order.photo_share) && order.photo_count > 0
     ? `\n\n<a href="https://eliocheesecakes.com/order-photos.html#photos=${order.photo_share}">View order reference photos</a>` : '';
   return {id:eventId,summary:`${unpaid?'Unpaid · ':completed?'✓ Completed · ':''}${delivery?`Delivery · ${area}`:'Pickup'} · ${clean(order.reference,80)} · ${name(order)}`.slice(0,500),
-    description:calendarDescription(order).split('\n').map(html).join('\n')+album,location:address,colorId:unpaid?'5':completed?'8':delivery?'9':'2',
-    start:{date:order.date},end:{date:end},visibility:'private',transparency:'transparent',status:'confirmed',
+    description:calendarDescription(order).split('\n').map(html).join('\n')+album,location:address,colorId:unpaid?eventColors.unpaid:completed?eventColors.completed:eventColors.paid,
+    start:{date:order.date},end:{date:end},visibility:'default',transparency:'transparent',status:'confirmed',
     reminders:{useDefault:false},attendees:[],source:{title:'Open in Elio',url},
     extendedProperties:{private:{elio_source:'elio-orders',elio_order_id:order.id}}};
 }

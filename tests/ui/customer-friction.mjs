@@ -147,23 +147,53 @@ try{
   assert(await card.evaluate(el=>document.activeElement===el));
   await finish(test,'Box entrance with '+action+' at '+width+'px');
  }
+ {
+  const t=await make({width:768,touch:true}),{ctx,page}=t;
+  let releaseCatalog;
+  const delayed=new Promise(resolve=>{releaseCatalog=resolve;});
+  await ctx.route('**/home-content.js',async route=>{await delayed;await route.fallback();});
+  await page.goto(origin+'/index.html',{waitUntil:'domcontentloaded'});
+  try{
+   await page.getByRole('button',{name:'Open navigation'}).tap();
+   assert(await page.getByRole('link',{name:'Order a Box',exact:true}).isVisible());
+  }finally{releaseCatalog();}
+  await page.getByRole('link',{name:'Order a Box',exact:true}).tap();
+  await page.waitForURL('**/order.html');
+  await finish(t,'Home menu opens on the first tap while the catalog is loading');
+ }
+ for(const width of [320,768,900,1440]){
+  const t=await make({width,touch:width<900}),{page}=t;
+  await page.goto(origin+'/flavors.html');
+  const header=page.getByRole('banner'),link=header.getByRole('link',{name:'Order a Box',exact:true});
+  const button=await link.boundingBox(),logo=await header.locator('.wordmark').boundingBox(),icons=await header.locator('nav').boundingBox();
+  assert(button&&button.height>=46&&button.x>=0&&button.x+button.width<=width);
+  assert(button.y>=logo.y+logo.height||(button.x>=logo.x+logo.width&&button.x+button.width<=icons.x));
+  if(width<900)await link.tap();else await link.press('Enter');
+  await page.waitForURL('**/order.html');
+  await finish(t,'Flavors header order button at '+width+'px');
+ }
  for(const width of [320,390,1440]){
   const t=await make({width}),{page,data}=t;
   data.catalog.settings.delivery_blocked_dates=[date];
   await page.goto(origin+'/index.html?preview=1');
+  if(width<600)await page.getByRole('button',{name:'Open navigation'}).click();
+  const orderLink=page.getByRole('link',{name:'Order a Box',exact:true});
+  assert.equal(await orderLink.getAttribute('href'),'order.html');
+  assert((await orderLink.boundingBox()).height>=46);
+  const appearance=await orderLink.evaluate(el=>{
+   const s=getComputedStyle(el);
+   return [s.backgroundColor,s.borderTopColor,s.borderRadius,s.fontSize];
+  });
+  assert.deepEqual(appearance,['rgba(0, 0, 0, 0)','rgb(213, 180, 131)','9px','17px']);
+  assert.equal(await orderLink.locator('img[alt=""]').count(),1);
   if(width<600){
-   await page.getByRole('button',{name:'Open navigation'}).click();
-   const order=page.locator('#mobile-nav .mobile-order');
-   assert(await order.isVisible());
-   assert.equal(await order.getAttribute('href'),'order.html');
-   assert((await order.boundingBox()).height>=44);
-   assert(Number.parseFloat(await order.evaluate(el=>getComputedStyle(el).fontSize))>=16);
-   assert.equal(await order.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(228, 196, 150)');
    if(width===390)await page.locator('.site-header').screenshot({path:join(out,'mobile-order-menu.png')});
    await page.getByRole('button',{name:'Close navigation'}).click();
-  }else{
-   const action=page.locator('.header-order');assert(await action.isVisible());
-   assert.equal(await action.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(228, 196, 150)');
+   const hero=await page.locator('.home-hero').boundingBox(),photo=await page.locator('.hero-image').boundingBox();
+   const heading=await page.locator('.home-hero h1').boundingBox(),cta=await page.locator('.hero-copy .button').boundingBox();
+   assert.equal(photo.y,hero.y);
+   assert(photo.y+photo.height>=heading.y+heading.height,'The photo shares the headline area');
+   assert(hero.y+hero.height-cta.y-cta.height<=32,'The hero ends just below the shop button');
   }
   await page.locator('.hero-copy').getByRole('link',{name:/Explore our boxes/}).click();
   await page.locator('#product-grid [data-product]').first().waitFor();
