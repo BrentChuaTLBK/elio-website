@@ -54,6 +54,10 @@ for(const agent of ['facebookexternalhit/1.1','Viber','Mozilla/5.0']){
 }
 assert.equal(read.filter(r=>r.init.method==='POST').length,1);
 assert.equal(read.filter(r=>r.init.method==='HEAD').length,1);
+live.home_hero=row(100,'Freshly published homepage');
+const refreshed=await worker.fetch(new Request(origin+'/',{headers:{'Cache-Control':'max-age=0'}}),env);
+assert.ok((await refreshed.text()).includes('src="'+websitePhotoUrl(live.home_hero.path,config.supabaseUrl)+'"'));
+assert.equal(read.filter(r=>r.init.method==='POST').length,2);
 assert.equal((await worker.fetch(new Request(origin+'/order',{method:'HEAD'}),env)).body,null);
 assert.equal(await (await worker.fetch(get('/manage'),env)).text(),'static');
 assert.equal(publicPage('/account'),null);

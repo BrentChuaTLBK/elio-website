@@ -6,8 +6,8 @@ export function createPhotoWorker(fetcher = fetch) {
  let snapshot, latest, nextRead = 0, readSequence = 0;
  const previews = new Map();
 
- async function publishedPhotos(fallback) {
-  if (Date.now() < nextRead) return latest || fallback;
+ async function publishedPhotos(fallback, refresh) {
+  if (!refresh && Date.now() < nextRead) return latest || fallback;
   const sequence = ++readSequence;
   try {
    const photos = await readPublishedPhotos(config,{fetcher,timeout:1800});
@@ -58,7 +58,8 @@ export function createPhotoWorker(fetcher = fetch) {
      if (!response.ok) throw new Error('Release snapshot unavailable');
      snapshot = await response.json();
     }
-    const photos = url.searchParams.get('preview') === '1' ? {} : await publishedPhotos(snapshot.photos);
+    const refresh = /\bno-(?:cache|store)\b|\bmax-age\s*=\s*0\b/i.test(request.headers.get('Cache-Control') || '');
+    const photos = url.searchParams.get('preview') === '1' ? {} : await publishedPhotos(snapshot.photos,refresh);
     const share = await shareFor(sharePhotoSlots[path],photos,snapshot.shares);
     return new Response(renderPhotoPage(html,path,photos,share),{headers:resultHeaders});
    } catch {
