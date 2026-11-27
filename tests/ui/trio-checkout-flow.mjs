@@ -16,7 +16,11 @@ export async function verifyTrio(ctx,h,origin,fixed,date) {
   const selectDate=async(trigger,value)=>{
     await trigger.click();
     const calendar=page.locator('#customer-calendar-popup[open]'),day=calendar.locator(`[data-customer-date="${value}"]`);
-    if(!await day.count())await calendar.locator('[data-customer-month="1"]').click();
+    if(!await day.count()){
+      const firstVisibleDate=await calendar.locator('[data-customer-date]').first().getAttribute('data-customer-date');
+      const monthStep=value<firstVisibleDate?-1:1;
+      await calendar.locator(`[data-customer-month="${monthStep}"]`).click();
+    }
     await day.click();
     await page.waitForFunction(d=>document.querySelector('#fulfillment-date').value===d,value);
     await page.waitForFunction(()=>!document.querySelector('#add-to-cart')?.textContent.includes('Checking'));

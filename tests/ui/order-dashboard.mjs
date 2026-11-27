@@ -78,6 +78,35 @@ function seed(data){const today=dateInManila(),past=addDays(today,-2);Object.ass
  {...structuredClone(data.otherOrder),id:'rejected-past',reference:'ELIO-REJECTED-PAST',payment_status:'rejected',fulfillment_date:past}];}
 const quick=(page,id)=>page.locator('[data-action=select-order][data-id="'+id+'"]');
 try{
+ {
+  const t=await make(390),{page,data}=t;
+  seed(data);
+  await admin(t);
+  await view(page,'orders');
+  const filters=page.locator('.orders-dashboard .filter-secondary');
+  const fulfillmentDate=filters.getByLabel('Fulfillment date');
+  const refund=filters.getByLabel('Refund label');
+  for(const width of [320,375,390,430,520,600,760,768,1440]){
+   await page.setViewportSize({width,height:844});
+   const dateBox=await fulfillmentDate.boundingBox(),refundBox=await refund.boundingBox(),row=await filters.boundingBox();
+   for(const box of [dateBox,refundBox]){
+    assert(box.x>=row.x-1&&box.x+box.width<=row.x+row.width+1,'Filter fits its row at '+width);
+    if(width<=760)assert(box.height>=44,'Tap target at '+width);
+   }
+   const verticalGap=refundBox.y-dateBox.y-dateBox.height;
+   const horizontalGap=refundBox.x-dateBox.x-dateBox.width;
+   assert(width<=520?verticalGap>=10:verticalGap>=10||horizontalGap>=10,'Separate date and refund controls at '+width);
+  }
+  await page.setViewportSize({width:390,height:844});
+  await fulfillmentDate.fill(data.order.fulfillment_date);
+  await refund.selectOption('yes');
+  await page.locator('[data-order-row=refund]').waitFor();
+  assert.equal(await page.locator('[data-order-row]').count(),1);
+  await filters.getByRole('button',{name:'Clear filters'}).click();
+  assert.equal(await fulfillmentDate.inputValue(),'');
+  assert.equal(await refund.inputValue(),'');
+  await finish(t,'Orders date and refund filters fit, can be combined, and clear on mobile');
+ }
  for(const width of [390,1440]){
   const t=await make(width),{page,data}=t;seed(data);
   data.flavors[0].photos=['assets/flavors-concept.webp'];
