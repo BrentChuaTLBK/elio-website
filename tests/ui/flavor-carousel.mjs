@@ -3,17 +3,27 @@ import {createRequire} from 'node:module';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {resolve,join,extname,sep} from 'node:path';
 import vm from 'node:vm';
+import {textureClip} from '../helpers/flavor-video.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(join(process.env.PLAYWRIGHT_PACKAGE_ROOT,'playwright'));
 const root=resolve(import.meta.dirname,'../../dist'),out=resolve(root,'../test-results/flavor-carousel'),origin='https://carousel.test';await mkdir(out,{recursive:true});
 const source=await readFile(join(root,'content.js'),'utf8'),sandbox={window:{}};vm.runInNewContext(source.slice(0,source.indexOf('// The public collection')),sandbox);
 const base=JSON.parse(JSON.stringify(sandbox.window.ELIO_CONTENT)),results=[],errors=[];
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
+const videoPath='11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.webm';
+
 const selectors=path=>path==='index.html'?{track:'#featured-products',section:'.home-flavors',dialog:'#detail-dialog'}:{track:'#order-products',section:'.shop-flavor-section',dialog:'#order-flavor-dialog'};
-async function open(path,width,{count=7,motion='reduce',touch=false}={}){
+async function open(path,width,{count=7,motion='reduce',touch=false,texture=null}={}){
  const data={...structuredClone(base),homeBoxes:[],homeLoaded:true,collectionLoaded:true};data.flavors=data.flavors.slice(0,count);
+ if(texture)data.flavors[0].texture_video_path=videoPath;
  const ctx=await browser.newContext({viewport:{width,height:950},reducedMotion:motion,hasTouch:touch,isMobile:touch,serviceWorkers:'block'});
  await ctx.route('**/*',async route=>{
-  const u=new URL(route.request().url());if(u.origin!==origin)return route.abort();
+  const u=new URL(route.request().url());
+  if(texture && u.pathname.endsWith('/flavor-videos/'+videoPath)){
+   texture.requests++;
+   await texture.gate;
+   return route.fulfill({status:texture.fail?404:200,contentType:'video/webm',body:texture.bytes});
+  }
+  if(u.origin!==origin)return route.abort();
   if(u.pathname==='/content.js')return route.fulfill({contentType:'text/javascript',body:`window.ELIO_CONTENT=${JSON.stringify(data)};window.ELIO_CONTENT.isAvailable=()=>true;window.ELIO_CONTENT_READY=Promise.resolve(window.ELIO_CONTENT);`});
   if(['/assets/shop/shop.js','/assets/shop/faqs.js','/assets/shop/newsletter.js','/assets/site-maintenance.js','/assets/site-analytics.js','/assets/website-photos.js','/calendar.js'].includes(u.pathname))return route.fulfill({contentType:'text/javascript',body:''});
   const file=resolve(root,'.'+u.pathname);if(!file.startsWith(root+sep))return route.abort();
@@ -50,8 +60,9 @@ try{
   await previous.click();await waitIndex(page,6);await track.press('Home');await waitIndex(page,0);await track.press('ArrowLeft');await waitIndex(page,6);await track.press('ArrowRight');await waitIndex(page,0);await track.press('End');await waitIndex(page,6);
   const copyIndex=await track.locator('[data-carousel-copy]').evaluateAll(nodes=>{const view=nodes[0].parentElement.getBoundingClientRect();return nodes.findIndex(n=>{const r=n.getBoundingClientRect();return r.left+r.width/2>view.left+2&&r.left+r.width/2<view.right-2;});});
   assert(copyIndex>=0,'A loop copy is visible at the end of the catalog');const copy=track.locator('[data-carousel-copy]').nth(copyIndex),flavorIndex=Number(await copy.getAttribute('data-flavor-index'));
-  const expectedName=await originals.nth(flavorIndex).locator('h3').textContent();await copy.locator('a').click();await page.locator(dialog+'[open]').waitFor();assert.equal(await page.locator(dialog+' h2').textContent(),expectedName);
-  await page.keyboard.press('Escape');await page.locator(dialog+'[open]').waitFor({state:'hidden'});await waitIndex(page,flavorIndex);
+  const expectedName=await originals.nth(flavorIndex).locator('h3').textContent();const before=await copy.boundingBox();await copy.locator('a').click();await page.locator(dialog+'[open]').waitFor();assert.equal(await page.locator(dialog+' h2').textContent(),expectedName);
+  await page.keyboard.press('Escape');await page.locator(dialog+'[open]').waitFor({state:'hidden'});
+  const landed=await originals.nth(flavorIndex).boundingBox();assert(Math.abs(landed.x-before.x)<2,'The same flavor stays at the tapped screen position');
   assert.deepEqual(await page.evaluate(()=>({index:Number(document.activeElement.closest('.flavor-slide')?.dataset.flavorIndex),copy:Boolean(document.activeElement.closest('[data-carousel-copy]'))})),{index:flavorIndex,copy:false});
   await track.press('End');await waitIndex(page,6);await page.waitForTimeout(200);await page.setViewportSize({width:width===1440?390:1440,height:950});await waitIndex(page,6);
   await page.setViewportSize({width,height:950});await section.scrollIntoViewIfNeeded();await track.press('Home');await waitIndex(page,0);await track.evaluate(el=>el.blur());await page.mouse.move(0,0);await section.screenshot({path:join(out,path.replace('.html','')+'-'+width+'.png')});
@@ -94,6 +105,31 @@ try{
   await viewer.getByRole('button',{name:'Close details'}).click();await viewer.waitFor({state:'hidden'});
   assert.equal(await vanilla.evaluate(link=>link===document.activeElement),true);
   await ctx.close();results.push({path,autoplay:true,automaticWrap:true,dialogPause:true,offscreenPause:true,motionPreferenceChange:true});console.log(`PASS ${path}: gentle automatic loop, seamless wrap, dialog/offscreen pause, resume and live reduced-motion change`);
+ }
+ for(const [path,width] of [['index.html',1440],['order.html',390]]){
+  let release;
+  const texture={bytes:textureClip,requests:0,gate:new Promise(resolve=>{release=resolve;})};
+  const {ctx,page,track,dialog}=await open(path,width,{motion:'no-preference',texture});
+  const link=track.locator('.flavor-slide:not([data-carousel-copy]) a').first(),viewer=page.locator(dialog);
+  assert.equal(texture.requests,0);
+  await link.click();
+  const video=viewer.locator('video');
+  await video.waitFor({state:'attached'});
+  await page.waitForFunction(()=>!document.querySelector('.flavor-flying-photo'));
+  assert.equal(await video.evaluate(v=>getComputedStyle(v).opacity),'0');
+  release();
+  await page.waitForFunction(()=>document.querySelector('dialog video.is-playing')?.readyState>=2);
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('dialog video')).opacity==='1');
+  assert(await video.evaluate(v=>v.muted && v.playsInline && !v.paused));
+  await viewer.getByRole('button',{name:'Pause texture video'}).click();assert(await video.evaluate(v=>v.paused));
+  await page.keyboard.press('Escape');await viewer.waitFor({state:'hidden'});assert.equal(await video.count(),0);
+  await page.emulateMedia({reducedMotion:'reduce'});await link.click();
+  assert(await video.evaluate(v=>v.paused));await viewer.getByRole('button',{name:'Play texture video'}).click();
+  await page.waitForFunction(()=>document.querySelector('dialog video.is-playing'));
+  await page.keyboard.press('Escape');await viewer.waitFor({state:'hidden'});
+  texture.fail=true;await link.click();await viewer.getByRole('button',{name:'Play texture video'}).click();
+  await video.waitFor({state:'detached'});assert(await viewer.locator('.flavor-portrait img').isVisible());
+  await ctx.close();
  }
  for(const path of ['index.html','order.html'])for(const count of [0,1,2]){
   const {ctx,page,track,section}=await open(path,390,{count});assert.equal(await track.locator('.flavor-slide:not([data-carousel-copy])').count(),count);

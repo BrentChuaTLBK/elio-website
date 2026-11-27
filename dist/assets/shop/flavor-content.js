@@ -4,7 +4,7 @@ export function mapPublicFlavors(flavors, initial = []) {
   return flavors.map(f => {
     const fallback = initial.find(item => item.id === f.slug);
     const image = f.photos?.find(url => typeof url === 'string' && /^(https?:\/\/|assets\/)/.test(url));
-    return { ...fallback, id: f.slug || f.id, productId: f.id, name: f.name, description: f.description || '', collection_details: f.collection_details, line: f.tagline ?? fallback?.line ?? '', category_ids: f.category_ids || [], category_sort_orders: f.category_sort_orders || {}, sort_order: f.sort_order || 0, collectionOnly: f.collection_only, uploadedPhoto: Boolean(image), ...(image ? { image, imagePosition: undefined } : {}) };
+    return { ...fallback, id: f.slug || f.id, productId: f.id, name: f.name, description: f.description || '', collection_details: f.collection_details, texture_video_path: f.texture_video_path || null, line: f.tagline ?? fallback?.line ?? '', category_ids: f.category_ids || [], category_sort_orders: f.category_sort_orders || {}, sort_order: f.sort_order || 0, collectionOnly: f.collection_only, uploadedPhoto: Boolean(image), ...(image ? { image, imagePosition: undefined } : {}) };
   });
 }
 

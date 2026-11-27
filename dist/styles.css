@@ -103,8 +103,25 @@ dialog{border:1px solid var(--line);padding:0;background:var(--ivory);color:var(
 .site-header{position:absolute;top:0;left:0;width:100%;background:transparent}
 .site-header .brand{color:var(--bronze-light)}
 .site-header .desktop-nav,.site-header .header-actions{color:var(--ivory)}
-.site-header .header-order{background:transparent;border-color:var(--gold);color:var(--ivory)}
-.site-header .header-order:hover{background:rgba(248,243,234,.12)}
+.site-header .button.header-order,
+.site-header .mobile-nav .mobile-order {
+  background: #e4c496;
+  border: 1px solid #e4c496;
+  color: #392218;
+}
+.site-header .mobile-nav .mobile-order {
+  align-self: center;
+  justify-content: center;
+  min-height: 46px;
+  margin-top: 20px;
+  padding: 10px 32px;
+  border-radius: 24px;
+}
+.site-header :is(.header-order,.mobile-order):focus-visible {
+  outline: 2px solid #fff5e3;
+  outline-offset: 4px;
+}
+.site-header .button.header-order:hover, .site-header .mobile-nav .mobile-order:hover { background: #f3dbb8; color: #392218; }
 .site-header .menu-toggle span{background:var(--ivory)}
 .site-header .mobile-nav:not([hidden]){background:var(--brown);color:var(--ivory);border-color:#795c46}
 .site-header .mobile-nav a{border-color:#795c46}.site-header .mobile-nav .small-note{color:var(--bronze-light)}

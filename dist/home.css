@@ -2,8 +2,6 @@
 .home-page .site-header{position:relative;background:var(--brown)}
 .home-page .site-header .brand{color:var(--bronze-light)}
 .home-page .site-header .desktop-nav,.home-page .site-header .header-actions{color:var(--ivory)}
-.home-page .site-header .header-order{background:transparent;color:var(--ivory);border-color:var(--gold)}
-.home-page .site-header .header-order:hover{background:rgba(248,243,234,.12)}
 .home-page .site-header .menu-toggle span{background:var(--ivory)}
 .home-page .site-header .mobile-nav:not([hidden]){background:var(--brown);color:var(--ivory);border-color:#795c46}
 .home-page .site-header .mobile-nav a{border-color:#795c46}

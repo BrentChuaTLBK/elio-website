@@ -1,3 +1,4 @@
+import {textureClip} from '../tests/helpers/flavor-video.mjs';
 import assert from 'node:assert/strict';
 import {readFile,writeFile,readdir,mkdir,rename} from 'node:fs/promises';
 import {resolve,join} from 'node:path';
@@ -56,15 +57,17 @@ export async function runDisasterRecoveryDrill({publicStorageExport=null,outputR
   const proof=(await db.query('select proof_path from elio.orders where id=$1',[paid.id])).rows[0].proof_path;
   const buckets=(await db.query('select * from storage.buckets order by id')).rows;
   assert.deepEqual(buckets.filter(b=>!b.public).map(b=>b.id),['affiliate-payout-proofs','delivery-proofs','order-photos','payment-proofs','pickup-proofs']);
-  assert.deepEqual(buckets.filter(b=>b.public).map(b=>b.id),['product-images','website-images']);
+  assert.deepEqual(buckets.filter(b=>b.public).map(b=>b.id),['flavor-videos','product-images','website-images']);
   // Real image bytes without contact/order data; synthetic proofs cover both
   // private buckets even when the production buckets contain no objects.
   const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6nFQAAAAASUVORK5CYII=','base64');
-  const objects=buckets.map(bucket=>({bucket:bucket.id,name:bucket.id==='payment-proofs'?proof:'synthetic-recovery/'+randomUUID()+'.png',mimetype:'image/png',bytes:Buffer.from(image)}));
+  const objects=buckets.map(bucket=>bucket.id==='flavor-videos'
+    ? {bucket:bucket.id,name:h.ids.owner+'/'+randomUUID()+'.webm',mimetype:'video/webm',bytes:textureClip}
+    : {bucket:bucket.id,name:bucket.id==='payment-proofs'?proof:'synthetic-recovery/'+randomUUID()+'.png',mimetype:'image/png',bytes:Buffer.from(image)});
   if(publicStorageExport){
    const exported=JSON.parse(await readFile(join(publicStorageExport,'manifest.json'),'utf8'));
    for(const object of exported.objects){
-    assert.equal(exported.buckets.find(bucket=>bucket.id===object.bucket)?.public,true,'Only public exported images may enter this local fixture');
+    assert.equal(exported.buckets.find(bucket=>bucket.id===object.bucket)?.public,true,'Only public exported media may enter this local fixture');
     const bytes=await readFile(containedFile(publicStorageExport,object.path));assert.equal(bytes.length,object.size);assert.equal(sha256(bytes),object.sha256);objects.push({...object,bytes});
    }
    report.publicStorageExport={at:exported.capturedAt,objects:exported.objects.length,bytes:exported.objects.reduce((sum,object)=>sum+object.size,0)};

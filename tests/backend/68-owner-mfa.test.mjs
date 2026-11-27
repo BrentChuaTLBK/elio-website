@@ -48,8 +48,8 @@ export default async function({db,check,state}){
   const had=await h.scalar("select has_table_privilege('authenticated','storage.objects','INSERT')");
   await db.exec('grant insert on storage.objects to authenticated');
   const objectIds=[];
-  const put=(bucket,claims,user=ids.owner)=>as(user,async()=>{const id=randomUUID();objectIds.push(id);await db.query("insert into storage.objects(id,bucket_id,name) values($1,$2,$3)",[id,bucket,user+'/'+randomUUID()+'.webp']);},'authenticated',claims);
-  try{for(const bucket of ['product-images','website-images']){await assert.rejects(put(bucket,{aal:'aal1'}),/row-level security/);await put(bucket,{aal:'aal2'});await assert.rejects(put(bucket,{aal:'aal2',session_id:h.ownerSession},ids.customer),/row-level security/);}}
+  const put=(bucket,claims,user=ids.owner)=>as(user,async()=>{const id=randomUUID();objectIds.push(id);await db.query("insert into storage.objects(id,bucket_id,name) values($1,$2,$3)",[id,bucket,user+'/'+randomUUID()+(bucket==='flavor-videos'?'.webm':'.webp')]);},'authenticated',claims);
+  try{for(const bucket of ['product-images','website-images','flavor-videos']){await assert.rejects(put(bucket,{aal:'aal1'}),/row-level security/);await put(bucket,{aal:'aal2'});await assert.rejects(put(bucket,{aal:'aal2',session_id:h.ownerSession},ids.customer),/row-level security/);}}
   finally{await db.query('delete from storage.objects where id=any($1::uuid[])',[objectIds]);if(!had)await db.exec('revoke insert on storage.objects from authenticated');}
  })();
  await check('Trusted recovery services retain access and factor/session revocation is immediate',async()=>{

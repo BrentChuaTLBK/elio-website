@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { flavorVideoBucket } from '../flavor-video.js';
 import { preparePhoto, prepareSharePhoto } from './photo-upload.js?v=published-photos-1';
 import { websiteSharePath } from '../website-photo-slots.js';
 import { photoExtension } from '../image-file.js';
@@ -137,6 +138,25 @@ export async function websiteVisitorStats({ signal } = {}) {
 
 export async function calendarConnection(action, payload = {}) {
   return edge('calendar-sync', { ...payload, action });
+}
+
+export async function uploadFlavorVideo(file) {
+  if (!file?.size || file.size > 20 * 1024 * 1024) throw new Error('Choose a video up to 20 MB.');
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const isWebM = header[0] === 0x1a && header[1] === 0x45 && header[2] === 0xdf && header[3] === 0xa3;
+  const isMovie = ['ftyp','moov','mdat','wide'].includes(String.fromCharCode(...header.slice(4, 8)));
+  if (!isWebM && !isMovie) throw new Error('Choose an MP4, MOV or WebM video.');
+  const mov = file.type === 'video/quicktime' || /\.mov$/i.test(file.name);
+  const ext = isWebM ? 'webm' : mov ? 'mov' : 'mp4';
+  const client = await connection();
+  const {data, error: authError} = await client.auth.getUser();
+  if (authError || !data?.user) throw new Error('Sign in as an owner to upload a video.');
+  const path = `${data.user.id}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await client.storage.from(flavorVideoBucket).upload(path,file,{
+    contentType: isWebM ? 'video/webm' : mov ? 'video/quicktime' : 'video/mp4', cacheControl: '31536000', upsert: false
+  });
+  if (error) throw new Error(error.message || 'Video upload failed. Choose the file to retry.');
+  return path;
 }
 
 export async function upload(file, { kind = 'proof', order_id, token, payment_reference, onProgress, sharePosition } = {}) {

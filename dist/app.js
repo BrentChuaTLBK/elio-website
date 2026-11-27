@@ -3,7 +3,7 @@
   if (location.hash === '#story') { location.replace('story.html'); return; }
   await window.ELIO_CONTENT_READY;
   const { closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
-  const { createFlavorDialog } = await import('./assets/shop/flavor-dialog.js');
+  const { createFlavorDialog } = await import('./assets/shop/flavor-dialog.js?v=texture-1');
   const { mountHomeBoxes } = await import('./assets/shop/home-boxes.js');
   mountHomeBoxes(window.ELIO_CONTENT);
   const { flavors, featuredOrder, productImage, isAvailable } = window.ELIO_CONTENT;
@@ -17,8 +17,8 @@
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map(byId).filter(Boolean);
   const track = document.querySelector('#featured-products');
   const renderSlide = (flavor, index, copy = false) => `<div class="flavor-slide" data-flavor-index="${index}"${copy ? ' data-carousel-copy aria-hidden="true"' : ` role="group" aria-roledescription="slide" aria-label="${escape(flavor.name)}, ${index + 1} of ${catalog.length}"`}><a class="product-card" href="#flavor-${escape(flavor.id)}"${copy ? ' tabindex="-1"' : ''} aria-label="Discover ${escape(flavor.name)}: ${escape(flavor.line)}${!isAvailable(flavor) ? ' — currently unavailable' : ''}">${photo(flavor)}<div class="product-label"><h3>${escape(flavor.name)}</h3><span class="product-arrow" aria-hidden="true">→</span></div><p class="product-line">${escape(flavor.line)}</p>${availability(flavor)}</a></div>`;
-  const { mountFlavorCarousel } = await import('./assets/shop/flavor-carousel.js?v=1');
-  const { slides, goToFlavor } = mountFlavorCarousel({
+  const { mountFlavorCarousel } = await import('./assets/shop/flavor-carousel.js?v=return-2');
+  const { holdForDetails, returnFromDetails } = mountFlavorCarousel({
     track, carousel: document.querySelector('.flavor-carousel'), catalog, renderSlide,
     carouselStatus: document.querySelector('#carousel-status'),
     emptyMessage: window.ELIO_CONTENT.homeLoaded ? 'More little discoveries to come.' : 'Our flavors couldn’t load just now. Please try again shortly.',
@@ -62,6 +62,7 @@
     const flavor = location.hash.startsWith('#flavor-') && byId(location.hash.slice(8));
     if (flavor) {
       const source = trigger?.hash === location.hash ? trigger.querySelector('.product-photo') : null;
+      if (source && !dialog.open) holdForDetails();
       flavorDialog.open(flavor, source);
       return;
     }
@@ -74,14 +75,7 @@
       document.querySelector('#dialog-title').focus({ preventScroll: true });
     } else if (dialog.open) {
       flavorDialog.close(() => {
-        if (!trigger?.isConnected) return;
-        const slide = trigger.closest('.flavor-slide');
-        if (slide) {
-          const index = Number(slide.dataset.flavorIndex);
-          goToFlavor(index, false);
-          trigger = slides[index].querySelector('a');
-        }
-        trigger.focus({ preventScroll: true });
+        returnFromDetails(trigger?.isConnected ? trigger : null);
         trigger = null;
       });
     }

@@ -19,6 +19,7 @@ import { PHOTO_ACCEPT, PHOTO_HELP, validatePhoto } from './photo-upload.js';
 import { createNewsletterAdmin } from './newsletter-admin.js';
 import { deliveryTrackingUrl } from '../delivery-tracking.js';
 import {faqView,bindFaqView} from './faqs.js';
+import { flavorVideoField, bindFlavorVideoField } from './flavor-video-field.js';
 import { flavorDetailFields, readFlavorDetails } from './flavor-details.js';
 import { productCategoryIds, sortProducts, categoryFields } from './catalog-ordering.js';
 import { mountCatalogOrder } from './catalog-order.js';
@@ -287,7 +288,7 @@ $('#workspace').innerHTML = setupNotice() + views[state.view]();
   if(state.connected&&state.view==='pos'){
 const host=$('#pos-manager');
     host.innerHTML='<p role="status">Opening POS…</p>';
-    loadingPOS=import('./pos.js?v=direct-workspace-1').then(({mountPOS})=>{
+    loadingPOS=import('./pos.js?v=box-quantity-1').then(({mountPOS})=>{
       if(!host.isConnected||!state.connected)return;
       posController=mountPOS(host,{role:state.role,openKitchenOrder:openPOSDetails,onOrderSaved:()=>{void refresh().catch(()=>toast('Refresh the dashboard to update its order totals.'));}});
       return posController;
@@ -371,11 +372,12 @@ function flavorMenusView() {
 }
 function editFlavorMenu(id) {
   const flavor = state.products.find(p => p.id === id);
-  showDialog(flavor ? 'Edit ' + flavor.name : 'Add a flavor', `<form data-form="flavor-menu-editor" ${flavor ? `data-edit-revision="${editRevision(flavor)}"` : ''}>${formError}${flavorMenuFields(state,id,{ today: manilaDate(),esc,input,textarea,select,option,check,disabled:ownerLocked() })}${actions(flavor ? 'Save flavor' : 'Add to collection')}${flavor && owner() ? `<div class="subsection product-delete-section"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(flavor.id)}">Delete flavor</button></div>` : ''}</form>`);
+  showDialog(flavor ? 'Edit ' + flavor.name : 'Add a flavor', `<form data-form="flavor-menu-editor" ${flavor ? `data-edit-revision="${editRevision(flavor)}"` : ''}>${formError}${flavorMenuFields(state,id,{ today: manilaDate(),esc,input,textarea,select,option,check,disabled:ownerLocked() })}${flavorVideoField(flavor,ownerLocked())}${actions(flavor ? 'Save flavor' : 'Add to collection')}${flavor && owner() ? `<div class="subsection product-delete-section"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(flavor.id)}">Delete flavor</button></div>` : ''}</form>`);
   const form = $("[data-form=flavor-menu-editor]");
   form.dataset.expectedCurrentMonth = String(fieldChecked(form, "current_month"));
   form.dataset.expectedNextMonth = String(fieldChecked(form, "next_month"));
   catalogDraft.mount(form,{reset:true});
+  bindFlavorVideoField(form);
 }
 function productionView() {
   const report=state.scopedReads?state.productionReport:buildProduction(state.orders,state.productionRange.from,state.productionRange.to);
@@ -597,7 +599,7 @@ function duplicateProduct(id) {
   const source = state.products.find(p => p.id === id && !p.deleted_at);
   if (!source) return;
   // Copy editable catalog details only. Identity, stock, menus and history belong to the original.
-  const fields = ['kind','description','category_id','category_ids','price_cents','min_quantity','minimum_order_unit','lead_days','pickup_only','allow_same_day','photos','box_questions','box_flavors','tagline','collection_details','label'];
+  const fields = ['kind','description','category_id','category_ids','price_cents','min_quantity','minimum_order_unit','lead_days','pickup_only','allow_same_day','photos','box_questions','box_flavors','tagline','collection_details','texture_video_path','label'];
   productDraft = clone(Object.fromEntries(fields.filter(key => source[key] !== undefined).map(key => [key,source[key]])));
   const names = new Set(state.products.map(p => p.name.toLocaleLowerCase()));
   let name, number = 1;
@@ -630,7 +632,7 @@ function captureProduct() {
   }
   if (productDraft.kind !== 'flavor') productDraft.minimum_order_unit = fieldValue(form, 'minimum_order_unit').trim() || 'box';
   if (productDraft.kind === 'set') productDraft.box_flavors = $$('[data-box-flavor]', form).map(select => select.value).filter(Boolean);
-  if (productDraft.kind === 'flavor') Object.assign(productDraft, { tagline: fieldValue(form,'tagline'), collection_details: readFlavorDetails(form), min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
+  if (productDraft.kind === 'flavor') Object.assign(productDraft, { tagline: fieldValue(form,'tagline'), collection_details: readFlavorDetails(form), texture_video_path: fieldValue(form,'texture_video_path') || null, min_quantity: 1, lead_days: 0, pickup_only: false, allow_same_day: false });
   productDraft.option_groups = [];
 }
 function boxQuestionFields(questions) {
@@ -734,12 +736,14 @@ function renderProductDialog() {
     ${categoryFields(p,areaCategories(),esc,ownerLocked())}
     ${productLabelEditor(p.label)}
     <section class="subsection"><h3>Photos</h3><p class="muted">${PHOTO_HELP} Product photos are public. The first photo is the cover.</p><p class="help-text" id="photo-order-help">Drag photos to rearrange them, or focus a photo and use the arrow keys. Save the item to keep your photo changes.</p><div id="product-photo-order">${renderProductPhotos(p.photos, { escapeHtml: esc, safeImage, disabled: Boolean(ownerLocked()) })}</div><p id="photo-order-status" class="sr-only" role="status" aria-live="polite"></p>${input('photos', 'Upload photos', '', 'file', `accept="${PHOTO_ACCEPT}" multiple id="product-photos" ` + ownerLocked())}</section>
+    ${flavor ? flavorVideoField(p,ownerLocked()) : ''}
     ${draftPublication ? `<div class="dialog-actions"><button type="button" class="button button-secondary" data-action="close-dialog">Cancel</button><button type="submit" class="button button-secondary" name="publication" value="${editingFlavor ? 'save' : 'draft'}" ${ownerLocked()}>${editingFlavor ? 'Save changes' : 'Save draft'}</button><button type="submit" class="button" name="publication" value="publish" ${ownerLocked()}>Publish product</button></div>` : actions(p.id ? 'Save changes' : 'Create ' + names[kind])}${p.id && owner() ? `<div class="subsection product-delete-section"><button type="button" class="button button-secondary danger" data-action="delete-product" data-id="${esc(p.id)}">Delete ${names[kind]}</button><p class="help-text">Existing orders and records are preserved.</p></div>` : ''}
   </form>`);
   bindPhotoOrder();
   updateProductLabelPreview();
   const form = $('[data-form=product]');
   catalogDraft.mount(form);
+  bindFlavorVideoField(form);
   for (const name of ['label_enabled', 'label_text', 'label_color']) $('[data-form="product"]').elements.namedItem(name).addEventListener('input', updateProductLabelPreview);
   $('[data-form="product"]').elements.namedItem('kind').addEventListener('change', () => { captureProduct(); renderProductDialog(); });
 }
@@ -1391,6 +1395,7 @@ async function submitForm(form, submitter) {
       payload.expected_next_month = form.dataset.expectedNextMonth === 'true';
       payload.category_ids=$$('[name=category_ids]:checked',form).map(el=>el.value);
       payload.collection_details=readFlavorDetails(form);
+      payload.texture_video_path=fieldValue(form,'texture_video_path')||null;
       payload.current_month = fieldChecked(form,'current_month'); payload.next_month = fieldChecked(form,'next_month'); payload.hidden = fieldChecked(form,'hidden'); payload.photos = JSON.parse(fieldValue(form,'photos') || '[]');
       const controls=$$('input,select,textarea,button',form),disabled=controls.map(el=>el.disabled);controls.forEach(el=>el.disabled=true);
       try {

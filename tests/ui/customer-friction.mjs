@@ -61,6 +61,43 @@ const close=async page=>{await page.locator('[aria-label="Close product"]').clic
 const add=async page=>{await page.locator('#add-to-cart').click();await page.waitForFunction(()=>!document.querySelector('#product-dialog').open&&!new URL(location.href).searchParams.has('product'));};
 const finish=async(test,name)=>{assert.deepEqual(test.errors,[]);assert.equal(await test.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);results.push(name);console.log('PASS '+name);await test.ctx.close();};
 try{
+ for(const width of [320,390,1440]){
+  const t=await make({width}),{page,data}=t;
+  data.catalog.settings.delivery_blocked_dates=[date];
+  await page.goto(origin+'/index.html?preview=1');
+  if(width<600){
+   await page.getByRole('button',{name:'Open navigation'}).click();
+   const order=page.locator('#mobile-nav .mobile-order');
+   assert(await order.isVisible());
+   assert.equal(await order.getAttribute('href'),'order.html');
+   assert((await order.boundingBox()).height>=44);
+   assert.equal(await order.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(228, 196, 150)');
+   if(width===390)await page.locator('.site-header').screenshot({path:join(out,'mobile-order-menu.png')});
+   await page.getByRole('button',{name:'Close navigation'}).click();
+  }else{
+   const action=page.locator('.header-order');assert(await action.isVisible());
+   assert.equal(await action.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(228, 196, 150)');
+  }
+  await page.locator('.hero-copy').getByRole('link',{name:/Explore our boxes/}).click();
+  await page.locator('#product-grid [data-product]').first().waitFor();
+  assert.equal(new URL(page.url()).pathname,'/order.html');assert.equal(new URL(page.url()).hash,'#cheesecake-boxes');
+  await page.waitForFunction(()=>{const h=document.querySelector('#cheesecake-boxes .section-heading h2')?.getBoundingClientRect();return h && h.top>=0 && h.bottom<innerHeight;});
+  const chooseDate=async value=>{
+   await page.locator('#fulfillment-date').click();
+   const day=page.locator(`[data-customer-date="${value}"]`);
+   if(!await day.count())await page.locator('[data-customer-month="1"]').click();
+   await day.click();
+  };
+  await chooseDate(date);
+  const pickup=page.locator('[data-method=pickup]'),delivery=page.locator('[data-method=delivery]'),notice=page.locator('#fulfillment-notice');
+  assert(await notice.isHidden());await delivery.click();
+  assert.match(await notice.innerText(),/Delivery is unavailable/);
+  assert.equal(await pickup.getAttribute('aria-pressed'),'true');
+  await pickup.click();assert(await notice.isHidden());await delivery.click();
+  await chooseDate(addDays(date,1));
+  assert(await notice.isHidden());await delivery.click();assert.equal(await delivery.getAttribute('aria-pressed'),'true');
+  await finish(t,'Homepage order buttons and on-demand delivery notice at '+width+'px');
+ }
  for(const width of [390,1440]){
   const t=await make({width}),{page,data}=t;await menu(page);await open(page);await choose(page,[['flavor-0',1],['flavor-1',1]]);await page.locator('#product-quantity').fill('2');await close(page);await open(page,'fixed');await close(page);await open(page);assert.equal(await page.locator('[data-trio-add="flavor-0"]').getAttribute('data-count'),'1');assert.equal(await page.locator('#product-quantity').inputValue(),'2');
   await page.reload();await page.locator('#product-dialog[open]').waitFor();assert.equal(await page.locator('[data-trio-add="flavor-1"]').getAttribute('data-count'),'1');

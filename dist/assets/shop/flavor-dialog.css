@@ -81,6 +81,44 @@ a.flavor-tile .flavor-tile-image .product-photo,
   object-fit: cover;
   transform: none;
 }
+.flavor-detail-layout > .flavor-portrait { position: relative; }
+.flavor-portrait .flavor-texture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 380ms ease-in-out;
+}
+.flavor-portrait .flavor-texture.is-playing { opacity: 1; }
+.flavor-video-toggle {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fffaf3;
+  cursor: pointer;
+}
+.flavor-video-toggle[hidden] { display: none; }
+.flavor-video-toggle svg {
+  width: 29px;
+  height: 29px;
+  padding: 6px;
+  border-radius: 50%;
+  background: rgb(50 32 23 / .83);
+}
+.flavor-video-toggle:focus-visible { outline: 2px solid white; outline-offset: -4px; }
+@media (prefers-reduced-motion: reduce) {
+  .flavor-portrait .flavor-texture { transition: none; }
+}
 .flavor-portrait.flavor-photo-fallback { color: #99704a; }
 .flavor-photo-fallback svg { width: 45%; height: 45%; }
 .flavor-detail-copy { min-width: 0; overflow-wrap: anywhere; }

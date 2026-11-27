@@ -12,7 +12,7 @@ const scope = host.attachShadow({mode:'open'});
 const manifest=document.createElement('link');
 manifest.rel='manifest';manifest.href='pos.webmanifest';document.head.append(manifest);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('pos-sw.js',{scope:'./'}).catch(()=>{});
-scope.innerHTML = `<link rel="stylesheet" href="assets/admin/pos.css?v=direct-workspace-1">
+scope.innerHTML = `<link rel="stylesheet" href="assets/admin/pos.css?v=box-quantity-1">
   <link rel="stylesheet" href="assets/box-questions.css">
   <link rel="stylesheet" href="assets/admin/order-item-details.css">
   <link rel="stylesheet" href="assets/admin/private-order-link.css">
@@ -288,8 +288,8 @@ function renderSetup(){
  ${eventStockSection('flavor')}
  <section class="panel"><div class="section-head"><h2>Event products</h2><div class="row">${button('import-event-products','Import boxes from website')}${button('new-event-product','+ Add product','class="primary"')}${button('new-event-item','Build a box recipe')}</div></div><p class="muted">Set a product’s name, price and stock together. Flavors are optional. Boxes use the shared flavor stock above.</p><div class="table-wrap"><table><thead><tr><th>Item / recipe</th><th>Event price</th><th>Available</th><th>Actions</th></tr></thead><tbody>${event.items.map(p=>`<tr><td><strong>${esc(p.name)}</strong><small>${simpleEventStock(p)?'One unit per sale':p.kind==='variant_item'?'Choose 1 flavor · '+p.choice_stock_ids.length+' options':p.kind==='custom_box'?'Choose 3 flavors per sale':p.recipe.map(r=>`${r.quantity} × ${esc(event.stock.find(s=>s.id===r.stock_id)?.name||'Deleted stock')}`).join(', ')}${p.active?'':' · Unavailable'}</small></td><td>${money(p.price_cents)}${['custom_box','variant_item'].includes(p.kind)?'<small>Plus selected flavor surcharges</small>':''}</td><td>${p.remaining}</td><td><div class="row">${button('edit-event-item','Edit',`data-id="${p.id}"`)}${button('delete-event-item','Delete',`data-id="${p.id}" class="danger-button"`)}</div></td></tr>`).join('')||'<tr><td colspan="4">Add a product with its price and stock, or import boxes from the website.</td></tr>'}</tbody></table></div></section>${event.stock.some(s=>s.stock_type==='item'&&!s.variant_item_id&&!event.items.some(p=>simpleEventStock(p)?.id===s.id))?'<details class="panel shared-event-stock"><summary>Shared stock &amp; previous stock</summary>'+eventStockSection('item')+'</details>':''}`;
 }
-function stockStepper(name,label,value=0,{disabled=false,max=1000000}={}){
- return `<div class="stock-quantity-label"><span>${esc(label)}</span><span class="stock-stepper"><button type="button" data-stock-step="-1" aria-label="Decrease ${esc(label)}" ${disabled||value<=0?'disabled':''}>−</button><input type="number" name="${esc(name)}" aria-label="${esc(label)}" value="${value}" min="0" max="${max}" step="1" inputmode="numeric" required ${disabled?'disabled':''}><button type="button" data-stock-step="1" aria-label="Increase ${esc(label)}" ${disabled||value>=max?'disabled':''}>+</button></span></div>`;
+function stockStepper(name,label,value=0,{disabled=false,min=0,max=1000000}={}){
+ return `<div class="stock-quantity-label"><span>${esc(label)}</span><span class="stock-stepper"><button type="button" data-stock-step="-1" aria-label="Decrease ${esc(label)}" ${disabled||value<=min?'disabled':''}>−</button><input type="number" name="${esc(name)}" aria-label="${esc(label)}" value="${value}" min="${min}" max="${max}" step="1" inputmode="numeric" required ${disabled?'disabled':''}><button type="button" data-stock-step="1" aria-label="Increase ${esc(label)}" ${disabled||value>=max?'disabled':''}>+</button></span></div>`;
 }
 function stockBulkToolbar(){return `<div class="stock-bulk-toolbar"><label class="check"><input type="checkbox" data-stock-all>Select all</label><div class="stock-bulk-apply">${stockStepper('bulk_quantity','Set selected to',0)}<button type="button" data-stock-apply>Apply quantity</button></div><p data-stock-summary role="status" class="muted"></p></div>`;}
 function bindStockQuantities(form){
@@ -297,12 +297,12 @@ function bindStockQuantities(form){
  const update=()=>{
   const available=rows.map(r=>r.querySelector('[data-stock-select]')).filter(el=>el&&!el.disabled),selected=available.filter(el=>el.checked);
   rows.forEach(row=>{const choice=row.querySelector('[data-stock-select]'),field=row.querySelector('.stock-stepper input');if(choice&&field)field.disabled=choice.disabled||!choice.checked;});
-  form.querySelectorAll('.stock-stepper').forEach(stepper=>{const field=stepper.querySelector('input'),n=field.valueAsNumber,valid=field.value!==''&&field.validity.valid;stepper.querySelector('[data-stock-step="-1"]').disabled=field.disabled||!valid||n<=0;stepper.querySelector('[data-stock-step="1"]').disabled=field.disabled||!valid||n>=Number(field.max);});
+  form.querySelectorAll('.stock-stepper').forEach(stepper=>{const field=stepper.querySelector('input'),n=field.valueAsNumber,valid=field.value!==''&&field.validity.valid;stepper.querySelector('[data-stock-step="-1"]').disabled=field.disabled||!valid||n<=Number(field.min);stepper.querySelector('[data-stock-step="1"]').disabled=field.disabled||!valid||n>=Number(field.max);});
   if(all){all.checked=available.length>0&&selected.length===available.length;all.indeterminate=selected.length>0&&selected.length<available.length;all.disabled=!available.length;form.querySelector('[data-stock-summary]').textContent=selected.length+' of '+available.length+' selected';form.querySelector('[data-stock-apply]').disabled=!selected.length;}
  };
  form.addEventListener('input',e=>{if(e.target!==all)update();});form.addEventListener('change',update);
  form.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled||busy)return;
-  if(b.hasAttribute('data-stock-step')){const field=b.closest('.stock-stepper').querySelector('input');if(Number(b.dataset.stockStep)>0)field.stepUp();else field.stepDown();update();}
+  if(b.hasAttribute('data-stock-step')){const field=b.closest('.stock-stepper').querySelector('input');if(Number(b.dataset.stockStep)>0)field.stepUp();else field.stepDown();field.dispatchEvent(new Event('input',{bubbles:true}));}
   if(b.hasAttribute('data-stock-apply')){const field=form.elements.bulk_quantity;if(!field.reportValidity())return;rows.forEach(row=>{const choice=row.querySelector('[data-stock-select]'),target=row.querySelector('.stock-stepper input');if(choice?.checked&&!choice.disabled&&target)target.value=field.value;});update();}
  });
  if(all)all.addEventListener('change',()=>{rows.forEach(row=>{const choice=row.querySelector('[data-stock-select]');if(choice&&!choice.disabled)choice.checked=all.checked;});update();});
@@ -446,10 +446,15 @@ function choiceStock(f){
  const held=editing?.fulfillment_date===draft.fulfillment_date?directPieces(editing.items,f.id):0;
  return {...f,remaining:Math.max(0,f.remaining+held-directPieces(draft.items,f.id))};
 }
+function boxAddControls(disabled=false){
+ const add = `<button class="primary" type="submit" ${disabled?'disabled':''}>Add box</button>`;
+ if(mode!=='direct')return add;
+ return `<div class="box-add-controls">${stockStepper('box_quantity','Quantity',1,{min:1,max:10000})}${add}</div>`;
+}
 function chooseBoxFlavors(p){
  let limit=3;
  const choices=mode==='in_person'?event.stock.filter(f=>p.choice_stock_ids.includes(f.id)).map(f=>({...f,price_cents:f.surcharge_cents,remaining:availableEventStock(f.id)})):catalog.flavors.map(choiceStock),selected=new Map(choices.map(f=>[f.id,0]));
- modal('Choose '+limit+' flavor pieces',`<form class="flavor-picker">${mode==='direct'?input('box_quantity','Boxes',1,'number','min="1" max="10000" step="1" required'):''}<p id="flavor-selection-status" class="muted" role="status" aria-live="polite">0 of ${limit} selected</p>${choices.map(f=>`<div class="flavor-choice"><span class="flavor-name">${esc(f.name)}${f.remaining===0?'<small>Unavailable</small>':''}${f.price_cents?`<small>+${money(f.price_cents)} per piece</small>`:''}</span><div class="flavor-stepper" role="group" aria-label="${esc(f.name)} quantity"><button type="button" data-flavor-minus="${esc(f.id)}" aria-label="Remove one ${esc(f.name)}" disabled>−</button><output data-flavor-count="${esc(f.id)}" aria-label="${esc(f.name)} pieces">0</output><button type="button" data-flavor-plus="${esc(f.id)}" aria-label="Add one ${esc(f.name)}">+</button></div></div>`).join('')}${boxQuestionFields(boxQuestions(p),{},{esc,money})}<button class="primary subheading" type="submit" disabled>Add box</button></form>`,async form=>{
+ modal('Choose '+limit+' flavor pieces',`<form class="flavor-picker"><p id="flavor-selection-status" class="muted" role="status" aria-live="polite">0 of ${limit} selected</p>${choices.map(f=>`<div class="flavor-choice"><span class="flavor-name">${esc(f.name)}${f.remaining===0?'<small>Unavailable</small>':''}${f.price_cents?`<small>+${money(f.price_cents)} per piece</small>`:''}</span><div class="flavor-stepper" role="group" aria-label="${esc(f.name)} quantity"><button type="button" data-flavor-minus="${esc(f.id)}" aria-label="Remove one ${esc(f.name)}" disabled>−</button><output data-flavor-count="${esc(f.id)}" aria-label="${esc(f.name)} pieces">0</output><button type="button" data-flavor-plus="${esc(f.id)}" aria-label="Add one ${esc(f.name)}">+</button></div></div>`).join('')}${boxQuestionFields(boxQuestions(p),{},{esc,money})}${boxAddControls(true)}</form>`,async form=>{
   const flavors=Object.fromEntries([...selected].filter(([,n])=>n>0));
   if(Object.values(flavors).reduce((a,b)=>a+b,0)!==limit)throw Error('Choose exactly '+limit+' pieces.');
   const quantity=limit/3;
@@ -467,6 +472,7 @@ function chooseBoxFlavors(p){
   form.querySelector('[type=submit]').disabled=!limit||count!==limit||Boolean(form.querySelector(':invalid'));
   form.querySelector('[role=status]').textContent=count+' of '+limit+' selected'+(count===limit?' · Remove a piece to change flavors.':'');
  }
+ if(form.elements.box_quantity)bindStockQuantities(form);
  form.addEventListener('change',update);
  form.elements.box_quantity?.addEventListener('input',update);
  form.querySelectorAll('[data-flavor-plus],[data-flavor-minus]').forEach(el=>el.onclick=()=>{
@@ -477,9 +483,10 @@ function chooseBoxFlavors(p){
  update();
 }
 function addItem(id){readDraft();const p=product(id);if(!p||immediateSale()&&eventAvailable(p)<1)return;if(p.kind==='variant_item')chooseItemFlavor(p);else if(p.kind==='custom_box')chooseBoxFlavors(p);else if(boxQuestions(p).length){
- modal(p.name,`<form>${boxQuestionFields(boxQuestions(p),{},{esc,money})}<button class="primary" type="submit">Add box</button></form>`,async form=>{
-  pushItem(p,readBoxAnswers(p,form));dialog.close();render();
+ modal(p.name,`<form>${boxQuestionFields(boxQuestions(p),{},{esc,money})}${boxAddControls()}</form>`,async form=>{
+  pushItem(p,readBoxAnswers(p,form),Number(form.get('box_quantity')??1));dialog.close();render();
  });
+ if(mode==='direct')bindStockQuantities(dialog.querySelector('form'));
  }else{pushItem(p,{});render();}}
 function pushItem(p,selections,quantity=1){const existing=draft.items.find(i=>i.product_id===p.id&&JSON.stringify(i.selections)===JSON.stringify(selections));if((existing?.quantity||0)+quantity>10000)throw Error('Each line can have up to 10,000 units.');if(existing)existing.quantity+=quantity;else draft.items.push({product_id:p.id,source:p.source||'event',quantity,selections,name:p.name});}
 async function editOrder(id){const o=await api('get_order',{order_id:id});if(!editable(o)){showReceipt(o);return;}if(!['direct','in_person'].includes(o.order_source))throw Error('Use the kitchen editor for this order.');mode=o.order_source;eventId=o.event_id||'';editing=o;receipt=o;dirty=false;resetFolds();if(o.discount_cents||o.gift)folds.add('discount');draft={...newDraft(),...structuredClone(o),payment:o.pos_payment||{method:'cash',cash_received_cents:null,reference:''},reason:'',items:structuredClone(o.items)};await load();mobileCheckout=mode==='direct';view='sale';render();}

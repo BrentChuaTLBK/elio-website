@@ -1,4 +1,5 @@
 import { responsiveImage } from '../responsive-images.js';
+import { mountFlavorTexture } from './flavor-texture.js';
 import { flavorMetaHtml } from './flavor-details.js';
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -29,6 +30,7 @@ export function createFlavorDialog(dialog, content, { productImage, status, foot
     if (!active) return;
     const state = active;
     active = null;
+    state.texture?.dispose();
     state.animations.forEach(animation => animation.cancel());
     state.ghost?.remove();
     state.source?.classList.remove('flavor-photo-away');
@@ -41,8 +43,11 @@ export function createFlavorDialog(dialog, content, { productImage, status, foot
     animation.finished.then(() => state.animations.delete(animation), () => state.animations.delete(animation));
     return animation;
   }
-  function flight(state, start, end, startRadius, endRadius, opening) {
-    const ghost = state.figure.cloneNode(true);
+  function flight(state, start, end, startRadius, endRadius, opening, textureFrame = null) {
+    const ghost = state.figure.cloneNode(false);
+    const cover = state.figure.querySelector('img,svg');
+    if (cover) ghost.append(cover.cloneNode(true));
+    if (textureFrame) ghost.append(textureFrame);
     const fromImage = state.source?.querySelector('img');
     const image = ghost.querySelector('img');
     if (image) {
@@ -65,11 +70,12 @@ export function createFlavorDialog(dialog, content, { productImage, status, foot
     const sx = start.width / end.width, sy = start.height / end.height;
     const lift = Math.min(32, Math.hypot(dx, dy) * .075);
     const turn = Math.sign(dx) * (opening ? 1.5 : -1);
+    if (textureFrame) animate(state, textureFrame, [{opacity:1},{opacity:0}], {duration:260,easing:'ease-in-out',fill:'forwards'});
     const animation = animate(state, ghost, [
       { transform: `translate(${dx}px,${dy}px) scale(${sx},${sy})`, borderRadius: startRadius },
       { transform: `translate(${dx * .44}px,${dy * .44 - lift}px) rotate(${turn}deg) scale(${1 + (sx - 1) * .44},${1 + (sy - 1) * .44})`, offset: .52 },
       { transform: 'none', borderRadius: endRadius }
-    ], { duration: opening ? 600 : 440, easing: opening ? enterEase : exitEase, fill: 'both' });
+    ], { duration: opening ? 600 : 440, easing: opening ? enterEase : 'cubic-bezier(.4,0,.24,1)', fill: 'both' });
     animation.finished.then(() => {
       ghost.remove();
       if (state.ghost === ghost) state.ghost = null;
@@ -91,13 +97,18 @@ export function createFlavorDialog(dialog, content, { productImage, status, foot
     if (image) image.loading = 'eager';
     if (!dialog.open) dialog.showModal();
     content.querySelector('#dialog-title').focus({ preventScroll: true });
-    if (reduced.matches || typeof figure.animate !== 'function') return;
+    if (reduced.matches || typeof figure.animate !== 'function') {
+      state.texture = mountFlavorTexture(figure,flavor.texture_video_path,Promise.resolve(),reduced);
+      return;
+    }
+    let arrival;
     const end = visibleBounds(figure);
     if (start && end && (source.querySelector('img') || source.classList.contains('flavor-photo-fallback'))) {
-      flight(state, start, end, getComputedStyle(source).borderRadius, getComputedStyle(figure).borderRadius, true);
+      arrival = flight(state, start, end, getComputedStyle(source).borderRadius, getComputedStyle(figure).borderRadius, true);
     }
-    animate(state, content.firstElementChild, [{ opacity: 0, transform: 'translateY(8px) scale(.975)' }, { opacity: 1, transform: 'none' }], { duration: 300, easing: enterEase });
+    const surface = animate(state, content.firstElementChild, [{ opacity: 0, transform: 'translateY(8px) scale(.975)' }, { opacity: 1, transform: 'none' }], { duration: 300, easing: enterEase });
     animate(state, content.querySelector('.flavor-detail-copy'), [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 100, easing: enterEase, fill: 'backwards' });
+    state.texture = mountFlavorTexture(figure,flavor.texture_video_path,(arrival || surface).finished,reduced);
   }
   function close(restoreFocus) {
     if (active?.closing) return;
@@ -110,6 +121,8 @@ export function createFlavorDialog(dialog, content, { productImage, status, foot
     };
     if (!state || reduced.matches || typeof dialog.animate !== 'function') { finish(); return; }
     state.closing = true;
+    const textureFrame = state.texture?.snapshot();
+    state.texture?.dispose();
     const startPhoto = state.ghost || state.figure;
     const start = visibleBounds(startPhoto), end = visibleBounds(state.source);
     const startRadius = getComputedStyle(startPhoto).borderRadius;
@@ -121,7 +134,7 @@ export function createFlavorDialog(dialog, content, { productImage, status, foot
     dialog.classList.add('flavor-detail-leaving');
     const fade = animate(state, surface, [{ opacity }, { opacity: 0, transform: 'translateY(5px) scale(.98)' }], { duration: 190, easing: exitEase, fill: 'forwards' });
     const returning = start && end && state.source.classList.contains('flavor-photo-away')
-      ? flight(state, start, end, startRadius, getComputedStyle(state.source).borderRadius, false) : fade;
+      ? flight(state, start, end, startRadius, getComputedStyle(state.source).borderRadius, false, textureFrame) : fade;
     returning.finished.then(finish, () => {});
   }
   reduced.addEventListener?.('change', () => { if (reduced.matches) active?.animations.forEach(animation => animation.finish()); });
