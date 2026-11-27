@@ -28,17 +28,49 @@ const unpaidStatus = new Map([
 ]);
 const phone=(order:any)=>clean(order.method==='delivery'?order.recipient?.phone||order.buyer?.phone:order.buyer?.phone,80);
 const name=(order:any)=>clean(order.method==='delivery'?order.recipient?.name||order.buyer?.name:order.buyer?.name,200)||'Customer';
+
+function insulatedAnswer(groupId: string | undefined, group: string, answer: string) {
+  if (groupId === 'flavors') return '';
+  const insulatedQuestion = groupId === 'insulated-bag' || /\binsulated\b/i.test(group);
+  const packagingQuestion = /\b(packaging|pack|bag)\b/i.test(group);
+  const namesInsulatedBag = (insulatedQuestion || packagingQuestion || !group) && /\binsulated bag\b/i.test(answer);
+  if ((insulatedQuestion || namesInsulatedBag) && /^(no|without)\b/i.test(answer)) return 'No';
+  if ((insulatedQuestion || packagingQuestion) && /^paper bag\b/i.test(answer)) return 'No';
+  if ((insulatedQuestion && /^yes\b/i.test(answer)) || namesInsulatedBag) return 'Yes';
+  return '';
+}
+
+function calendarItemLines(item: any) {
+  const selections = Array.isArray(item.selection_labels) && item.selection_labels.length
+    ? item.selection_labels : Array.isArray(item.flavor_contents) ? item.flavor_contents : [];
+  const lines = [`${Number(item.quantity) || 0} × ${clean(item.name, 200)}`];
+  const details = [];
+  let insulated = '';
+  for (const selection of selections) {
+    const legacy = typeof selection === 'string' ? /^([^:]+):\s*(?:\d+\s*×\s*)?(.+)$/.exec(selection) : null;
+    const label = clean(typeof selection === 'string' ? selection : selection?.label || selection?.name, 200).trim();
+    if (!label) continue;
+    const group = legacy?.[1] || clean(selection?.group);
+    const answer = insulatedAnswer(selection?.group_id, group, (legacy?.[2] || label).trim());
+    if (answer) {
+      if (!insulated || selection?.group_id === 'insulated-bag') insulated = answer;
+      continue;
+    }
+    details.push(selection?.quantity ? `${Number(selection.quantity) || 0} × ${label}` : label);
+  }
+  if (details.length) lines.push('  ' + details.join(', '));
+  if (insulated) lines.push('  Insulated · ' + insulated);
+  if (item.description) lines.push('  ' + clean(item.description));
+  return lines;
+}
+
 export function calendarDescription(order:any){
  const delivery=order.method==='delivery',buyer=order.buyer||{},customer=clean(buyer.name,200)||name(order),contact=clean(buyer.phone,80)||phone(order);
  const platform=clean(buyer.social_platform,50).trim(),username=clean(buyer.social_username,160).trim();
  const social=!username||platform.toLowerCase()==='na'||/^n\/?a$/i.test(username)?'Not provided':[
   platform.toLowerCase()==='instagram'?'Instagram':platform.toLowerCase()==='facebook'?'Facebook':platform,username].filter(Boolean).join(' · ');
  const address=[order.address?.line1,order.address?.line2,order.address?.locality,order.address?.postal_code].filter(Boolean).map(v=>clean(v)).join(', ');
- const items=(Array.isArray(order.items)?order.items:[]).flatMap((item:any)=>{
-  const selections=Array.isArray(item.selection_labels)&&item.selection_labels.length?item.selection_labels:Array.isArray(item.flavor_contents)?item.flavor_contents:[];
-  const details=selections.map((s:any)=>`${s.quantity?`${Number(s.quantity)||0} × `:''}${clean(s.label||s.name,200)}`).filter(Boolean);
-  return [`${Number(item.quantity)||0} × ${clean(item.name,200)}`,...(details.length?['  '+details.join(', ')]:[]),...(item.description?['  '+clean(item.description)]:[])];
- });
+ const items=(Array.isArray(order.items)?order.items:[]).flatMap(calendarItemLines);
  const amount=Number.isSafeInteger(order.total_cents)&&order.total_cents>=0?new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(order.total_cents/100):'Not recorded';
  return [`Customer name: ${customer}`,`Phone number: ${contact||'Not provided'}`,`Social media: ${social}`,`Order ID: ${clean(order.reference,80)}`,
   ...(delivery?[...(name(order)!==customer?[`Recipient: ${name(order)}`]:[]),...(phone(order)&&phone(order)!==contact?[`Recipient phone: ${phone(order)}`]:[]),`Delivery address: ${address||'Not provided'}`]:[]),
