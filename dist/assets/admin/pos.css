@@ -93,6 +93,15 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .direct-screen .pending-review,.pos-receipt { max-width: 760px; margin: 16px auto; border: 1px solid var(--line); }
 .pos-receipt h2 { font: 1.6rem Georgia,serif; margin: 0; }
 .pos-receipt .totals { padding-bottom: 0; }
+.copy-recipient {
+  min-height: 26px;
+  padding: 3px 8px;
+  margin: 0 0 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 16px;
+}
+@media (pointer: coarse) { .copy-recipient { min-height: 30px; } }
 .receipt-status { color: var(--brown); text-transform: capitalize; }
 .receipt-items,.pos-order-list { list-style: none; padding: 0; margin: 0; }
 .receipt-items > li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }

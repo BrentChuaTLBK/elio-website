@@ -42,6 +42,7 @@ try{
     const {action,payload}=route.request().postDataJSON();calls.push({action,payload});let response;
     if(action==='admin_bootstrap')response={role,products:[],categories:[],orders:[order,pickup],inventory:[],zones:[],staff:[],promos:[],settings:{paused:false}};
     else if(action==='get_order')response=payload.order_id===pickup.id?pickup:order;
+    else if(action==='pos_payment_link')response={id:payload.order_id,token:'test-link-'.repeat(6)};
     else if(action==='calendar_list')response={connection:{connected:false},orders:[]};
     else if(action==='accounting_report'){
      const eligible=[...entries,...(cost?.amount_cents!=null?[{id:order.id,category_id:'cost',kind:'expense',entry_date:cost.cost_date,amount_cents:cost.amount_cents,note:cost.note,source:'Delivery cost',order_id:order.id,reference:order.reference}]:[])].filter(e=>!excludeOrder||e.order_id!==order.id);

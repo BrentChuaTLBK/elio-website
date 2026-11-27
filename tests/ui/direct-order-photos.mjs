@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {createRequire} from 'node:module';
-import {readFile,readdir} from 'node:fs/promises';
+import {readFile,readdir,mkdir} from 'node:fs/promises';
 import {join,resolve,extname,sep} from 'node:path';
 import {makeHarness} from '../backend/helpers.mjs';
 import {eventBody} from '../../supabase/functions/calendar-sync/google.ts';
@@ -69,7 +69,25 @@ try{
  }
  const staff=await pageFor(h.ids.staff),guest=await pageFor(null),link=await customerLink(order);
  await guest.goto(link);await guest.getByRole('heading',{name:order.reference}).waitFor();assert.equal(await guest.locator('[data-pickup-proof],[data-order-photos]').count(),0);
- const email=guest.locator('#order-email-form');await email.locator('[name=email]').fill('optional@example.test');await email.getByRole('button').click();
+const email=guest.locator('#order-email-form'),optIn=email.locator('[data-newsletter-option]'),saveEmail=email.getByRole('button',{name:'Save email for order updates'});
+ await optIn.waitFor();
+ assert.equal(await optIn.getByRole('checkbox').isChecked(),false);
+ for(const width of [1440,768,390,320]){
+   await guest.setViewportSize({width,height:900});
+   const panel=await guest.locator('[aria-labelledby=order-email-title]').boundingBox();
+   const grid=await guest.locator('.order-layout').boundingBox();
+   const field=await email.locator('[name=email]').boundingBox(),check=await optIn.boundingBox(),button=await saveEmail.boundingBox();
+   assert(Math.abs(panel.width-grid.width)<2&&panel.y+panel.height<=grid.y+1);
+   assert(field.width>panel.width*.78&&field.y+field.height<=check.y+1);
+   if(width>800){assert(check.x+check.width<=button.x&&Math.abs((check.y+check.height/2)-(button.y+button.height/2))<2);}
+   else {assert(check.y+check.height<=button.y&&Math.abs(check.width-button.width)<2);}
+   assert(button.height>=44&&check.height>=44&&button.x+button.width<=width);
+   if(width===390||width===1440){
+     const out=join(root,'test-results','order-email');await mkdir(out,{recursive:true});
+     await guest.locator('[aria-labelledby=order-email-title]').screenshot({path:join(out,'order-email-'+width+'.png')});
+   }
+ }
+ await email.locator('[name=email]').fill('optional@example.test');await email.getByRole('button').click();
  await guest.getByText('Order updates will go to optional@example.test.').waitFor();
  await staff.goto(origin+'/manage.html?order='+order.id+'&section=photos');const photos=staff.locator('[data-order-photos]');
  await photos.getByText('No photos attached yet.').waitFor();

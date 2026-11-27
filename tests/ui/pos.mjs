@@ -114,6 +114,14 @@ try{
   assert(await minus.isDisabled());
 
   await page.getByLabel('Fulfillment',{exact:true}).selectOption('delivery');
+  const copyBuyer=page.getByRole('button',{name:'Same as customer',exact:true});
+  const copySize=await copyBuyer.boundingBox();
+  assert(copySize.height>=24&&copySize.height<=30&&copySize.width<150,`Recipient shortcut at ${width}px measured ${copySize.width} × ${copySize.height}`);
+  await page.getByLabel('Customer name',{exact:true}).fill('Sample customer');
+  await page.getByLabel('Contact number',{exact:true}).fill('09170000000');
+  await copyBuyer.click();
+  assert.equal(await page.getByLabel('Recipient name',{exact:true}).inputValue(),'Sample customer');
+  assert.equal(await page.getByLabel('Recipient phone',{exact:true}).inputValue(),'09170000000');
   await page.getByLabel('Delivery fee',{exact:true}).selectOption('true');
   const field=page.locator('.accounting-date-picker').filter({has:page.locator('[name=fulfillment_date]')});
   await field.locator('summary').click();
