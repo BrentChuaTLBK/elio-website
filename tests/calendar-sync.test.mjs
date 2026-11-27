@@ -16,6 +16,22 @@ assert.equal(calendarId('https://calendar.google.com/calendar/embed?src=elio.che
 assert.throws(()=>calendarId('https://evil.test/'),CalendarError);
 const body=eventBody(order,job.event_id);assert.equal(body.end.date,'2026-10-01');assert.equal(body.colorId,'9');assert.match(body.description,/&lt;Recipient&gt;/);assert.deepEqual(body.attendees,[]);assert.equal(body.visibility,'private');
 assert.equal(eventBody({...order,method:'pickup'},job.event_id).colorId,'2');
+for(const payment_status of ['awaiting_payment','under_review','rejected']){
+ const unpaid=eventBody({...order,payment_status,status:'pending_confirmation'},job.event_id);
+ assert.equal(unpaid.colorId,'5');
+ assert.match(unpaid.summary,/^Unpaid · /);
+ assert.match(unpaid.description,/Payment: /);
+ assert.equal(unpaid.id,job.event_id);
+ assert.equal(new URL(unpaid.source.url).searchParams.get('order'),order.id);
+}
+{
+ const f=fixture([{method:'GET',data:owned},{method:'PUT',data:{etag:'now-paid'}}]);
+ await f.client.sync('elio@example.test',{...job,desired:{...order,payment_status:'paid'}});
+ const update=JSON.parse(f.calls.at(-1).body);
+ assert.equal(update.id,job.event_id);
+ assert.equal(update.colorId,'9');
+ assert.doesNotMatch(update.summary,/Unpaid/);
+}
 const album='a'.repeat(64);
 const referenced={...order,method:'pickup',photo_count:2,photo_share:album,instructions:'Keep <cold>',items:[{name:'Custom cake',quantity:1,description:'Write Happy Birthday'}]};
 const described=eventBody(referenced,job.event_id).description;

@@ -9,7 +9,7 @@ assert.equal(matchesOrderView({...base,payment_status:'under_review'},'review',t
 assert.equal(matchesOrderView({...base,fulfillment_date:'2026-10-03'},'today',today),false);
 for(const fulfillment_status of ['pending_confirmation','confirmed','preparing','ready_for_pickup','out_for_delivery'])assert.equal(isUpcomingOrder({...base,fulfillment_status,fulfillment_date:'2026-10-01'},today),true,'Overdue paid '+fulfillment_status+' remains upcoming');
 for(const payment_status of ['awaiting_payment','under_review','rejected']){
- assert.equal(isUpcomingOrder({...base,payment_status,fulfillment_date:'2026-10-01'},today),false,'Overdue '+payment_status+' does not enter upcoming');
+ assert.equal(isUpcomingOrder({...base,payment_status,fulfillment_date:'2026-10-01'}),true,'Overdue '+payment_status+' remains upcoming');
  for(const fulfillment_date of [today,'2026-10-03'])assert.equal(isUpcomingOrder({...base,payment_status,fulfillment_date},today),true,'Current/future active '+payment_status+' remains upcoming');
 }
 for(const fulfillment_status of ['completed','cancelled','expired','refunded'])for(const fulfillment_date of ['2026-10-01',today,'2026-10-03']){

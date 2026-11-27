@@ -8,10 +8,16 @@ export default async function({db,check,state}) {
  const flavorId=product.box_flavors[0];
  let order=await h.api('create_order',h.checkout(product,date),h.ids.customer);
  const row=()=>h.scalar('select (select to_jsonb(e) from elio.calendar_events e where order_id=$1)',[order.id]);
- await check('calendar only includes authorized staff and paid confirmed orders',async()=>{
+ await check('Unpaid website orders enter Google’s queue and the staff calendar lists paid work',async()=>{
   for(const user of [null,h.ids.customer])await assert.rejects(h.api('calendar_list',{from:date,to:date},user));
-  assert.equal(await row(),null);
-  order=await h.action('approve_payment',await h.proof(order));
+  const unpaid=await row();
+  assert.equal(unpaid.desired.payment_status,'awaiting_payment');
+  assert(!(await h.api('calendar_list',{from:date,to:date},h.ids.staff)).orders.some(entry=>entry.id===order.id));
+  const proof=await h.proof(order);
+  assert.equal((await row()).desired.payment_status,'under_review');
+  order=await h.action('approve_payment',proof);
+  assert.equal((await row()).event_id,unpaid.event_id);
+  assert.equal((await row()).desired.payment_status,'paid');
   const data=await h.api('calendar_list',{from:date,to:date},h.ids.staff),entry=data.orders.find(o=>o.id===order.id);
   assert.equal(entry.reference,order.reference);assert.equal(entry.buyer.phone,'09171234567');
   assert.equal(entry.total_cents,order.total_cents);
@@ -21,6 +27,20 @@ export default async function({db,check,state}) {
   await assert.rejects(h.service('calendar_connect',{user_id:h.ids.staff,calendar_id:'fixture@example.test'}));
   await h.service('calendar_connect',{user_id:h.ids.owner,calendar_id:'fixture@example.test'});
   await assert.rejects(h.api('calendar_list',{from:'2026-01-01',to:'2026-12-31'},h.ids.owner));
+ })();
+ await check('Expired website orders queue a Google deletion and release the stock reservation',async()=>{
+  const expiring=await h.api('create_order',h.checkout(product,date));
+  const queued=()=>h.scalar('select to_jsonb(e) from elio.calendar_events e where order_id=$1',[expiring.id]);
+  const before=await queued();
+  assert.equal(before.desired.payment_status,'awaiting_payment');
+  await db.query("update elio.orders set payment_deadline=now()-interval '1 second' where id=$1",[expiring.id]);
+  await h.scalar('select elio.expire_orders()');
+  assert.equal((await h.order(expiring.id)).fulfillment_status,'expired');
+  const after=await queued();
+  assert.equal(after.desired,null);
+  assert.equal(after.event_id,before.event_id);
+  assert.ok(after.revision>before.revision);
+  assert.deepEqual(await h.allocations(expiring.id),[]);
  })();
  await check('calendar revisions survive changes during sync and retry without duplicate events',async()=>{
   const lease=await h.service('calendar_begin'),payload={lease_token:lease.lease_token};
