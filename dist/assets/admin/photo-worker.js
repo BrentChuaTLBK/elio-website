@@ -28,6 +28,17 @@ self.onmessage = async ({data}) => {
   try {
     bitmap = await decode(file);
     if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 60000000) throw new Error('Choose a photo with no more than 60 megapixels.');
+    if (data.purpose === 'share') {
+      const canvas = new OffscreenCanvas(1200,630), ctx = canvas.getContext('2d');
+      const scale = Math.max(canvas.width/bitmap.width,canvas.height/bitmap.height);
+      const w = bitmap.width*scale, h = bitmap.height*scale;
+      const {x=50,y=50} = data.position || {};
+      ctx.fillStyle = '#fffaf2';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(bitmap,(canvas.width-w)*x/100,(canvas.height-h)*y/100,w,h);
+      self.postMessage({blob:await canvas.convertToBlob({type:'image/jpeg',quality:.86})});
+      return;
+    }
     const scale = Math.min(1, (receipt?3200:2400) / Math.max(bitmap.width,bitmap.height));
     const canvas = new OffscreenCanvas(Math.max(1,Math.round(bitmap.width*scale)),Math.max(1,Math.round(bitmap.height*scale)));
     const ctx = canvas.getContext('2d');

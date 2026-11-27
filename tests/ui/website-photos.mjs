@@ -55,8 +55,8 @@ try{
  await card().locator('[name=position_x]').fill('72');await card().locator('[name=position_y]').fill('38');
  await page.locator('[data-view=settings]').click();await page.getByRole('button',{name:'Keep editing',exact:true}).click();assert(await card().isVisible());
  control.failSave=true;await card().getByRole('button',{name:'Save photo',exact:true}).click();await card().getByRole('alert').waitFor();assert.equal(photos.home_hero.path,null);
- assert.equal(uploads.length,1);assert.equal(uploads[0].bucket,'website-images');assert.equal(uploads[0].type,'image/webp');assert.equal(String.fromCharCode(...uploads[0].header.slice(8)),'WEBP');
- await card().getByRole('button',{name:'Save photo',exact:true}).click();await card().getByText('Saved. This photo is now published.',{exact:true}).waitFor();assert.equal(uploads.length,1);assert.equal(photos.home_hero.position_x,72);
+ assert.equal(uploads.length,2);assert.deepEqual(uploads[1].header.slice(0,3),[255,216,255]);assert.equal(uploads[1].type,'image/jpeg');assert.equal(uploads[1].path,uploads[0].path.replace(/\.webp$/,'.jpg'));assert.equal(uploads[0].bucket,'website-images');assert.equal(uploads[0].type,'image/webp');assert.equal(String.fromCharCode(...uploads[0].header.slice(8)),'WEBP');
+ await card().getByRole('button',{name:'Save photo',exact:true}).click();await card().getByText('Saved. This photo is now published.',{exact:true}).waitFor();assert.equal(uploads.length,2);assert.equal(photos.home_hero.position_x,72);
  await card().locator('[name=alt]').fill('Pending conflicting description');photos.home_hero.revision++;
  await card().getByRole('button',{name:'Save photo',exact:true}).click();await card().getByRole('alert').waitFor();assert.equal(photos.home_hero.alt,'Freshly baked cheesecakes');
  await card().getByRole('button',{name:'Reload saved',exact:true}).click();await card().getByText('Your photo is published.',{exact:true}).waitFor();assert.equal(await card().locator('[name=alt]').inputValue(),'Freshly baked cheesecakes');
@@ -89,6 +89,28 @@ try{
   assert.equal(await hero.isVisible(),true);
   assert.deepEqual(bundled,[]);
  }
+// Delay each first read. No responsive candidate or preload may request the original photo.
+ for(const file of ['order.html','story.html','flavors.html']){
+  const pageId=file==='order.html'?'shop':file.replace('.html','');
+  const urls=photoSlots.filter(slot=>slot.page===pageId).map(slot=>'/'+slot.src);
+  for(const width of [390,1440]){
+   await refresh.setViewportSize({width,height:900});
+   const requests=[];
+   const observe=req=>{if(req.resourceType()==='image'&&urls.includes(new URL(req.url()).pathname))requests.push(req.url());};
+   refresh.on('request',observe);
+   let release;control.readGate=new Promise(resolve=>{release=resolve;});
+   try{
+    await refresh.goto(origin+'/'+file,{waitUntil:'domcontentloaded'});
+    const pending=await refresh.locator('[data-website-photo]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute(n.tagName==='SOURCE'?'srcset':'src')));
+    assert(pending.length>0);assert(pending.every(src=>src===null));
+    assert.deepEqual(requests,[]);
+   }finally{release();control.readGate=null;}
+   await refresh.waitForFunction(()=>[...document.querySelectorAll('[data-website-photo]')].every(n=>n.dataset.websitePhotoApplied));
+   assert.deepEqual(requests,[]);
+   refresh.off('request',observe);
+  }
+ }
+ await refresh.goto(origin+'/index.html');
  control.failRead=true;await refresh.reload();
  await refresh.waitForFunction(path=>document.querySelector('img[data-website-photo=home_hero]').currentSrc.endsWith(path),photos.home_hero.path);
  assert.deepEqual(bundled,[]);await refreshCtx.close();
@@ -96,7 +118,7 @@ try{
  await offline.goto(origin+'/index.html');
  await offline.waitForFunction(()=>document.querySelector('img[data-website-photo=home_hero]').currentSrc.endsWith('/assets/home-editorial-hero.webp'));
  await cold.close();control.failRead=false;
- checks.push('A delayed cold load and refresh request only the published hero. An outage uses the last verified photo, or the original on a first visit.');
+ checks.push('Delayed home, shop, story and flavor visits never request bundled originals before the published photo. An outage uses the last verified photo, or the original on a first visit.');
  for(const width of [1440,390,320]){
   const ctx=await context(width),page=await ctx.newPage();
   for(const file of ['index.html','story.html','order.html','flavors.html']){

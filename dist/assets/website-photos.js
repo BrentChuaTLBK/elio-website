@@ -1,60 +1,82 @@
 import {config} from './admin/config.js';
-import {websitePhotoUrl} from './website-photo-slots.js';
+import {photoSlots,readPublishedPhotos,websitePhotoUrl} from './website-photo-slots.js';
 
-// The homepage reserves the banner space but leaves its source unset until the
-// published photo is known. A cached upload can start downloading in parallel.
-const hero = document.querySelector('img[data-website-photo="home_hero"][data-default-src]');
-const online = config.supabaseUrl && config.supabasePublishableKey && new URLSearchParams(location.search).get('preview') !== '1';
-if (!online && hero) hero.src = hero.dataset.defaultSrc;
-if (online) {
- let photos={},loaded=false;
- const checked=new Map(),originals=new WeakMap(),mobile=matchMedia('(max-width:600px)');
- const original=node=>{if(!originals.has(node))originals.set(node,{src:node.dataset.defaultSrc || node.getAttribute(node.tagName==='SOURCE'?'srcset':'src'),alt:node.getAttribute('alt'),position:node.style.objectPosition});return originals.get(node);};
- const ready=(url,priority=false)=>{if(!checked.has(url))checked.set(url,new Promise(resolve=>{const image=new Image();if(priority)image.fetchPriority='high';image.onload=()=>resolve(true);image.onerror=()=>resolve(false);image.src=url;}));return checked.get(url);};
- const cacheKey='elio-published-home-photo-v1:'+config.supabaseUrl;
- let lastHero;
- if(hero){
-  try{lastHero=JSON.parse(localStorage.getItem(cacheKey));}catch{}
-  const cachedUrl=websitePhotoUrl(lastHero?.path,config.supabaseUrl);
-  if(cachedUrl)void ready(cachedUrl,true);
- }
- function rememberHero(value){
-  try{if(value)localStorage.setItem(cacheKey,JSON.stringify(value));else localStorage.removeItem(cacheKey);}catch{}
- }
- function position(img){
-  const source=img.parentElement?.tagName==='PICTURE'?[...img.parentElement.querySelectorAll('source[data-website-photo]')].find(s=>matchMedia(s.media).matches):null;
-  const saved=photos[(source||img).dataset.websitePhoto],fallback=original(img);
-  const url=websitePhotoUrl(saved?.path,config.supabaseUrl);
-  const applied=(source||img).dataset.websitePhotoApplied===url&&url;
-  img.style.objectPosition=applied?`${saved.position_x}% ${saved.position_y}%`:fallback.position;
-  img.alt=applied?saved.alt:fallback.alt||'';
- }
- async function apply(node){
-  if(!loaded)return;
-  const fallback=original(node),saved=photos[node.dataset.websitePhoto],url=websitePhotoUrl(saved?.path,config.supabaseUrl);
-  const image=node.tagName==='SOURCE'?node.parentElement.querySelector('img'):node;
-  if(image)original(image);
-  if(url&&await ready(url,node===hero)){
-   node.setAttribute(node.tagName==='SOURCE'?'srcset':'src',url);node.dataset.websitePhotoApplied=url;
-   if(node===hero)rememberHero({path:saved.path,alt:saved.alt,position_x:saved.position_x,position_y:saved.position_y});
-   node.closest('.detail-layout')?.querySelector('[data-photo-disclaimer]')?.setAttribute('hidden','');
-  }else{node.setAttribute(node.tagName==='SOURCE'?'srcset':'src',fallback.src);delete node.dataset.websitePhotoApplied;if(node===hero)rememberHero(null);}
-  if(image)position(image);
- }
- function scan(root){
-  if(root.matches?.('[data-website-photo]'))void apply(root);
-  root.querySelectorAll?.('[data-website-photo]').forEach(node=>void apply(node));
- }
- fetch(`${config.supabaseUrl}/rest/v1/rpc/shop_api`,{
-  method:'POST',headers:{apikey:config.supabasePublishableKey,'Content-Type':'application/json'},
-  body:JSON.stringify({p_action:'website_photos',p_payload:{},p_token:null}),cache:'no-store',signal:AbortSignal.timeout(5000),
- }).then(response=>{if(!response.ok)throw new Error('Photos unavailable');return response.json();}).then(result=>{
-  photos=result?.photos||{};loaded=true;scan(document);
-  new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(node=>{if(node.nodeType===1)scan(node);}))).observe(document.body,{childList:true,subtree:true});
-  mobile.addEventListener('change',()=>document.querySelectorAll('picture img[data-website-photo]').forEach(position));
- }).catch(()=>{
-  if(!hero)return;
-  // Prefer the last verified upload if the settings service is unavailable.
-  photos={home_hero:lastHero};loaded=true;void apply(hero);
- });
+const selector = '[data-website-photo]';
+const defaults = new Map(photoSlots.map(slot => [slot.id,slot]));
+const media = matchMedia('(max-width:600px)');
+const cacheKey = 'elio-published-website-photos-v2:' + config.supabaseUrl;
+
+function readCache() {
+ try { return JSON.parse(localStorage.getItem(cacheKey)) || {}; } catch { return {}; }
 }
+
+async function start() {
+ const preview = new URLSearchParams(location.search).get('preview') === '1';
+ const embedded = document.getElementById('elio-published-photos');
+ let photos = {};
+ if (embedded && !preview) {
+  photos = JSON.parse(embedded.textContent);
+ } else if (!preview && config.supabaseUrl && config.supabasePublishableKey) {
+  try { photos = await readPublishedPhotos(config); }
+  catch { photos = readCache(); }
+ }
+ if (!preview) {
+  try { localStorage.setItem(cacheKey,JSON.stringify(photos)); } catch {}
+ }
+
+ function selectedNode(img) {
+  return img.parentElement?.tagName === 'PICTURE'
+   ? [...img.parentElement.querySelectorAll('source[data-website-photo]')].find(source => !source.media || matchMedia(source.media).matches) || img
+   : img;
+ }
+
+ function describe(img) {
+  const node = selectedNode(img), id = node.dataset.websitePhoto;
+  const saved = node.dataset.websitePhotoApplied && photos[id];
+  img.alt = saved?.alt || defaults.get(id)?.alt || '';
+  img.style.objectPosition = saved ? `${saved.position_x}% ${saved.position_y}%` : '';
+ }
+
+ function apply(node, useOriginal = false) {
+  const isSource = node.tagName === 'SOURCE', attr = isSource ? 'srcset' : 'src';
+  const saved = photos[node.dataset.websitePhoto];
+  const url = useOriginal ? '' : websitePhotoUrl(saved?.path,config.supabaseUrl);
+  const target = url || (isSource ? node.dataset.defaultSrcset : node.dataset.defaultSrc);
+  if (!target) return;
+  if (url) node.dataset.websitePhotoApplied = url;
+  else delete node.dataset.websitePhotoApplied;
+  if (node.getAttribute(attr) !== target) node.setAttribute(attr,target);
+  if (!isSource) {
+   describe(node);
+   const disclaimer = node.closest('.detail-layout')?.querySelector('[data-photo-disclaimer]');
+   if (disclaimer) disclaimer.hidden = Boolean(url);
+  }
+ }
+
+ function imageFailed(img) {
+  if (!img.matches?.('img[data-website-photo]')) return;
+  const node = selectedNode(img);
+  if (!node.dataset.websitePhotoApplied || img.currentSrc !== node.dataset.websitePhotoApplied) return;
+  apply(node,true);
+  describe(img);
+ }
+
+ function scan(root) {
+  if (root.matches?.(selector)) apply(root);
+  root.querySelectorAll?.(selector).forEach(node => apply(node));
+  if (root.matches?.('img[data-website-photo]') && root.complete && !root.naturalWidth) imageFailed(root);
+  root.querySelectorAll?.('img[data-website-photo]').forEach(img => {
+   if (img.complete && !img.naturalWidth) imageFailed(img);
+  });
+ }
+
+ document.addEventListener('error',event => imageFailed(event.target),true);
+ scan(document);
+ const observer = new MutationObserver(records => {
+  for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1) scan(node);
+ });
+ observer.observe(document.body,{childList:true,subtree:true});
+ media.addEventListener('change',() => document.querySelectorAll('picture img[data-website-photo]').forEach(describe));
+}
+
+void start();
