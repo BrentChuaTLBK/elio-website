@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-const values = { SUPABASE_URL: 'https://elio.example.test', SUPABASE_SERVICE_ROLE_KEY: 'test-service-key', RESEND_API_KEY: 'test-resend-key', EMAIL_FROM: 'Elio <hello@example.test>' };
+const values = { SUPABASE_URL: 'https://elio.example.test', SUPABASE_ANON_KEY: 'test-public-key', SUPABASE_SERVICE_ROLE_KEY: 'test-service-key', RESEND_API_KEY: 'test-resend-key', EMAIL_FROM: 'Elio <hello@example.test>' };
 globalThis.Deno = { env: { get: name => values[name] } };
 const { handle } = await import('../supabase/functions/email-worker/worker.ts');
 const { renderEmail } = await import('../supabase/functions/_shared/emails.ts');
@@ -18,6 +18,10 @@ globalThis.fetch = async (url, options) => {
     return Response.json(setup.providerFailure ? {} : { id: 'provider-id' }, { status: setup.providerFailure ? 429 : 200 });
   }
   if (String(url).endsWith('/elio_email_worker_authorized')) { calls.push('authorize'); return Response.json(setup.authorized !== false); }
+  if (String(url).endsWith('/shop_api') && body.p_action==='flavor_collection') {
+    assert.equal(options.headers.apikey,'test-public-key'); calls.push('public_flavor_photos');
+    return Response.json({flavors:[{id:'ube',name:'Ube',photos:['assets/ube.webp']}]},{status:setup.catalogDown?503:200});
+  }
   calls.push(body.p_action);
   const newsletterRow = { ...row, id: 'newsletter-id', event_key: 'newsletter-test/sender-check', subject: 'Newsletter test', payload: { event_type: 'newsletter_test_campaign', settings: { site_url: 'https://eliocheesecakes.com', newsletter_mailing_address: 'Test address' }, subscriber: { email: 'qa@example.test' }, campaign: { subject: 'Newsletter test', title: 'A little Elio', body: 'A subscriber update.', template: 'letter' } } };
   if (setup.voucher) newsletterRow.subject='A sweet thank-you from Elio 🍰';
@@ -120,11 +124,29 @@ try {
     setup.skipBeforeFreeze = true;
     assert.equal((await (await handle(request())).json()).skipped, 1); assert.equal(providerBodies.length, 0);
   });
+  await check('order emails use public flavor thumbnails and keep the first rendered body on retry', async () => {
+    setup.row = {...row, payload:{...row.payload,event_type:'payment_approved',order:{...row.payload.order,
+      access_token:'private-test-link',items:[{name:'Build your own trio',quantity:1,unit_price_cents:80000,
+        flavor_contents:[{name:'Ube',product_id:'ube',quantity:1}]}]}}};
+    setup.ackFailure=true;await handle(request());
+    assert(providerBodies[0].body.html.includes('src="https://eliocheesecakes.com/assets/ube.webp"'));
+    assert.equal(calls.filter(action=>action==='public_flavor_photos').length,1);
+    setup.ackFailure=false;await handle(request());
+    assert.deepEqual(providerBodies[1],providerBodies[0]);
+    assert.equal(calls.filter(action=>action==='public_flavor_photos').length,1);
+  });
+  await check('an unavailable flavor photo catalog still sends the readable order', async () => {
+    setup.catalogDown=true;
+    setup.row = {...row,payload:{...row.payload,event_type:'payment_approved',order:{...row.payload.order,
+      access_token:'private-test-link',items:[{name:'Trio',quantity:1,unit_price_cents:80000,flavor_contents:[{name:'Ube',product_id:'ube',quantity:1}]}]}}};
+    await handle(request());assert.equal(providerBodies.length,1);
+    assert(providerBodies[0].body.text.includes('Ube'));assert(!providerBodies[0].body.html.includes('assets/ube.webp'));
+  });
   await check('customer order links and HTML values are escaped', async () => {
     const email = renderEmail({ ...row.payload, event_type: 'payment_approved', order: { ...row.payload.order, access_token: 'private-order-token', items: [{ name: '<img src=x>', quantity: 1, line_total_cents: 99000, selection_labels: [], flavor_contents: [{ name: 'Vanilla', quantity: 2 }, { name: 'Matcha', quantity: 1 }] }] } });
     assert.ok(email.text.includes('https://eliocheesecakes.com/order.html#order='));
     assert.ok(email.html.includes('&lt;img src=x&gt;')); assert.ok(!email.html.includes('<img src=x>'));
-    assert.ok(email.text.includes('Vanilla × 2, Matcha × 1'));
+    assert.ok(email.text.includes('2 × Vanilla, Matcha'));
     assert.ok(email.text.includes('Please use your order page to upload payment proof'));
   });
   await check('tracking follow-up retains branded details and links to current order tracking', async () => {

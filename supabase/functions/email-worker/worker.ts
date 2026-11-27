@@ -1,5 +1,6 @@
 import { env, json, rpc, service } from "../_shared/server.ts";
 import { renderEmail } from "../_shared/emails.ts";
+import type { EmailFlavorPhoto } from "../_shared/email-design.ts";
 import { syncNewsletterContacts } from "./newsletter-contacts.ts";
 import { deliverNewsletters } from "./newsletter-worker.ts";
 import { deliverBroadcasts, checkBroadcastConfiguration } from "./newsletter-broadcasts.ts";
@@ -29,6 +30,7 @@ export async function handle(request: Request): Promise<Response> {
     stats.maintenance = await service("maintenance");
     const claimed = await service("claim_emails", { limit: 3 });
     if (!Array.isArray(claimed)) throw new Error("Invalid claim response.");
+    let flavorCatalog: Promise<EmailFlavorPhoto[]> | undefined;
     for (const row of claimed) {
       let accepted = false;
       try {
@@ -42,7 +44,14 @@ export async function handle(request: Request): Promise<Response> {
         if (current?.skip) { stats.skipped++; continue; }
         if (!current?.payload || !current.to_email || !current.event_key) throw new Error("Invalid leased message.");
         if (!current.provider_payload) {
-          const rendered = renderEmail(current.payload);
+          const hasSelections = current.payload.order?.items?.some((item: any) =>
+            item.flavor_contents?.length || item.event_recipe?.length || item.selection_labels?.length || item.selections?.flavors);
+          if (hasSelections && !flavorCatalog) {
+            flavorCatalog = rpc("shop_api", { p_action: "flavor_collection", p_payload: {} }, 2500, env("SUPABASE_ANON_KEY"))
+              .then(collection => Array.isArray(collection?.flavors) ? collection.flavors : [])
+              .catch(() => []);
+          }
+          const rendered = renderEmail(current.payload, hasSelections ? await flavorCatalog : []);
           // Persist the complete provider body before the network call. The second
           // preparation also rechecks order eligibility after rendering.
           current = await service("prepare_email", { id: row.id, lease_token: row.lease_token, provider_payload: {

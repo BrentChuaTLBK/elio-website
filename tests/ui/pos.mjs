@@ -65,14 +65,29 @@ try{
  assert.equal(await row.getByRole('button').count(),1);
  await row.getByRole('button').click();
  const receipt=page.locator('.pos-receipt');
+ async function checkLinkLayout(view){
+  for(const width of [320,390,1024]){
+   await page.setViewportSize({width,height:900});
+   const layout=await view.locator('[data-private-order-link]').evaluate(section=>{
+    const rect=tag=>section.querySelector(tag).getBoundingClientRect();
+    const label=rect('label'),input=rect('input'),button=rect('button');
+    return {above:label.bottom<=input.top,aligned:Math.abs(input.y-button.y)<1,separate:button.left>=input.right+6,
+     fills:Math.abs(button.right-section.getBoundingClientRect().right)<2,tappable:button.height>=44&&input.height>=44};
+   });
+   assert(Object.values(layout).every(Boolean),'Private link layout at '+width+'px: '+JSON.stringify(layout));
+  }
+  await page.setViewportSize({width:1440,height:1000});
+ }
  await receipt.getByRole('button',{name:'Copy link',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.copied.at(-1)),link);
  assert(await receipt.locator('.totals + [data-private-order-link]').isVisible());
+ await checkLinkLayout(receipt);
  await receipt.getByRole('button',{name:'Order history / status'}).click();
  const kitchen=page.locator('#admin-dialog');
  await kitchen.getByRole('button',{name:'Copy link',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.copied.at(-1)),link);
  assert(await kitchen.locator('.order-total + [data-private-order-link]').isVisible());
+ await checkLinkLayout(kitchen);
  await page.emulateMedia({media:'print'});assert.equal(await kitchen.locator('[data-private-order-link]').isVisible(),false);await page.emulateMedia({media:'screen'});
  await kitchen.getByRole('button',{name:'Edit order',exact:true}).click();
  

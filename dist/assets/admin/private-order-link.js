@@ -1,8 +1,11 @@
 // Only the open order asks for its customer link. The token stays in the URL fragment.
 export function privateOrderLinkField() {
   return `<section class="private-order-link" data-private-order-link aria-label="Private order link">
-    <label><span>Private order link</span><input data-receipt-link type="text" readonly autocomplete="off" spellcheck="false" placeholder="Loading link…"></label>
-    <button type="button" data-copy-link disabled>Copy link</button>
+    <label for="private-order-url">Private order link</label>
+    <div class="private-order-link-controls">
+      <input id="private-order-url" data-receipt-link type="text" readonly autocomplete="off" spellcheck="false" placeholder="Loading link…">
+      <button type="button" data-copy-link disabled>Copy link</button>
+    </div>
     <small role="status"></small>
   </section>`;
 }
