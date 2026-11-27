@@ -36,7 +36,6 @@ import { orderItemDetails, renderOrderFlavors } from './order-item-details.js';
 import { INSULATED_BAG_QUESTION_ID, insulatedBagQuestion } from '../shop/box-questions.js';
 import { pickupProofSection, bindPickupProof } from '../pickup-proof.js';
 import { mountOrderPhotos, orderPhotosMarkup } from './order-photos.js';
-import { mountPOS } from './pos.js?v=direct-workspace-1';
 import { privateOrderLinkField, bindPrivateOrderLink } from './private-order-link.js';
 import { mountLiveChecklist } from './live-checklist.js';
 import { mountOrderChecklists } from './order-checklists.js';
@@ -68,7 +67,7 @@ const PAYMENT = ['awaiting_payment', 'under_review', 'paid', 'rejected', 'cancel
 const FULFILLMENT = ['pending_confirmation', 'confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'completed', 'refunded', 'cancelled', 'expired'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const state = { view: 'overview', role: null, connected: false, products: [], categories: [], inventory: [], promos: [], zones: [], orders: [], settings: {}, staff: [], filters: { search: '', payment: '', fulfillment: '', date: '', method: '', refund: '', upcoming: false }, inventoryDates: [manilaDate()], inventoryDrafts: {} };
-let posController=null;
+let posController=null,loadingPOS=null;
 let staffUserId=null,bootstrapRequest=0,orderEditBaseline=null;
 let progressStorage;try{progressStorage=window.sessionStorage;}catch{}
 const orderView=adminOrderView(progressStorage),monthDrafts=inventoryMonthDrafts();
@@ -239,8 +238,8 @@ async function refresh() {
 }
 function render() {
   rememberOrderView();
-  if(state.view==='pos'&&state.connected&&posController)return;
-  posController?.destroy();posController=null;
+  if(state.view==='pos'&&state.connected&&loadingPOS&&$('#pos-manager'))return;
+  posController?.destroy();posController=null;loadingPOS=null;
   $('[data-view="checklist"]').hidden = !state.connected;
   if (state.view === 'checklist' && state.connected && checklistController) {
     checklistController.refresh();
@@ -286,7 +285,15 @@ function render() {
   const heldSettings=state.view==='settings'&&state.connected&&(settingsDraft.dirty()||settingsDraft.busy())?settingsDraft.form:null;
 $('#workspace').innerHTML = setupNotice() + views[state.view]();
   if(state.connected&&state.view==='pos'){
-    posController=mountPOS($('#pos-manager'),{role:state.role,openKitchenOrder:openPOSDetails,onOrderSaved:()=>{void refresh().catch(()=>toast('Refresh the dashboard to update its order totals.'));}});
+const host=$('#pos-manager');
+    host.innerHTML='<p role="status">Opening POS…</p>';
+    loadingPOS=import('./pos.js?v=direct-workspace-1').then(({mountPOS})=>{
+      if(!host.isConnected||!state.connected)return;
+      posController=mountPOS(host,{role:state.role,openKitchenOrder:openPOSDetails,onOrderSaved:()=>{void refresh().catch(()=>toast('Refresh the dashboard to update its order totals.'));}});
+      return posController;
+    }).catch(()=>{
+      if(host.isConnected)host.innerHTML='<p role="alert">The POS could not open. <button type="button" class="button button-secondary" data-action="retry-pos">Try again</button></p>';
+    });
   }
   if (state.connected && state.view === 'checklist') {
     checklistController = mountLiveChecklist($('#live-order-checklist'), {
@@ -805,7 +812,8 @@ async function enterPOS(id,intent){
   url.hash='pos';url.searchParams.delete('order');url.searchParams.delete('section');
   history.replaceState(null,'',url);
   render();
-  await posController?.open(id,intent);
+  const controller=posController||await loadingPOS;
+  await controller?.open(id,intent);
 }
 async function quickOrderAction(id,intent){
  if(!state.connected||!['owner','staff'].includes(state.role)||!await openOrder(id))return;
@@ -1126,6 +1134,7 @@ async function onAction(button) {
       } finally { button.disabled = false; }
       break;
     }
+    case 'retry-pos': $('#pos-manager')?.remove();render();break;
     case 'pos-delivery-receipt': await enterPOS(activeOrder.id,'delivery');break;
     case 'pos-receipt': await enterPOS(activeOrder.id,'receipt');break;
     case 'edit-order': if(['direct','in_person'].includes(activeOrder.order_source)){await enterPOS(activeOrder.id,'edit');}else startEditOrder(); break;
@@ -1155,7 +1164,7 @@ async function exportOrders() {
 
 document.addEventListener('click', async event => {
   const view = event.target.closest('[data-view]');
-  if(view&&state.view==='pos'&&view.dataset.view!=='pos'&&!posController?.canLeave())return;
+  if(view&&state.view==='pos'&&view.dataset.view!=='pos'&&posController&&!posController.canLeave())return;
   if(view&&state.view==='settings'&&view.dataset.view!==state.view&&!await settingsDraft.canLeave())return;
   if(view && state.view==='website-photos' && view.dataset.view!==state.view){const manager=$('#website-photos-manager');if(manager?.dataset.busy==='true'){toast('Please wait for the photo to finish saving.');return;}if(manager?.dataset.dirty==='true'&&!await confirmDialog('Discard unsaved website photo changes?',{title:'Unsaved photos',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;}
   if(view && state.view==='maintenance' && view.dataset.view!==state.view){const manager=$('#maintenance-manager');if(manager?.dataset.busy==='true'){toast('Please wait for maintenance settings to save.');return;}if(manager?.dataset.dirty==='true'&&!await confirmDialog('Discard unsaved maintenance settings?',{title:'Unsaved maintenance settings',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;}
@@ -1170,7 +1179,7 @@ document.addEventListener('click', async event => {
     if(manager?.dataset.dirty==='true' && !await confirmDialog('Leave accounting and discard these unsaved changes?',{title:'Unsaved accounting entry',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;
   }
   if(view?.dataset.newsletterTab)newsletterAdmin.selectTab(view.dataset.newsletterTab);
-  if (view) { if(compactNavigation.matches&&dashboardNavigation&&$('#admin-nav').contains(view)){dashboardNavigation.open=false;dashboardNavigation.querySelector('summary')?.focus();} if(view.dataset.view==='pos'||location.hash==='#pos'){const url=new URL(location.href);url.hash=view.dataset.view;history.replaceState(null,'',url);} state.view = view.dataset.view; state.productFilters = { search: '', status: '', category: '' }; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
+  if (view) { if(compactNavigation.matches&&dashboardNavigation&&$('#admin-nav').contains(view)){dashboardNavigation.open=false;dashboardNavigation.querySelector('summary')?.focus();} if(view.dataset.view==='pos'||location.hash==='#pos'){const url=new URL(location.href);url.hash=view.dataset.view==='pos'?'pos':'';url.searchParams.delete('order');url.searchParams.delete('section');history.replaceState(null,'',url);} state.view = view.dataset.view; state.productFilters = { search: '', status: '', category: '' }; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
   const button = event.target.closest('[data-action]');
   if (!button) return;
   event.preventDefault();
@@ -1575,7 +1584,8 @@ async function init() {
     const params = new URL(location.href).searchParams;
 if(state.view==='pos'&&(params.has('edit')||params.has('delivery_receipt'))){
       const delivery=params.get('delivery_receipt');
-      await posController.open(delivery||params.get('edit'),delivery?'delivery':'edit');
+      const controller=posController||await loadingPOS;
+      await controller?.open(delivery||params.get('edit'),delivery?'delivery':'edit');
       const url=new URL(location.href);url.searchParams.delete('edit');url.searchParams.delete('delivery_receipt');history.replaceState(null,'',url);
     }
     if (params.get('order') && await openOrder(params.get('order'))) {
