@@ -33,6 +33,8 @@ export function mountFlavorCarousel({ track, carousel, catalog, renderSlide, car
   let settleTimer;
   let layout;
   let navigationTarget = null;
+  let holdingDetails = false;
+  let touchOrigin = null;
   let touching = false;
   let touchSettling = false;
   const wrap = (index) => ((index % catalog.length) + catalog.length) % catalog.length;
@@ -76,7 +78,7 @@ export function mountFlavorCarousel({ track, carousel, catalog, renderSlide, car
     }
   }
   function settleCarousel() {
-    if (touching || autoplayFrame) return;
+    if (holdingDetails || touching || autoplayFrame) return;
     touchSettling = false;
     normalizePosition();
     navigationTarget = null;
@@ -132,6 +134,7 @@ export function mountFlavorCarousel({ track, carousel, catalog, renderSlide, car
     } else moveCarousel(event.key === 'ArrowRight' ? 1 : -1);
   });
   track.addEventListener('scroll', () => {
+    if (holdingDetails) return;
     if (autoplayFrame) { updateCarousel(); return; }
     // Native touch momentum can consume the buffer before the debounce runs.
     // Recenter at its outer edge, but don't interrupt button-driven animation.
@@ -145,22 +148,29 @@ export function mountFlavorCarousel({ track, carousel, catalog, renderSlide, car
   }, { passive: true });
   track.addEventListener('scrollend', () => {
     // Wait for the finger to lift and ignore the end of an interrupted arrow move.
-    if (touching) return;
+    if (holdingDetails || touching) return;
     if (navigationTarget !== null ? Math.abs(track.scrollLeft - navigationTarget) > 1 : !touchSettling) return;
     clearTimeout(settleTimer);
     settleCarousel();
   }, { passive: true });
-  track.addEventListener('touchstart', () => {
+  track.addEventListener('touchstart', (event) => {
     touching = true;
-    touchSettling = true;
-    prepareManualScroll();
+    touchSettling = false;
+    touchOrigin = event.touches[0]?.clientX;
+    holdAutoplay();
     navigationTarget = null;
     clearTimeout(settleTimer);
-    // Start each gesture in the original set, even during rapid repeat swipes.
+  }, { passive: true });
+  track.addEventListener('touchmove', (event) => {
+    if (touchSettling || touchOrigin == null || Math.abs(event.touches[0].clientX - touchOrigin) < 6) return;
+    touchSettling = true;
+    prepareManualScroll();
     normalizePosition();
   }, { passive: true });
   const endTouch = () => {
     touching = false;
+    touchOrigin = null;
+    if (!touchSettling) { syncAutoplay(); return; }
     // Let native momentum finish, then continue without a timed reading pause.
     resumeAt = 0;
     clearTimeout(autoplayTimer);
@@ -192,7 +202,7 @@ export function mountFlavorCarousel({ track, carousel, catalog, renderSlide, car
     // Keep the fractional position while paused; restoring snap here would jump.
   }
   function canAutoplay() {
-    return !reducedMotion.matches && canLoop && layout && inView && pageActive && !document.hidden && !touching && !touchSettling && navigationTarget === null && !document.querySelector('dialog[open]');
+    return !holdingDetails && !reducedMotion.matches && canLoop && layout && inView && pageActive && !document.hidden && !touching && !touchSettling && navigationTarget === null && !document.querySelector('dialog[open]');
   }
   function animateCarousel(time) {
     if (!canAutoplay()) { stopAutoplay(); return; }
@@ -244,5 +254,31 @@ export function mountFlavorCarousel({ track, carousel, catalog, renderSlide, car
   for (const dialog of dialogs) dialogObserver.observe(dialog, { attributes: true, attributeFilter: ['open'] });
   new ResizeObserver(measureCarousel).observe(track);
   measureCarousel();
-  return { slides, goToFlavor };
+  function holdForDetails() {
+    holdingDetails = true;
+    stopAutoplay();
+    clearTimeout(settleTimer);
+    clearTimeout(autoplayTimer);
+    navigationTarget = null;
+    touchSettling = false;
+    const left = track.scrollLeft;
+    track.classList.add('is-drifting');
+    jumpTo(left);
+  }
+  function returnFromDetails(link) {
+    const slide = link?.closest('.flavor-slide');
+    if (slide?.hasAttribute('data-carousel-copy')) {
+      const original = slides[Number(slide.dataset.flavorIndex)];
+      // Exchange identical loop copies at the same screen coordinate, including
+      // a partly visible card. Preserve the offset between the neighboring cards.
+      jumpTo(track.scrollLeft + original.getBoundingClientRect().left - slide.getBoundingClientRect().left);
+      link = original.querySelector('a');
+    }
+    link?.focus({preventScroll:true});
+    holdingDetails = false;
+    resumeAt = 0;
+    updateCarousel();
+    syncAutoplay();
+  }
+  return { holdForDetails, returnFromDetails };
 }

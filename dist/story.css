@@ -3,8 +3,7 @@
 .story-page .site-header{position:relative;background:var(--brown);color:var(--ivory)}
 .story-page .site-header .brand{color:var(--bronze-light)}
 .story-page .site-header .desktop-nav,.story-page .site-header .header-actions{color:var(--ivory)}
-.story-page .site-header .header-order{background:transparent;color:var(--ivory);border-color:var(--gold);font:17px/1.3 var(--body);min-height:44px;padding:12px 25px}
-.story-page .site-header .header-order:hover{background:rgba(248,243,234,.12)}
+.story-page .site-header .header-order{font:17px/1.3 var(--body);min-height:44px;padding:12px 25px}
 .story-page .site-header a:focus-visible,.story-page .site-header button:focus-visible{outline-color:var(--bronze-light)}
 .story-page .site-header .menu-toggle span{background:var(--ivory)}
 .story-page .site-header .mobile-nav:not([hidden]){background:var(--brown);color:var(--ivory);border-color:#795c46}

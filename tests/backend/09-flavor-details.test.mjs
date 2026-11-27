@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-export default async function({check,state}) {
+export default async function({check,state,db}) {
  const {api,ids}=state.h;
  let flavor;
  const details={product_type:'Small-batch cheesecake',serving:'Six squares per box\nKeep chilled'};
@@ -55,5 +55,24 @@ export default async function({check,state}) {
   await api('save_flavor_editor',{...menu,builder_cutout_url:null},ids.owner);
   const removed=await read();
   assert.equal(removed.builder_cutout_url,null);assert.deepEqual(removed.photos,[cover]);assert.equal(removed.price_cents,5000);
+ })();
+ await check('Texture footage follows flavor saves, visibility and both public collections',async()=>{
+  const p=await state.h.product({kind:'flavor',name:'Texture fixture',lead_days:0});
+  const path=ids.owner+'/a0000000-0000-4000-8000-000000000001.mp4';
+  const month=(await api('admin_bootstrap',{},ids.owner)).flavor_menus.current_month;
+  const menu={id:p.id,name:p.name,expected_month:month,current_month:true,next_month:false,hidden:false};
+  await assert.rejects(()=>api('save_product',{product:{...p,texture_video_path:path}},ids.owner),/Upload a texture video/);
+  await db.query("insert into storage.objects(bucket_id,name) values ('flavor-videos',$1)",[path]);
+  await api('save_product',{product:{...p,texture_video_path:path}},ids.owner);
+  await api('save_product',{product:p},ids.owner);
+  for(const action of ['home_catalog','flavor_collection']){
+    assert.equal((await api(action)).flavors.find(f=>f.id===p.id).texture_video_path,path);
+  }
+  await api('save_flavor_editor',{...menu,hidden:true,current_month:false},ids.owner);
+  for(const action of ['home_catalog','flavor_collection'])assert(!(await api(action)).flavors.some(f=>f.id===p.id));
+  await api('save_flavor_editor',{...menu,texture_video_path:null},ids.owner);
+  assert.equal((await api('flavor_collection')).flavors.find(f=>f.id===p.id).texture_video_path,null);
+  await api('save_flavor_editor',{...menu,texture_video_path:path},ids.owner);
+  assert.equal((await api('home_catalog')).flavors.find(f=>f.id===p.id).texture_video_path,path);
  })();
 }

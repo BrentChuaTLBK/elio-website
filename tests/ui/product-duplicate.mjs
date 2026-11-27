@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {textureClip} from '../helpers/flavor-video.mjs';
 import {createRequire} from 'node:module';
 import {readFile,readdir,mkdir,writeFile} from 'node:fs/promises';
 import {resolve,join,extname,sep} from 'node:path';
@@ -25,7 +26,7 @@ const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTAB
 const hold=(options={})=>{let started,release;const began=new Promise(r=>started=r),gate=new Promise(r=>release=r);held={...options,started,gate};return {began,release};};
 try{
  const ctx=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block',reducedMotion:'reduce'});
- await ctx.exposeBinding('duplicateUpload',(_,{path,type})=>{if(failUpload){failUpload=false;return {error:{message:'Simulated photo upload failure'}};}uploads.push({path,type});return {};});
+ await ctx.exposeBinding('duplicateUpload',async(_,{bucket,path,type})=>{if(failUpload){failUpload=false;return {error:{message:'Simulated photo upload failure'}};}if(bucket==='flavor-videos')await db.query("insert into storage.objects(bucket_id,name) values($1,$2)",[bucket,path]);uploads.push({path,type});return {};});
  await ctx.exposeBinding('duplicateRpc',async(_,{action,payload})=>{
   calls.push({action,payload:structuredClone(payload)});let plan;
   if(action==='save_product'&&held){plan=held;held=null;plan.started();await plan.gate;}
@@ -34,7 +35,7 @@ try{
  });
  await ctx.route('**/*',async route=>{
   const u=new URL(route.request().url());
-  if(u.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:`export function createClient(){return {auth:{initialize:async()=>({}),getSession:async()=>({data:{session:{user:{id:'${h.ids.owner}',email:'owner@example.test'}}}}),getUser:async()=>({data:{user:{id:'${h.ids.owner}'}}}),onAuthStateChange:()=>{}},rpc:async(n,p)=>window.duplicateRpc({action:p.p_action,payload:p.p_payload}),storage:{from:()=>({upload:async(path,file)=>window.duplicateUpload({path,type:file.type}),getPublicUrl:path=>({data:{publicUrl:'${origin}/fixture-photo.png?uploaded='+path}})})}}}`});
+  if(u.hostname==='esm.sh')return route.fulfill({contentType:'text/javascript',body:`export function createClient(){return {auth:{initialize:async()=>({}),getSession:async()=>({data:{session:{user:{id:'${h.ids.owner}',email:'owner@example.test'}}}}),getUser:async()=>({data:{user:{id:'${h.ids.owner}'}}}),onAuthStateChange:()=>{}},rpc:async(n,p)=>window.duplicateRpc({action:p.p_action,payload:p.p_payload}),storage:{from:bucket=>({upload:async(path,file)=>window.duplicateUpload({bucket,path,type:file.type}),getPublicUrl:path=>({data:{publicUrl:'${origin}/fixture-photo.png?uploaded='+path}})})}}}`});
   if(u.origin!==origin)return route.abort();
   if(u.pathname==='/fixture-photo.png')return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV9kAAAAASUVORK5CYII=','base64')});
   const file=resolve(root,'.'+u.pathname);if(!file.startsWith(root+sep))return route.abort();
@@ -82,8 +83,18 @@ try{
  await form.locator('#product-photos').setInputFiles({name:'cover.png',mimeType:'image/png',buffer:imageBytes});
  await page.waitForFunction(()=>document.querySelector('#photo-order-status').textContent.startsWith('1 photo'));
  assert.equal(await form.locator('[data-cutout-file]').count(),0);
+ const clipUpload=form.locator('[data-texture-field] input[type=file]');
+ await clipUpload.setInputFiles({name:'texture.webm',mimeType:'video/webm',buffer:textureClip});
+ await form.locator('[data-video-preview] video').waitFor({state:'attached'});
+ const clipPath=await form.locator('[name=texture_video_path]').inputValue();
+ assert.match(clipPath,/\.webm$/);
+ await clipUpload.setInputFiles({name:'wrong.mp4',mimeType:'video/mp4',buffer:imageBytes});
+ await page.waitForFunction(()=>document.querySelector('[data-video-status]').textContent.includes('Choose an MP4'));
+ assert.equal(await form.locator('[name=texture_video_path]').inputValue(),clipPath);
  await form.getByRole('button',{name:'Create flavor',exact:true}).click();await closed();
  const pistachio=(await invoke('admin_bootstrap')).products.find(p=>p.name==='New pistachio trio flavor');
+ assert.equal(pistachio.texture_video_path,clipPath);
+ assert.equal((await invoke('flavor_collection',{},null)).flavors.find(f=>f.id===pistachio.id).texture_video_path,clipPath);
  assert.equal(pistachio.price_cents,5000);assert.equal(pistachio.photos.length,1);
  await copy(pistachio);assert.equal(await form.locator('.photo-tile').count(),1);
  await form.getByRole('button',{name:'Remove photo 1',exact:true}).click();
@@ -94,6 +105,8 @@ try{
  await page.locator('[data-action=edit-flavor-menu][data-id="'+pistachio.id+'"]').click();
  const menuEditor=page.locator('[data-form=flavor-menu-editor]');
  assert.equal(await menuEditor.locator('[data-cutout-file]').count(),0);
+ assert.equal(await menuEditor.locator('[name=texture_video_path]').inputValue(),clipPath);
+ await menuEditor.getByRole('button',{name:'Remove video'}).click();
  await menuEditor.locator('[name=current_month]').check();
  await menuEditor.locator('[name=next_month]').check();
  await menuEditor.locator('#menu-cover-photo').setInputFiles({name:'updated-cover.png',mimeType:'image/png',buffer:imageBytes});
@@ -102,6 +115,7 @@ try{
  assert.notEqual(replacement,pistachio.photos[0]);
  await menuEditor.getByRole('button',{name:'Save flavor',exact:true}).click();await closed();
  const guestFlavor=(await invoke('catalog',{},null)).flavors.find(f=>f.id===pistachio.id);
+ assert.equal((await invoke('home_catalog',{},null)).flavors.find(f=>f.id===pistachio.id).texture_video_path,null);
  assert.deepEqual(guestFlavor.photos,[replacement]);assert.equal(guestFlavor.price_cents,5000);
  const orderDate=await h.day(3);
  await invoke('save_inventory',{rows:[{product_id:pistachio.id,date:orderDate,capacity:6,available:true}]});

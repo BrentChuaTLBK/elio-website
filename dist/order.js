@@ -2,7 +2,7 @@
   'use strict';
   await window.ELIO_CONTENT_READY;
   const { closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
-  const { createFlavorDialog } = await import('./assets/shop/flavor-dialog.js');
+  const { createFlavorDialog } = await import('./assets/shop/flavor-dialog.js?v=texture-1');
   const { flavors, featuredOrder, productImage, boxCollections, isAvailable } = window.ELIO_CONTENT;
   const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const catalog = [...new Set([...featuredOrder, ...flavors.map((flavor) => flavor.id)])].map((id) => flavors.find((flavor) => flavor.id === id)).filter(Boolean);
@@ -13,8 +13,8 @@
   const availability = (flavor) => !isAvailable(flavor) ? '<p class="availability-label">Currently unavailable</p>' : '';
   const products = document.querySelector('#order-products');
   const renderSlide = (flavor, index, copy = false) => `<div class="shop-flavor-card flavor-slide" data-flavor="${escape(flavor.id)}" data-flavor-index="${index}"${copy ? ' data-carousel-copy aria-hidden="true"' : ` role="group" aria-roledescription="slide" aria-label="${escape(flavor.name)}, ${index + 1} of ${catalog.length}"`}><a href="#flavor-${escape(flavor.id)}"${copy ? ' tabindex="-1"' : ''} aria-label="View ${escape(flavor.name)} flavor details${!isAvailable(flavor) ? ' — currently unavailable' : ''}">${photo(flavor)}<h3>${escape(flavor.name)}</h3>${availability(flavor)}</a></div>`;
-  const { mountFlavorCarousel } = await import('./assets/shop/flavor-carousel.js?v=1');
-  const { slides, goToFlavor } = mountFlavorCarousel({
+  const { mountFlavorCarousel } = await import('./assets/shop/flavor-carousel.js?v=return-2');
+  const { holdForDetails, returnFromDetails } = mountFlavorCarousel({
     track: products, carousel: document.querySelector('.shop-flavor-carousel'), catalog, renderSlide,
     carouselStatus: document.querySelector('#order-carousel-status'),
     emptyMessage: window.ELIO_CONTENT.collectionLoaded ? 'More little discoveries to come.' : 'Our flavors couldn’t load just now. Please try again shortly.',
@@ -32,20 +32,14 @@
     if (!flavor) {
       if (dialog.open) {
         flavorDialog.close(() => {
-          if (!trigger?.isConnected) return;
-          const slide = trigger.closest('.flavor-slide');
-          if (slide) {
-            const index = Number(slide.dataset.flavorIndex);
-            goToFlavor(index, false);
-            trigger = slides[index].querySelector('a');
-          }
-          trigger.focus({ preventScroll: true });
+          returnFromDetails(trigger?.isConnected ? trigger : null);
           trigger = null;
         });
       }
       return;
     }
     const source = trigger?.hash === location.hash ? trigger.querySelector('.product-photo') : null;
+    if (source && !dialog.open) holdForDetails();
     flavorDialog.open(flavor, source);
   }
   document.addEventListener('click', (event) => {

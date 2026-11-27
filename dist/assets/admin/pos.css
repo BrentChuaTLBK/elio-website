@@ -12,6 +12,16 @@
 
 /* Compact cashier layout; catalog management stays in Setup. */
 .event-toolbar{justify-content:flex-start;align-items:flex-end;gap:12px;margin-bottom:0}.event-toolbar>label:first-child{flex:0 1 220px;min-width:0;max-width:360px;margin:0}.event-toolbar>[data-action=new-event]{height:44px;white-space:nowrap}.event-toolbar .check{order:1;align-items:center;min-height:44px;margin:0 0 0 auto}.cashier-screen h1{font-size:29px;margin:16px 0 4px}.cashier-screen>p.muted{margin-bottom:12px}.cashier-screen .tabs{padding:10px 0 16px}.cashier-screen .event-toolbar label{margin-bottom:0}.cashier-screen .checkout-panel{position:sticky;top:18px}.cart-line-quick{grid-template-columns:minmax(0,1fr) max-content 36px}
+.box-add-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.box-add-controls .stock-quantity-label { width: 138px; }
+.box-add-controls .stock-quantity-label > span:first-child { font-size: 12px; font-weight: 600; }
 .cart-quantity {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 44px;

@@ -88,10 +88,6 @@
 @media (hover: hover) and (pointer: fine) {
   .flavor-tile:hover h3 { text-decoration: underline; text-decoration-color: #b99b77; text-underline-offset: .16em; text-decoration-thickness: 1px; }
 }
-@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .flavor-collection-tile .flavor-portrait { transition: transform 240ms ease-out; }
-  .flavor-collection-tile:hover .flavor-portrait { transform: translateY(-3px); }
-}
 @media (max-width: 620px) {
   #other-flavors-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 10px; padding-top: 14px; }
   .flavor-tile.flavor-collection-tile { gap: 10px; }

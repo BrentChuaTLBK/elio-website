@@ -64,6 +64,15 @@ a.flavor-tile .flavor-tile-image .product-photo,
   aspect-ratio: 1;
   border-radius: 14%;
 }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :is(.flavor-slide > a, a.flavor-tile) > :is(.product-photo, .flavor-tile-image) {
+    transition: transform 350ms cubic-bezier(.2,.7,.2,1), box-shadow 200ms ease-out;
+  }
+  :is(.flavor-slide > a, a.flavor-tile):is(:hover, :focus-visible) > :is(.product-photo, .flavor-tile-image) {
+    transform: translateY(-2px) scale(1.025);
+    box-shadow: 0 5px 14px rgb(61 37 28 / .12);
+  }
+}
 .flavor-carousel .product-placeholder::after,
 .flavor-tile .product-placeholder::after { border-radius: inherit; }
 .product-photo.flavor-portrait {
@@ -80,6 +89,44 @@ a.flavor-tile .flavor-tile-image .product-photo,
   height: 100%;
   object-fit: cover;
   transform: none;
+}
+.flavor-detail-layout > .flavor-portrait { position: relative; }
+.flavor-portrait .flavor-texture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 380ms ease-in-out;
+}
+.flavor-portrait .flavor-texture.is-playing { opacity: 1; }
+.flavor-video-toggle {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fffaf3;
+  cursor: pointer;
+}
+.flavor-video-toggle[hidden] { display: none; }
+.flavor-video-toggle svg {
+  width: 29px;
+  height: 29px;
+  padding: 6px;
+  border-radius: 50%;
+  background: rgb(50 32 23 / .83);
+}
+.flavor-video-toggle:focus-visible { outline: 2px solid white; outline-offset: -4px; }
+@media (prefers-reduced-motion: reduce) {
+  .flavor-portrait .flavor-texture { transition: none; }
 }
 .flavor-portrait.flavor-photo-fallback { color: #99704a; }
 .flavor-photo-fallback svg { width: 45%; height: 45%; }

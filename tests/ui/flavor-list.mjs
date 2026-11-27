@@ -25,6 +25,15 @@ try{
   let revision=0;
   // These are independent catalog/layout fixtures. Persistence has its own browser coverage.
   const loaded=async hash=>{if(revision)await page.evaluate(()=>sessionStorage.removeItem('elio-flavor-browse-v1'));await page.goto(origin+'/flavors.html?fixture='+(++revision)+(hash||''));await page.waitForFunction(()=>document.querySelector('.flavor-result-summary')?.textContent.length>0);await page.evaluate(()=>document.fonts.ready)};
+  async function hoverFlavor(tile,portrait){
+   await tile.hover();
+   await page.waitForFunction(el=>{
+    const m=new DOMMatrixReadOnly(getComputedStyle(el).transform);
+    return Math.abs(m.a-1.025)<.001 && Math.abs(m.f+2)<.1;
+   },await portrait.elementHandle());
+   await page.mouse.move(0,0);
+   await page.waitForFunction(el=>getComputedStyle(el).transform==='none',await portrait.elementHandle());
+  }
   const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await loaded();assert.equal(await page.locator('#monthly-title').textContent(),'September 2026');assert.equal(await page.locator('#next-month-title').textContent(),'October 2026');assert.equal(await page.locator('#monthly-label').textContent(),'This month’s favorites');
   assert.equal(await page.locator('#monthly-flavors .flavor-tile:visible').count(),4);assert.equal(await page.locator('#next-month-flavors .flavor-tile:visible').count(),4);
@@ -34,6 +43,7 @@ try{
   const size=await page.locator('#monthly-flavors .flavor-tile-image').first().boundingBox();assert.ok(size.width<=126);assert.ok(Math.abs(size.width-size.height)<=1);assert.equal(await page.locator('#monthly-flavors .flavor-tile-image .product-photo').first().evaluate(el=>getComputedStyle(el).borderRadius),'14%');
   assert.equal(await page.locator('#monthly-flavors').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),width>900?2:1);
   assert.equal(await page.locator('.flavors-grid .flavors-box').count(),0);assert.equal(await page.locator('[data-website-photo]').count(),2);await fits();
+  if(width===1440)await hoverFlavor(page.locator('#monthly-flavors .flavor-tile').first(),page.locator('#monthly-flavors .flavor-tile-image').first());
   await page.screenshot({path:join(out,`monthly-${width}.png`),fullPage:true});
   await page.getByRole('searchbox').fill(' VÁN ');assert.deepEqual(await page.locator('#monthly-panel .flavor-tile:visible').evaluateAll(nodes=>nodes.map(node=>node.dataset.flavor)),['vanilla','vanilla']);
   for(const term of ['creamy','Earthy and Bold','Keep chilled']){await page.getByRole('searchbox').fill(term);assert.equal(await page.locator('#monthly-panel .flavor-tile:visible').count(),0);}
@@ -42,6 +52,7 @@ try{
   await page.getByRole('button',{name:'All flavors',exact:true}).click();await page.getByRole('tab',{name:'Full collection',exact:true}).click();assert.equal(await page.locator('#other-flavors-grid .flavor-tile:visible').count(),7);await fits();await page.screenshot({path:join(out,`collection-${width}.png`),fullPage:true});
   const grid = page.locator('#other-flavors-grid'), dialog = page.locator('#flavor-dialog');
   const vanilla = grid.locator('[data-flavor=vanilla]');
+  if(width===1440)await hoverFlavor(vanilla,vanilla.locator('.flavor-portrait'));
   assert.equal(await vanilla.innerText(), 'Vanilla');
   assert.equal(await vanilla.locator('.product-photo').evaluate(el => getComputedStyle(el).borderRadius), '14%');
   assert.equal(await grid.locator('.flavor-brief,.detail-meta,.flavor-month-badge').count(), 0);

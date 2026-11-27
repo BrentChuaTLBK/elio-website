@@ -90,10 +90,14 @@ function zoneFee(){return Number(selectedZone()?.fee_cents||0)}
 function zoneDescription(description){return typeof description==='string'&&description.trim()?`<div class="help-card delivery-zone-note"><strong>Delivery area information</strong><div class="delivery-zone-text">${esc(description)}</div></div>`:''}
 function updateZoneDescription(){const el=$('#delivery-zone-description');if(el)el.innerHTML=zoneDescription(selectedZone()?.description)}
 function sameDayEligible(){return sameDayBasketEligible(state.items,catalog.products,catalog.inventory,state.method)}
+let deliveryAttempted = false;
 function updateFulfillment(){
   const reason=deliveryRestriction(state.items,catalog.products,state.fulfillment_date,catalog.settings),button=$('[data-method="delivery"]'),notice=$('#fulfillment-notice');
-  if(button){button.disabled=!!reason;button.setAttribute('aria-describedby','fulfillment-notice')}
-  if(notice){notice.textContent=customerDateIssue(state.fulfillment_date,catalog.settings,state.method,new Date(),sameDayEligible())||(state.method==='delivery'?reason:'')||issues()[0]||reason;notice.hidden=!notice.textContent}
+  if(button){
+    if(reason && (deliveryAttempted || state.method==='delivery'))button.setAttribute('aria-describedby','fulfillment-notice');
+    else button.removeAttribute('aria-describedby');
+  }
+  if(notice){notice.textContent=((deliveryAttempted||state.method==='delivery')&&reason)||customerDateIssue(state.fulfillment_date,catalog.settings,state.method,new Date(),sameDayEligible())||issues()[0]||'';notice.hidden=!notice.textContent}
 }
 function issues(items=state.items){return [...basketStockIssues(items,catalog.products,catalog.inventory,state.fulfillment_date),...items.flatMap(line=>{const p=lineProduct(line);if(!p)return [`${line.name||'An item'} is no longer available. Remove it to continue.`];const a=displayAvailability(p);const totalQty=items.filter(l=>l.product_id===p.id).reduce((s,l)=>s+l.quantity,0);let issues=[];if(!a.available)issues.push(`${p.name}: ${a.reason}`);else if(totalQty<p.min_quantity)issues.push(`${p.name}: add at least ${minimumOrderAmount(p)} across your selected configurations.`);else if(state.fulfillment_date&&totalQty>a.remaining)issues.push(`${p.name}: only ${a.remaining} available on this date.`);try{selectionPrice(p,line.selections)}catch(e){issues.push(`${p.name}: ${e.message}`)}return issues})]}
 function displayAvailability(p){
@@ -132,11 +136,18 @@ async function renderShop(){
   document.body.classList.remove('viewing-order');
   app.innerHTML=`${catalog.settings.paused?'<div class="notice" role="status">'+esc(catalog.settings.pause_message||'We’re temporarily pausing new orders. Please check back soon.')+'</div>':''}
   <section class="fulfillment-bar" aria-label="Choose fulfillment"><div class="date-field"><span id="fulfillment-date-label">Choose your date</span><div id="customer-date-picker"></div></div><div class="method-toggle" role="group" aria-label="Pickup or delivery"><button data-method="pickup" class="${state.method==='pickup'?'selected':''}" aria-pressed="${state.method==='pickup'}">Pickup</button><button data-method="delivery" class="${state.method==='delivery'?'selected':''}" aria-pressed="${state.method==='delivery'}">Delivery</button></div></section><div id="fulfillment-notice" class="notice" role="status" hidden></div>
-  <div class="shop-layout"><section id="cheesecake-boxes"><div class="section-heading" data-store-section="shop-boxes"><h2>Our Cheesecake Boxes</h2><span class="muted">A box for every craving.</span></div><div id="product-grid" class="product-grid"></div></section><aside id="cart" class="panel cart-panel" aria-label="Your basket"></aside></div><button id="mobile-cart" class="mobile-cart" aria-haspopup="dialog" aria-controls="quick-cart-dialog" aria-expanded="false" hidden></button>`;
+  <div class="shop-layout"><section><div class="section-heading" data-store-section="shop-boxes"><h2>Our Cheesecake Boxes</h2><span class="muted">A box for every craving.</span></div><div id="product-grid" class="product-grid"></div></section><aside id="cart" class="panel cart-panel" aria-label="Your basket"></aside></div><button id="mobile-cart" class="mobile-cart" aria-haspopup="dialog" aria-controls="quick-cart-dialog" aria-expanded="false" hidden></button>`;
   boxGrid=mountBoxGrid($('#product-grid'),productRoutes.open);
   renderProducts();renderCart();watchSections(app);
-  customerCalendar=mountCustomerCalendar($('#customer-date-picker'),{value:state.fulfillment_date,settings:catalog.settings,method:state.method,allowSameDay:sameDayEligible(),onSelect:date=>{state.fulfillment_date=date;quote=null;persist();renderProducts();renderCart();if(configured)void loadInventory();else trioView?.update();}});
-  document.querySelectorAll('[data-method]').forEach(b=>b.onclick=()=>{state.method=b.dataset.method;quote=null;persist();renderShop()});
+  customerCalendar=mountCustomerCalendar($('#customer-date-picker'),{value:state.fulfillment_date,settings:catalog.settings,method:state.method,allowSameDay:sameDayEligible(),onSelect:date=>{deliveryAttempted=false;state.fulfillment_date=date;quote=null;persist();renderProducts();renderCart();if(configured)void loadInventory();else trioView?.update();}});
+  document.querySelectorAll('[data-method]').forEach(button=>button.onclick=()=>{
+    deliveryAttempted=button.dataset.method==='delivery';
+    if(deliveryAttempted && deliveryRestriction(state.items,catalog.products,state.fulfillment_date,catalog.settings)){
+      updateFulfillment();
+      return;
+    }
+    state.method=button.dataset.method;quote=null;persist();renderShop();
+  });
 }
 function renderProducts(){
  const grid=$('#product-grid');if(!grid||!boxGrid)return;

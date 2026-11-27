@@ -6,7 +6,7 @@
   await window.ELIO_CONTENT_READY;
   const {responsiveImage}=await import('./assets/responsive-images.js');
   const { flavorMetaHtml, closeFlavorOnBackdrop } = await import('./assets/shop/flavor-details.js');
-  const { createFlavorDialog, flavorPortrait } = await import('./assets/shop/flavor-dialog.js');
+  const { createFlavorDialog, flavorPortrait } = await import('./assets/shop/flavor-dialog.js?v=texture-1');
   const data = window.ELIO_CONTENT;
   const { flavors, featuredOrder, productImage } = data;
   const escape = text => String(text ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
