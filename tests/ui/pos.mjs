@@ -137,6 +137,29 @@ try{
  await page.getByLabel('Cash received · PHP').fill('300');await page.getByRole('button',{name:'Record sale',exact:true}).click();
  await page.getByRole('heading',{name:'Order saved'}).waitFor();assert.match(await page.locator('#dialog-body').innerText(),/79\.50/);
  assert(await page.locator('#dialog').getByRole('button',{name:'Reference photos',exact:true}).isVisible());await page.getByRole('button',{name:'Next sale',exact:true}).click();
+ // The Gift option uses the real POS quote and records no payment.
+ await page.locator('[data-add="'+fixture.product.id+'"]').click();
+ await page.getByRole('button',{name:'View basket',exact:true}).click();
+ await chooseDate('fulfillment_date',fixture.date);
+ await page.getByLabel('Fulfillment',{exact:true}).selectOption('delivery');
+ await page.getByLabel('Exact delivery fee · PHP').fill('100');
+ await page.getByRole('checkbox',{name:'Gift · waive all charges'}).check();
+ assert.match(await page.locator('.totals .grand').innerText(),/Gift total\s*₱0\.00/);
+ await page.getByRole('button',{name:'Review sale',exact:true}).click();
+ await page.getByRole('button',{name:'Record gift',exact:true}).waitFor({timeout:5000}).catch(async error=>{
+  throw Error(error.message+' '+await page.locator('#page-error').textContent());
+ });
+ assert.match(await page.locator('.pending-review [data-review-payment]').innerText(),/No payment required/);
+ assert.equal(await page.getByLabel('Payment status').count(),0);
+ assert.match(await page.locator('.pending-review .grand').innerText(),/Gift total\s*₱0\.00/);
+ await page.getByRole('button',{name:'Record gift',exact:true}).click();
+ await page.getByRole('heading',{name:'Order saved'}).waitFor();
+ assert.match(await page.locator('#dialog-body .notice').innerText(),/₱0\.00 · Gift/);
+ const savedGift=(await invoke('pos_orders',{})).find(order=>order.gift);
+ assert.equal(savedGift.total_cents,0);
+ assert.equal(savedGift.discount_cents,0);
+ assert.equal(savedGift.fulfillment_status,'confirmed');
+ await page.getByRole('button',{name:'Next sale',exact:true}).click();
  // Import flavors first, then boxes, retaining custom event items and independent stock.
  await page.setViewportSize({width:1440,height:1000});await page.getByRole('button',{name:'In-person sales',exact:true}).click();await page.locator('#event-select').selectOption(event.id);await page.locator('[data-add]').first().waitFor();await page.getByRole('button',{name:'Setup',exact:true}).click();
  await page.getByRole('button',{name:'Import flavors',exact:true}).click();

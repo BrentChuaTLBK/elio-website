@@ -2,8 +2,12 @@ import {isActiveFulfillment,needsPaymentReview} from './refund-status.js';
 import {deliveryFeeSummary} from '../delivery-fee.js';
 const closed=new Set(['cancelled','expired','completed','refunded']);
 const label=value=>String(value||'').replaceAll('_',' ').replace(/^\w/,c=>c.toUpperCase());
-export function isUpcomingOrder(order,today){
- return isActiveFulfillment(order)&&(order.fulfillment_date>=today||order.payment_status==='paid');
+export function isUpcomingOrder(order){
+ return isActiveFulfillment(order);
+}
+export function canEditDeliveryTracking(order){
+ return order.method==='delivery' && order.payment_status==='paid' && !order.refund_label &&
+  ['confirmed','preparing','out_for_delivery'].includes(order.fulfillment_status);
 }
 export function matchesOrderView(order,view,today){
  if(view==='review')return needsPaymentReview(order);
@@ -25,5 +29,5 @@ export function orderNextStep(order){
 export function orderQuickPanel(order,{escapeHtml:esc,money,formatDate,locked=false}){
  const next=orderNextStep(order),disabled=locked?'disabled':'',id=esc(order.id);
  const line=(title,value)=>`<div class="order-quick-line"><span>${title}</span><strong>${value}</strong></div>`;
- return `<span class="eyebrow">Next action</span><h2 id="order-quick-title" tabindex="-1">${esc(next.title)}</h2><p class="muted">${esc(order.reference)} · ${esc(order.buyer?.name||'Customer')}</p>${line('Items',esc((order.items||[]).map(i=>i.quantity+' × '+i.name).join(' · ')||'See full order for item details'))}${line('Due',esc(formatDate(order.fulfillment_date)))}${line('Method',esc(label(order.method)))}${line('Total',money(order.total_cents))}${order.delivery_charge?`<p class="muted">${esc(deliveryFeeSummary(order,money))}</p>`:''}<div class="order-quick-actions">${needsPaymentReview(order)?`<button type="button" class="button button-secondary" data-action="quick-order" data-intent="proof" data-id="${id}" ${disabled}>View payment proof</button>`:''}${next.action!=='details'?`<button type="button" class="button" data-action="quick-order" data-intent="${next.action}" data-id="${id}" ${disabled}>${esc(next.label)}</button>`:''}<button type="button" class="button button-quiet" data-action="open-order" data-id="${id}" ${disabled}>Open full order →</button></div><p class="muted">${needsPaymentReview(order)?'Check the uploaded receipt and the amount received before approving.':'Full order includes customer details, staff notes and order history.'}</p>`;
+ return `<span class="eyebrow">Next action</span><h2 id="order-quick-title" tabindex="-1">${esc(next.title)}</h2><p class="muted">${esc(order.reference)} · ${esc(order.buyer?.name||'Customer')}</p>${line('Items',esc((order.items||[]).map(i=>i.quantity+' × '+i.name).join(' · ')||'See full order for item details'))}${line('Due',esc(formatDate(order.fulfillment_date)))}${line('Method',esc(label(order.method)))}${line('Total',money(order.total_cents))}${order.delivery_charge?`<p class="muted">${esc(deliveryFeeSummary(order,money))}</p>`:''}<div class="order-quick-actions">${needsPaymentReview(order)?`<button type="button" class="button button-secondary" data-action="quick-order" data-intent="proof" data-id="${id}" ${disabled}>View payment proof</button>`:''}${next.action!=='details'?`<button type="button" class="button" data-action="quick-order" data-intent="${next.action}" data-id="${id}" ${disabled}>${esc(next.label)}</button>`:''}${canEditDeliveryTracking(order)?`<button type="button" class="button button-secondary" data-action="quick-order" data-intent="tracking" data-id="${id}" ${disabled}>Tracking link</button>`:''}<button type="button" class="button button-quiet" data-action="open-order" data-id="${id}" ${disabled}>Open full order →</button></div><p class="muted">${needsPaymentReview(order)?'Check the uploaded receipt and the amount received before approving.':'Full order includes customer details, staff notes and order history.'}</p>`;
 }

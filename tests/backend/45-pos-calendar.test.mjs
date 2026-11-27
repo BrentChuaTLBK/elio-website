@@ -5,8 +5,10 @@ export default async function({db,check,state}){
  const h=state.h,{api,ids,scalar}=h,{product,date}=await accountingFixture(h),today=await h.day(0),later=await h.day(3);let pickup,delivery;
  const create=async changes=>{const p={order_source:'direct',method:'pickup',fulfillment_date:date,items:[h.item(product)],paid:true,payment:{method:'cash',cash_received_cents:50000},buyer:{name:'Direct calendar customer',phone:'09170000000'},...changes};return api('pos_create_order',{...p,expected_quote:await api('pos_quote',p,ids.staff),idempotency_key:randomUUID()},ids.staff);};
  const queued=id=>scalar('select (select to_jsonb(e) from elio.calendar_events e where order_id=$1)',[id]);
- await check('paid direct pickup and delivery orders appear in the admin calendar and Google sync queue; unpaid stays out',async()=>{
-  const unpaid=await create({paid:false});assert.equal(await queued(unpaid.id),null);
+ await check('Unpaid Direct orders enter Google’s queue and paid Direct orders appear on both calendars',async()=>{
+  const unpaid=await create({paid:false});
+  assert.equal(unpaid.payment_deadline,null);
+  assert.equal((await queued(unpaid.id)).desired.payment_status,'awaiting_payment');
   pickup=await create({});delivery=await create({method:'delivery',delivery_fee_pending:true,recipient:{name:'Delivery client',phone:'09171111111'},address:{line1:'QA street',locality:'Quezon City'}});
   const calendar=await api('calendar_list',{from:date,to:date},ids.staff);
   for(const order of [pickup,delivery]){const entry=calendar.orders.find(x=>x.id===order.id);assert(entry);assert.equal(entry.method,order.method);assert.equal(entry.date,date);assert.equal((await queued(order.id)).desired.method,order.method);}

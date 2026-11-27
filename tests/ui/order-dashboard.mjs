@@ -25,6 +25,11 @@ async function make(width=1440){
   const ok=result=>({data:structuredClone(result),error:null}),fail=error=>({data:null,error});
   if(action==='catalog')return ok(data.catalog);
   if(action==='get_order'){if(data.readError)return fail(data.readError);return ok([data.order,data.otherOrder,...(data.extraOrders||[])].find(o=>o.id===payload.order_id));}
+  if(action==='save_delivery_tracking'){
+   const order=[data.order,data.otherOrder].find(o=>o.id===payload.order_id);
+   assert(payload.idempotency_key&&order.revision===payload.revision);
+   order.delivery_tracking_url=payload.tracking_url;order.revision++;return ok(order);
+  }
   if(action==='admin_bootstrap'){if(data.bootstrapError)return fail(data.bootstrapError);return ok({role:data.role,products:[data.product,...data.flavors],categories:[],inventory:data.inventory,promos:[],zones:[],orders:[data.order,data.otherOrder,...(data.extraOrders||[])],settings:data.settings,staff:[],inventory_default:60,flavor_menus:{current_month:month+'-01',next_month:nextMonth+'-01',menus:data.menus},email_status:[]});}
   if(action==='set_fulfillment'){const order=[data.order,data.otherOrder,...(data.extraOrders||[])].find(o=>o.id===payload.order_id);assert(payload.idempotency_key);if(payload.revision!==order.revision)return fail({code:'P0001',message:'Order changed. Reload and review.'});order.fulfillment_status=payload.status;order.revision++;return ok(order);}
   if(action==='quote'){if(data.expiredPromo&&payload.promo_code)return fail({message:'This code has expired.',code:'P0001'});const discount=payload.promo_code?data.discount:0;return ok({...data.order,discount_cents:discount,total_cents:105000-discount,promo_snapshot:payload.promo_code?{code:payload.promo_code}:null});}
@@ -81,7 +86,7 @@ try{
     {group:'Add an insulated bag with ice? We recommend it for longer trips.',label:'No',quantity:1},
   ];
   await admin(t);assert.match(await page.locator('#workspace').innerText(),/ELIO-OVERDUE/);await view(page,'orders');assert.equal(await page.locator('#order-quick-panel').isVisible(),false);assert.equal(await page.locator('[data-order-view=review] span').innerText(),'1');assert.equal(await page.locator('[data-order-view=today] span').innerText(),'2');assert.equal(await page.locator('[data-order-view=awaiting_payment] span').innerText(),'2');
-  await page.locator('[data-filter=upcoming]').check();assert.deepEqual(await page.locator('[data-order-row]').evaluateAll(rows=>rows.map(row=>row.dataset.orderRow)),['overdue','order1','order2','later','awaiting-future']);assert.equal(await page.locator('[data-order-row=overdue]').isVisible(),true);
+  await page.locator('[data-filter=upcoming]').check();assert.deepEqual(await page.locator('[data-order-row]').evaluateAll(rows=>rows.map(row=>row.dataset.orderRow)),['overdue','awaiting-past','rejected-past','order1','order2','later','awaiting-future']);assert.equal(await page.locator('[data-order-row=overdue]').isVisible(),true);
   await page.locator('[data-order-view=awaiting_payment]').click();assert.equal(await page.locator('[data-filter=upcoming]').isChecked(),false);assert.equal(await page.locator('.order-view-title').innerText(),'Awaiting payment');assert.deepEqual(await page.locator('[data-order-row]').evaluateAll(rows=>rows.map(row=>row.dataset.orderRow).sort()),['awaiting-future','awaiting-past']);
   await page.reload();await page.locator('#order-table').waitFor();assert.equal(await page.locator('[data-order-view=awaiting_payment]').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('#order-table tbody tr').count(),2);await page.screenshot({path:join(out,'awaiting-payment-'+width+'.png'),fullPage:true});
   await page.locator('#order-search').fill('AWAITING');await view(page,'overview');await page.locator('[data-action=upcoming]').click();assert.equal(await page.locator('[data-order-view=all]').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('#order-search').inputValue(),'');assert.equal(await page.locator('[data-filter=upcoming]').isChecked(),true);assert.equal(await page.locator('[data-order-row=overdue]').isVisible(),true);
@@ -99,6 +104,21 @@ try{
   await quick(page,'order2').click();data.otherOrder.fulfillment_status='completed';const mutations=data.calls.filter(c=>c.action==='set_fulfillment').length;await page.locator('#order-quick-panel [data-intent=progress]').click();await page.locator('#print-order').waitFor();assert.equal(await page.locator('.site-dialog').count(),0);assert.equal(data.calls.filter(c=>c.action==='set_fulfillment').length,mutations);await page.locator('#dialog-close').click();
   await quick(page,'order1').click();const release=hold(data,'get_order');await page.locator('#order-quick-panel [data-intent=progress]').click();await page.getByRole('heading',{name:'Opening order',exact:true}).waitFor();await page.locator('#dialog-close').click();release();await page.waitForTimeout(50);assert.equal(await page.locator('#admin-dialog').evaluate(el=>el.open),false);assert.equal(await page.locator('.site-dialog').count(),0);assert.equal(data.calls.filter(c=>c.action==='set_fulfillment').length,mutations);
   await page.screenshot({path:join(out,'orders-'+width+'.png'),fullPage:true});await finish(t,'AD05–07 task memory, keyboard/print selection, private proof, explicit payment/progress, closed/refunded rows, stale order and closed-dialog request '+width);
+ }
+ {
+  const t=await make(390),{page,data}=t;seed(data);
+  Object.assign(data.otherOrder,{method:'delivery',fulfillment_status:'out_for_delivery'});
+  await admin(t);await view(page,'orders');
+  await quick(page,'order2').click();
+  await page.getByRole('button',{name:'Tracking link',exact:true}).click();
+  const field=page.getByRole('textbox',{name:'Tracking link',exact:true});
+  await field.waitFor();
+  assert(await field.evaluate(input=>input===document.activeElement));
+  await field.fill('https://delivery.lalamove.com/track/demo');
+  await page.getByRole('button',{name:'Save tracking link',exact:true}).click();
+  await page.getByRole('link',{name:'Open current tracking link'}).waitFor();
+  assert.equal(data.otherOrder.delivery_tracking_url,'https://delivery.lalamove.com/track/demo');
+  await finish(t,'A dispatched website delivery opens the tracking field from the order panel and saves the link');
  }
  {
   const t=await make(),{page,data}=t;seed(data);data.role='staff';await admin(t);await view(page,'orders');await quick(page,'order1').click();const release=hold(data,'get_order');await page.locator('#order-quick-panel [data-intent=approve]').click();await page.getByRole('heading',{name:'Opening order',exact:true}).waitFor();data.session=null;await page.evaluate(()=>fixtureAuthChange('SIGNED_OUT',null));release();await page.waitForURL('**/admin-account.html?next=manage.html');assert.equal(data.calls.filter(c=>c.action==='approve_payment').length,0);await finish(t,'staff sign-out during quick-action read cannot reopen or approve an order');
