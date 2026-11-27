@@ -12,11 +12,21 @@ try{
  await ctx.route('**/*',async route=>{
   const u=new URL(route.request().url());if(u.origin!==origin)return route.abort();
   if(u.pathname==='/assets/admin/client.js')return route.fulfill({contentType:'text/javascript',body:helpers});
-  if(u.pathname==='/test')return route.fulfill({contentType:'text/html',body:`<!doctype html><button id="print">Print</button><p id="error"></p><script type="module">import {printOrderSlips} from '/assets/admin/order-slips.js';document.querySelector('#print').onclick=()=>printOrderSlips(window.orders).catch(e=>document.querySelector('#error').textContent=e.message);</script>`});
+  if(u.pathname==='/test')return route.fulfill({contentType:'text/html',body:`<!doctype html><button id="print">Print</button><p id="error"></p><script type="module">import {printOrderSlips} from '/assets/admin/order-slips.js';document.querySelector('#print').onclick=()=>printOrderSlips(window.orders,{products:window.products}).catch(e=>document.querySelector('#error').textContent=e.message);</script>`});
   const path=resolve(root,'.'+u.pathname);if(!path.startsWith(root+sep))return route.abort();
-  try{return route.fulfill({contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css'})[extname(path)]||'application/octet-stream',body:await readFile(path)});}catch{return route.fulfill({status:404,body:''});}
+  try{return route.fulfill({contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.webp':'image/webp'})[extname(path)]||'application/octet-stream',body:await readFile(path)});}catch{return route.fulfill({status:404,body:''});}
  });
  const page=await ctx.newPage();await page.goto(origin+'/test');
+ const products=[{id:'matcha-flavor',kind:'flavor',name:'Matcha',photos:['assets/flavors-concept.webp']}];
+ await page.evaluate(products=>{window.products=products;},products);
+ const trio=base.items[1];
+ trio.selections={'insulated-bag':{no:1}};
+ trio.flavor_contents=[{product_id:'matcha-flavor',name:'Matcha',quantity:1},{product_id:'vanilla-flavor',name:'Vanilla',quantity:2}];
+ trio.selection_labels=[
+  {group:'Flavors per box',label:'Matcha',quantity:1,surcharge_cents:2500},
+  'Flavors per box: 2 × Vanilla',
+  {group_id:'insulated-bag',group:'Add an insulated bag with ice?',label:'No · Paper bag only',quantity:1},
+ ];
  const many={...base,reference:'ELIO-12-ITEMS',instructions:'Keep upright. Handle carefully.',items:Array.from({length:12},(_,i)=>({...base.items[0],name:'Test box '+(i+1),selection_labels:['Vanilla × 1 · Chocolate × 1 · Matcha × 1']})),subtotal_cents:1080000,discount_cents:10000,total_cents:1100000};
  const cases=[['compact-quarter',[base],1],['half-sheet',[many],1],['mixed-batch',[base,many,base,base],2]];
  for(const [name,orders,expectedSheets] of cases){
@@ -25,7 +35,13 @@ try{
   await preview.locator('.print-slips:not([disabled])').waitFor({timeout:15000}).catch(async()=>{throw Error(await preview.locator('[role=status]').textContent());});
   assert.equal(await preview.locator('.slip').count(),orders.length);
   assert.equal(await preview.locator('.print-sheet').count(),expectedSheets);
-  if(name==='compact-quarter')assert.equal(await preview.locator('.slip').getAttribute('data-size'),'quarter');
+  if(name==='compact-quarter'){
+   assert.equal(await preview.locator('.slip').getAttribute('data-size'),'quarter');
+   assert.deepEqual(await preview.locator('.order-flavors li').allTextContents(),['Matcha','2 × Vanilla']);
+   assert.equal(await preview.locator('.order-packing').innerText(),'Insulated · No');
+   assert(await preview.locator('.order-flavors li').first().locator('img').evaluate(img=>img.naturalWidth>0));
+   assert(!await preview.locator('#slips').textContent().then(text=>text.includes('Add an insulated bag with ice?')));
+  }
   if(name==='half-sheet')assert.equal(await preview.locator('.slip').getAttribute('data-size'),'half');
   for(const paper of ['a4','letter']){
    await preview.locator('#paper-size').selectOption(paper);await preview.locator('.print-slips:not([disabled])').waitFor();

@@ -31,7 +31,9 @@ import { confirmFlavorRemoval } from './flavor-confirmation.js';
 import { socialContactMessage } from './checkout-fields.js';
 import { fulfillmentStatus, matchesFulfillmentStatus, isActiveFulfillment, needsPaymentReview } from './refund-status.js';
 import { renderProductPhotos, bindProductPhotoOrder } from './product-photos.js';
-import { printOrderSlips } from './order-slips.js?v=slip-copies-1';
+import { printOrderSlips } from './order-slips.js?v=flavor-details-1';
+import { orderItemDetails, renderOrderFlavors } from './order-item-details.js';
+import { INSULATED_BAG_QUESTION_ID, insulatedBagQuestion } from '../shop/box-questions.js';
 import { pickupProofSection, bindPickupProof } from '../pickup-proof.js';
 import { mountOrderPhotos, orderPhotosMarkup } from './order-photos.js';
 import { mountLiveChecklist } from './live-checklist.js';
@@ -598,6 +600,10 @@ function captureProduct() {
   }
   if (productDraft.kind !== 'flavor') {
     for (const [gi, question] of (productDraft.box_questions || []).entries()) {
+      if (question.id === INSULATED_BAG_QUESTION_ID) {
+        productDraft.box_questions[gi] = insulatedBagQuestion(cents(fieldValue(form, 'insulated_price_' + gi)));
+        continue;
+      }
       question.label = fieldValue(form, 'group_label_' + gi).trim();
       for (const [ci, choice] of question.choices.entries()) {
         choice.label = fieldValue(form, `choice_label_${gi}_${ci}`).trim();
@@ -611,7 +617,14 @@ function captureProduct() {
   productDraft.option_groups = [];
 }
 function boxQuestionFields(questions) {
-  return questions.map((question, gi) => `<fieldset class="option-group">
+  return questions.map((question, gi) => {
+    if (question.id === INSULATED_BAG_QUESTION_ID) return `<fieldset class="option-group">
+      <legend>Insulated bag with ice</legend>
+      <p class="muted">Customers choose Yes or No.</p>
+      ${input('insulated_price_' + gi, 'Extra price for Yes · PHP', amount(question.choices.find(choice => choice.id === 'yes')?.surcharge_cents), 'number', 'min="0" max="1000000" step="0.01"')}
+      <button type="button" class="button button-quiet" data-action="remove-group" data-index="${gi}">Remove insulated bag preset</button>
+    </fieldset>`;
+    return `<fieldset class="option-group">
     <legend>Question ${gi + 1}</legend>
     ${input('group_label_' + gi, 'Question', question.label, 'text', 'required maxlength="160" placeholder="What packaging would you like?"')}
     ${question.choices.map((choice, ci) => `<div class="field-row">
@@ -621,10 +634,12 @@ function boxQuestionFields(questions) {
     </div>`).join('')}
     <div class="row-actions"><button type="button" class="button button-secondary" data-action="add-choice" data-index="${gi}">+ Add choice</button>
     <button type="button" class="button button-quiet" data-action="remove-group" data-index="${gi}">Remove question</button></div>
-  </fieldset>`).join('');
+    </fieldset>`;
+  }).join('');
 }
 function refreshBoxQuestions(focus) {
   $('[data-box-questions]').innerHTML = boxQuestionFields(productDraft.box_questions);
+  $('[data-action="add-insulated-bag"]').disabled = productDraft.box_questions.some(question => question.id === INSULATED_BAG_QUESTION_ID);
   $(focus)?.focus();
   catalogDraft.sync();
 }
@@ -697,7 +712,7 @@ function renderProductDialog() {
     ${kind === 'set' ? `<section class="subsection"><h3>Inside this box</h3><p class="muted">Choose a flavor for each of the three pieces. Repeats are welcome. Each box uses these flavors’ stock. If any required flavor is unavailable, the set is sold out.</p><div class="field-row three">${[0,1,2].map(i => select('box_flavor_' + i, 'Cheesecake ' + (i + 1), option('', 'Choose a flavor', savedFlavor(p.box_flavors?.[i])) + boxChoices.map(f => option(f.id, f.name, savedFlavor(p.box_flavors?.[i]))).join(''), 'data-box-flavor required')).join('')}</div></section>` : ''}
     ${kind === 'custom_box' ? '<p class="notice">Customers choose exactly three pieces. Each flavor adds its own surcharge and uses its own daily stock. Manage those choices in Flavors.</p>' : ''}
     ${flavor ? '<p class="notice">Inventory is counted in individual pieces and shared across all boxes. Set a quantity for each date in Daily quantities. Unavailable flavors also make their fixed sets unavailable.</p>' : `<section class="subsection"><h3>Ordering & fulfillment</h3><div class="field-row">${input('min_quantity', 'Minimum quantity per order', p.min_quantity || 1, 'number', 'required min="1" max="9999" step="1"')}${input('minimum_order_unit', 'Minimum order label', p.minimum_order_unit || 'box', 'text', 'maxlength="40"', 'Shown after a minimum of 2 or more. Use box for “boxes”, or enter your wording, such as “trays”.')}</div><div class="field-row">${input('lead_days', 'Full production days', p.lead_days || 0, 'number', 'required min="0" max="365" step="1"')}</div>${check('pickup_only', 'Pickup only', p.pickup_only === true)}${check('allow_same_day', 'Allow same-day orders (requires 0 production days)', p.allow_same_day === true)}</section>`}
-    ${flavor ? '' : `<section class="subsection"><h3>Box questions</h3><p class="muted">Customers choose one answer per question. Leave the extra price at zero for an included choice.</p><div data-box-questions>${boxQuestionFields(p.box_questions || [])}</div><button type="button" class="button button-secondary" data-action="add-group">+ Add question</button></section>`}
+    ${flavor ? '' : `<section class="subsection"><h3>Box questions</h3><p class="muted">Customers choose one answer per question. Leave the extra price at zero for an included choice.</p><div data-box-questions>${boxQuestionFields(p.box_questions || [])}</div><div class="row-actions"><button type="button" class="button button-secondary" data-action="add-group">+ Add question</button><button type="button" class="button button-secondary" data-action="add-insulated-bag" ${p.box_questions?.some(question => question.id === INSULATED_BAG_QUESTION_ID) ? 'disabled' : ''}>+ Add insulated bag preset</button></div></section>`}
     ${flavor ? flavorDetailFields(p,{input,textarea,disabled:ownerLocked()}) : ''}
     ${categoryFields(p,areaCategories(),esc,ownerLocked())}
     ${productLabelEditor(p.label)}
@@ -741,8 +756,10 @@ function selectionParts(item) {
 function selectionText(item) { return selectionParts(item).join(' · '); }
 function itemTable(items) {
   return `<div class="table-wrap"><table class="data-table order-items-table"><thead><tr><th>Product & flavors</th><th>Units</th><th>Unit price</th><th>Subtotal</th></tr></thead><tbody>${items.map(item => {
-    const parts = selectionParts(item);
-    return `<tr><td class="order-item-product"><strong class="order-item-name">${esc(item.name)}</strong>${parts.length ? `<ul class="order-item-options" aria-label="${item.flavor_contents?.length ? 'Flavors per box' : 'Product options'}">${parts.map(part => `<li>${esc(part)}</li>`).join('')}</ul>` : ''}</td><td>${item.quantity}</td><td>${money(item.unit_price_cents)}</td><td>${money(item.line_total_cents ?? item.quantity * item.unit_price_cents)}</td></tr>`;
+    const product = state.products.find(entry => entry.id === item.product_id);
+    const { flavors, insulated, extras } = orderItemDetails(item, product);
+    const choices = renderOrderFlavors(flavors, { products: state.products, esc, money });
+    return `<tr><td class="order-item-product"><strong class="order-item-name">${esc(item.name)}</strong>${choices}${insulated ? `<small class="order-packing">Insulated · ${esc(insulated)}</small>` : ''}${extras.length ? `<ul class="order-item-options" aria-label="Product options">${extras.map(part => `<li>${esc(part)}</li>`).join('')}</ul>` : ''}</td><td>${item.quantity}</td><td>${money(item.unit_price_cents)}</td><td>${money(item.line_total_cents ?? item.quantity * item.unit_price_cents)}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
@@ -1022,6 +1039,14 @@ async function onAction(button) {
       const questions = productDraft.box_questions ||= [];
       questions.push({ id: uid(), label: '', required_count: 1, choices: [1,2].map(() => ({ id: uid(), label: '', surcharge_cents: 0, active: true })) });
       refreshBoxQuestions(`[name="group_label_${questions.length-1}"]`); break;
+    }
+    case 'add-insulated-bag': {
+      captureProduct();
+      const questions = productDraft.box_questions ||= [];
+      if (questions.some(question => question.id === INSULATED_BAG_QUESTION_ID)) break;
+      questions.push(insulatedBagQuestion());
+      refreshBoxQuestions(`[name="insulated_price_${questions.length - 1}"]`);
+      break;
     }
     case 'remove-group':
       captureProduct(); productDraft.box_questions.splice(index, 1); refreshBoxQuestions('[data-action="add-group"]'); break;

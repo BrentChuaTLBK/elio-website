@@ -59,5 +59,7 @@
 input[type=number]{appearance:textfield;-moz-appearance:textfield}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}
 
+.pending-review .review-item { overflow-wrap: anywhere; }
+.pending-review .review-item small { margin-top: 4px; }
 #direct-payment-review{margin:18px 0}
 #direct-payment-review fieldset{margin:0;padding:0;border:0}
