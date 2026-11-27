@@ -93,7 +93,7 @@ export function eventBody(order:any,eventId:string) {
     ? `\n\n<a href="https://eliocheesecakes.com/order-photos.html#photos=${order.photo_share}">View order reference photos</a>` : '';
   return {id:eventId,summary:`${unpaid?'Unpaid · ':completed?'✓ Completed · ':''}${delivery?`Delivery · ${area}`:'Pickup'} · ${clean(order.reference,80)} · ${name(order)}`.slice(0,500),
     description:calendarDescription(order).split('\n').map(html).join('\n')+album,location:address,colorId:unpaid?eventColors.unpaid:completed?eventColors.completed:eventColors.paid,
-    start:{date:order.date},end:{date:end},visibility:'private',transparency:'transparent',status:'confirmed',
+    start:{date:order.date},end:{date:end},visibility:'default',transparency:'transparent',status:'confirmed',
     reminders:{useDefault:false},attendees:[],source:{title:'Open in Elio',url},
     extendedProperties:{private:{elio_source:'elio-orders',elio_order_id:order.id}}};
 }

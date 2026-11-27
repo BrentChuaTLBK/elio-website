@@ -1,8 +1,10 @@
 # Elio order calendar
 
-Staff open **Calendar** in the kitchen dashboard. Paid, confirmed, preparing, ready, dispatched and completed orders appear on their fulfillment date. Unpaid, cancelled, expired and refund-labelled orders are excluded. Pickup is green; delivery is blue and grouped alphabetically by delivery area. The day view and month agenda support search, fulfillment and area filters, plus copy buttons for customer details.
+Staff open **Calendar** in the kitchen dashboard to see paid orders by fulfillment date. The dashboard marks pickup in green and delivery in blue. The day view and month agenda support search, fulfillment and area filters, and copying customer details.
 
-Elio is the schedule authority. Reschedule in the order editor; Google Calendar changes never alter an order. Google events are private all-day events with the saved pickup/delivery window in the description. No customer invitations or calendar email notifications are sent. Only the selected calendar receives updates, and unrelated calendar events are never changed.
+Google Calendar shows active paid orders in green, unpaid orders in yellow, and completed orders in grey. Pickup or delivery appears in the event title. Expired website reservations are removed.
+
+ELIO syncs all-day order events to the staff calendar using **Default visibility**. Staff with **See event details** can read the customer and fulfillment information. To subscribe, staff open their calendar invitation and add the calendar. Order events have no guests. Reschedule orders in the order editor.
 
 ## Connection and operation
 
@@ -23,6 +25,6 @@ The separate worker credential is generated in Supabase Vault. Anonymous/custome
 ## Validation at release
 
 - 55 database migrations and 183 regression checks passed in isolated PostgreSQL tests.
-- Google adapter tests cover private events, OAuth scope, empty calendars, pagination reset, duplicate recovery, ownership checks, deletion, cleanup and retries.
+- Google adapter tests cover calendar sharing permissions, payment and completion colors, OAuth scope, empty calendars, pagination reset, duplicate recovery, ownership checks, deletion, cleanup and retries.
 - Browser checks passed at 1440, 390 and 320 pixels for calendar/copy/filter/deletion flows; accounting owner/staff and real Excel-download checks passed.
 - Live connection and worker checks created, rescheduled and deleted a temporary private event. The temporary queue record was removed; no test order was created. The normal authenticated Edge Function bundle was restored and verified.
