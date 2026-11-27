@@ -39,6 +39,7 @@ try{
     else if(action==='calendar_list')data={connection:{connected:false},orders:[]};
     else if(action==='admin_bootstrap')data={role:'owner',products:[],categories:[],orders:[pickupOrder],inventory:[],zones:[],staff:[],promos:[],email_status:[emailAlert],settings:{paused:false}};
     else if(action==='get_order')data=pickupOrder;
+    else if(action==='pos_payment_link')data={id:payload.order_id,token:'test-link-'.repeat(6)};
     else if(action==='send_pickup_reminder'){assert.equal(payload.order_id,pickupOrder.id);assert.equal(payload.revision,pickupOrder.revision);assert(payload.idempotency_key);pickupOrder={...pickupOrder,revision:2,pickup_reminder_count:1,pickup_reminder_requested_at:new Date().toISOString()};data=pickupOrder;}
     else if(action==='review_email_alert'){assert.equal(payload.id,emailAlert.id);assert.equal(payload.attempts,1);emailAlert.reviewed_at=new Date().toISOString();data={reviewed:true};}
     else if(action==='maintenance_admin')data={settings,revision,status:state()};

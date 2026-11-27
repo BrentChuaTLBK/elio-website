@@ -36,6 +36,7 @@ import { orderItemDetails, renderOrderFlavors } from './order-item-details.js';
 import { INSULATED_BAG_QUESTION_ID, insulatedBagQuestion } from '../shop/box-questions.js';
 import { pickupProofSection, bindPickupProof } from '../pickup-proof.js';
 import { mountOrderPhotos, orderPhotosMarkup } from './order-photos.js';
+import { privateOrderLinkField, bindPrivateOrderLink } from './private-order-link.js';
 import { mountLiveChecklist } from './live-checklist.js';
 import { mountOrderChecklists } from './order-checklists.js';
 import { productLabelSettings, labelTextColor, MAX_LABEL_LENGTH } from './product-label.js';
@@ -66,6 +67,7 @@ const PAYMENT = ['awaiting_payment', 'under_review', 'paid', 'rejected', 'cancel
 const FULFILLMENT = ['pending_confirmation', 'confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'completed', 'refunded', 'cancelled', 'expired'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const state = { view: 'overview', role: null, connected: false, products: [], categories: [], inventory: [], promos: [], zones: [], orders: [], settings: {}, staff: [], filters: { search: '', payment: '', fulfillment: '', date: '', method: '', refund: '', upcoming: false }, inventoryDates: [manilaDate()], inventoryDrafts: {} };
+let posController=null,loadingPOS=null;
 let staffUserId=null,bootstrapRequest=0,orderEditBaseline=null;
 let progressStorage;try{progressStorage=window.sessionStorage;}catch{}
 const orderView=adminOrderView(progressStorage),monthDrafts=inventoryMonthDrafts();
@@ -219,7 +221,7 @@ async function refresh() {
   if(!['owner','staff'].includes(result.role))throw new Error('Staff access is required.');
   if(!state.connected&&!location.hash&&!new URL(location.href).searchParams.has('order')){const saved=orderView.restore(staffUserId);if(saved){state.view=saved.view;state.filters=saved.filters;state.orderTaskView=saved.taskView||'all';}}
   if(!state.connected && ['#accounting','#affiliates','#maintenance','#website-photos','#backup','#marketing'].includes(location.hash) && result.role==='owner')state.view=location.hash.slice(1);
-  if(!state.connected && ['#orders','#checklist'].includes(location.hash))state.view=location.hash.slice(1);
+  if(!state.connected && ['#orders','#checklist','#pos'].includes(location.hash))state.view=location.hash.slice(1);
   if(!state.connected && /^#calendar(?:\?|$)/.test(location.hash))state.view='calendar';
   Object.assign(state, result, { connected: true, scopedReads:result.orders_mode==='scoped', analyticsUpdatedAt: new Date().toISOString() });
   adminReads.invalidate();scopedGeneration++;scopedPendingKey=null;scopedError=null;
@@ -236,6 +238,8 @@ async function refresh() {
 }
 function render() {
   rememberOrderView();
+  if(state.view==='pos'&&state.connected&&loadingPOS&&$('#pos-manager'))return;
+  posController?.destroy();posController=null;loadingPOS=null;
   $('[data-view="checklist"]').hidden = !state.connected;
   if (state.view === 'checklist' && state.connected && checklistController) {
     checklistController.refresh();
@@ -275,10 +279,22 @@ function render() {
   if(!scopedViewReady())return;
   const views = { backup:()=>'<div id="backup-manager"></div>', offers:()=>'<div id="voucher-campaigns-manager"></div>', 'website-photos':()=>'<div id="website-photos-manager"></div>', calendar:()=>'<div id="order-calendar-manager"></div>', maintenance:()=>'<div id="maintenance-manager"></div>', affiliates:()=>'<div id="affiliates-manager"></div>', accounting:()=>'<div id="accounting-manager"></div>', overview: overviewView, analytics: analyticsView, orders: ordersView, flavors: productsView, menus: flavorMenusView, boxes: productsView, inventory: inventoryView, production: productionView, promos: promosView, newsletter:newsletterAdmin.render, faqs:()=>faqView(state), settings: settingsView, team: teamView };
   unmountAnalyticsChart();
+  views.pos = () => '<div id="pos-manager"></div>';
   views.checklist = () => '<div id="live-order-checklist"></div>';
   views.marketing=()=>'<div id="marketing-insights-manager"></div>';
   const heldSettings=state.view==='settings'&&state.connected&&(settingsDraft.dirty()||settingsDraft.busy())?settingsDraft.form:null;
-  $('#workspace').innerHTML = setupNotice() + views[state.view]();
+$('#workspace').innerHTML = setupNotice() + views[state.view]();
+  if(state.connected&&state.view==='pos'){
+const host=$('#pos-manager');
+    host.innerHTML='<p role="status">Opening POS…</p>';
+    loadingPOS=import('./pos.js?v=direct-workspace-1').then(({mountPOS})=>{
+      if(!host.isConnected||!state.connected)return;
+      posController=mountPOS(host,{role:state.role,openKitchenOrder:openPOSDetails,onOrderSaved:()=>{void refresh().catch(()=>toast('Refresh the dashboard to update its order totals.'));}});
+      return posController;
+    }).catch(()=>{
+      if(host.isConnected)host.innerHTML='<p role="alert">The POS could not open. <button type="button" class="button button-secondary" data-action="retry-pos">Try again</button></p>';
+    });
+  }
   if (state.connected && state.view === 'checklist') {
     checklistController = mountLiveChecklist($('#live-order-checklist'), {
       products: state.products,
@@ -782,13 +798,30 @@ async function openOrder(id) {
   try { const order=await api('get_order',{order_id:id});if(!current())return false;activeOrder=order;renderOrderDialog();return true; }
   catch(error){if(current())showDialog('Unable to open order', '<p class="notice danger">'+esc(error.message)+'</p>');return false;}
 }
+async function openPOSDetails(id,section){
+  if(!await openOrder(id))return;
+  if(section==='client'){contactDialog();return;}
+  const target=section==='photos'?$('#dialog-body [data-order-photos]'):$('#dialog-body .history-block');
+  if(target){target.tabIndex=-1;target.focus();}
+}
+async function enterPOS(id,intent){
+  if(modal.open)await closeDialog();
+  if(modal.open)return;
+  state.view='pos';
+  const url=new URL(location.href);
+  url.hash='pos';url.searchParams.delete('order');url.searchParams.delete('section');
+  history.replaceState(null,'',url);
+  render();
+  const controller=posController||await loadingPOS;
+  await controller?.open(id,intent);
+}
 async function quickOrderAction(id,intent){
  if(!state.connected||!['owner','staff'].includes(state.role)||!await openOrder(id))return;
  const order=activeOrder,userId=staffUserId,next=orderNextStep(order);
  if(intent==='proof'){const button=$('[data-action="view-proof"]',modal);if(button)await onAction(button);return;}
  if(intent==='tracking'){$('[name="tracking_url"]',modal)?.focus();return;}
  if(intent==='approve'&&next.action==='approve'){orderActionDialog('approve_payment');return;}
- if(intent==='pos'&&next.action==='pos'){location.href='pos.html?edit='+encodeURIComponent(order.id);return;}
+ if(intent==='pos'&&next.action==='pos'){await enterPOS(order.id,'edit');return;}
  if(intent==='progress'&&next.action==='progress'){
   const confirmed=await confirmDialog('Update '+order.reference+' to '+label(next.status).toLowerCase()+'?',{title:next.label,confirmLabel:next.label,cancelLabel:'Keep current status',parentDialog:modal});
   if(confirmed&&activeOrder===order&&staffUserId===userId&&state.connected&&modal.open)await updateActive('set_fulfillment',orderMutationPayload({status:next.status}));
@@ -801,7 +834,8 @@ function renderOrderDialog() {
   const statuses = ['confirmed', 'preparing', o.method === 'pickup' ? 'ready_for_pickup' : 'out_for_delivery', 'completed'];
   const address = o.address ? [o.address.line1, o.address.line2, o.address.locality, o.address.postal_code].filter(Boolean).join('\n') : '';
   const notes = o.staff_notes || (o.history || []).filter(event => event.action === 'staff_note').map(event => ({ note: event.reason }));
-  showDialog(o.reference, `<div id="print-order"><p class="muted">Placed ${esc(dateTime(o.created_at))} · Revision ${o.revision}</p><div class="order-status-row">${orderPaymentBadges(o)} ${badge(fulfillmentStatus(o))}</div><div class="order-detail-grid"><section class="detail-section"><h3>Buyer</h3><p><strong>${esc(o.buyer?.name)}</strong>\n${esc(o.buyer?.email)}\n${esc(o.buyer?.phone)}</p>${o.buyer?.social_username ? `<p>${esc(o.buyer.social_platform?.toLowerCase() === 'na' ? 'Social contact' : label(o.buyer.social_platform))}: ${esc(o.buyer.social_username)}</p>` : ''}</section><section class="detail-section"><h3>${esc(label(o.method))} · ${esc(humanDate(o.fulfillment_date))}</h3>${o.method === 'delivery' ? `<p><strong>${esc(o.recipient?.name)}</strong>\n${esc(o.recipient?.phone)}\n${esc(address)}</p>` : `<p>${esc(o.pickup_address || state.settings.pickup_address || '')}</p>`}${o.method === 'delivery' && o.delivery_zone_description ? `<p class="zone-description">${esc(o.delivery_zone_description)}</p>` : ''}${o.instructions ? `<p>Instructions: ${esc(o.instructions)}</p>` : ''}</section></div>${deliveryTrackingForm(o)}${itemTable(o.items,o.gift)}${totals(o)}${o.order_source==='direct'&&o.delivery_charge?.proof_status==='under_review'?`<section class="detail-section"><h3>Delivery receipt awaiting review</h3><a class="button button-secondary" href="pos.html?delivery_receipt=${encodeURIComponent(o.id)}">Review delivery receipt</a></section>`:''}${pickupProofSection(o, PHOTO_ACCEPT)}${o.order_source === 'direct' ? orderPhotosMarkup() : ''}${o.payment_status === 'paid' && !o.gift && !o.refund_label ? '<p class="muted">Any difference after an order edit is settled directly with the customer. The original payment record and current fulfillment progress are retained.</p>' : ''}<section class="detail-section proof-block"><h3>Initial payment</h3>${o.pos_payment?`<p>Recorded via POS · ${esc(o.pos_payment.label)}</p>`:''}${o.order_source==='direct'?`<p><a class="button button-secondary" href="pos.html?edit=${encodeURIComponent(o.id)}">Open in POS</a></p>`:''}<p>Reference: ${esc(o.payment_reference || 'Not provided')}</p>${o.proof_path ? '<button class="button button-secondary" data-action="view-proof">View private payment proof ↗</button>' : `<p class="muted">${o.payment_status === 'awaiting_payment' && !CLOSED.has(o.fulfillment_status) ? o.order_source==='direct'?'Payment link stays open until payment or manual cancellation.':`Proof deadline: ${esc(dateTime(o.payment_deadline))}` : 'No payment proof on this order.'}</p>`}<div id="proof-viewer"></div></section>${o.refund_label ? '<p class="notice">Fulfillment is Refunded. Remove the Refund label to restore the previous fulfillment status. Refund transfers are handled manually.</p>' : ''}${o.buyer?.email && (o.order_source!=='direct'||o.pos_email_opt_in) && o.method === 'pickup' && canProgress && o.fulfillment_status === 'ready_for_pickup' ? `<section class="detail-section pickup-reminder"><h3>Pickup reminder</h3><p class="muted">Send a reminder to ${esc(o.buyer?.email)} if this order is still waiting for collection.</p><button type="button" class="button button-secondary" data-action="send-pickup-reminder">Send pickup reminder</button><p class="help-text">${o.pickup_reminder_requested_at ? `Last requested ${esc(dateTime(o.pickup_reminder_requested_at))}. ` : ''}Check Email delivery for sending status. Allow 15 minutes between reminders.</p></section>` : ''}<div class="order-toolbar">${needsPaymentReview(o) ? '<button class="button" data-action="payment-approve">Approve full payment</button><button class="button button-secondary" data-action="payment-reject">Reject payment</button>' : ''}${canProgress ? `<select id="next-fulfillment" aria-label="Fulfillment status">${options(statuses, o.fulfillment_status, null)}</select><button class="button button-secondary" data-action="fulfill-order">Update progress</button>` : ''}${!CLOSED.has(o.fulfillment_status) ? '<button class="button button-secondary" data-action="edit-order">Edit order</button><button class="button button-quiet" data-action="cancel-order">Cancel order</button>' : '<button class="button button-secondary" data-action="edit-contact">Edit contact details</button>'}<button class="button button-quiet" data-action="refund-label">${o.refund_label ? 'Remove' : 'Apply'} Refund label</button><button class="button button-quiet" data-action="print-order">Print summary</button></div><section class="private-staff"><h3>Private staff notes</h3>${notes.map(note => `<p class="muted">${esc(typeof note === 'string' ? note : note.note || note.text || '')}</p>`).join('')}<form data-form="staff-note">${formError}${textarea('note', 'Add a private note', '', 'Visible only to authorized team members.', 'required maxlength="4000"')}<button type="submit" class="button button-secondary">Save note</button></form></section><section class="subsection history-block"><h3>Order history</h3><ol class="history">${(o.history || []).slice().reverse().map(event => `<li><strong>${esc(label(event.action))}</strong>${event.reason ? ` — ${esc(event.reason)}` : ''}<small>${esc(dateTime(event.at || event.created_at))} · ${esc(typeof event.actor === 'object' ? event.actor.email || event.actor.id || 'Team member' : event.actor || 'System')}</small>${event.before || event.after ? `<details><summary>View recorded changes</summary><div class="change-grid"><div><strong>Before</strong>${historySnapshot(event.before)}</div><div><strong>After</strong>${historySnapshot(event.after)}</div></div></details>` : ''}</li>`).join('') || '<li>Order history is recorded as changes are made.</li>'}</ol></section></div>`);
+  showDialog(o.reference, `<div id="print-order"><p class="muted">Placed ${esc(dateTime(o.created_at))} · Revision ${o.revision}</p><div class="order-status-row">${orderPaymentBadges(o)} ${badge(fulfillmentStatus(o))}</div><div class="order-detail-grid"><section class="detail-section"><h3>Buyer</h3><p><strong>${esc(o.buyer?.name)}</strong>\n${esc(o.buyer?.email)}\n${esc(o.buyer?.phone)}</p>${o.buyer?.social_username ? `<p>${esc(o.buyer.social_platform?.toLowerCase() === 'na' ? 'Social contact' : label(o.buyer.social_platform))}: ${esc(o.buyer.social_username)}</p>` : ''}</section><section class="detail-section"><h3>${esc(label(o.method))} · ${esc(humanDate(o.fulfillment_date))}</h3>${o.method === 'delivery' ? `<p><strong>${esc(o.recipient?.name)}</strong>\n${esc(o.recipient?.phone)}\n${esc(address)}</p>` : `<p>${esc(o.pickup_address || state.settings.pickup_address || '')}</p>`}${o.method === 'delivery' && o.delivery_zone_description ? `<p class="zone-description">${esc(o.delivery_zone_description)}</p>` : ''}${o.instructions ? `<p>Instructions: ${esc(o.instructions)}</p>` : ''}</section></div>${deliveryTrackingForm(o)}${itemTable(o.items,o.gift)}${totals(o)}${privateOrderLinkField()}${o.order_source==='direct'&&o.delivery_charge?.proof_status==='under_review'?`<section class="detail-section"><h3>Delivery receipt awaiting review</h3><button type="button" class="button button-secondary" data-action="pos-delivery-receipt">Review delivery receipt</button></section>`:''}${pickupProofSection(o, PHOTO_ACCEPT)}${o.order_source === 'direct' ? orderPhotosMarkup() : ''}${o.payment_status === 'paid' && !o.gift && !o.refund_label ? '<p class="muted">Any difference after an order edit is settled directly with the customer. The original payment record and current fulfillment progress are retained.</p>' : ''}<section class="detail-section proof-block"><h3>Initial payment</h3>${o.pos_payment?`<p>Recorded via POS · ${esc(o.pos_payment.label)}</p>`:''}${o.order_source==='direct'?`<p><button type="button" class="button button-secondary" data-action="pos-receipt">Open in POS</button></p>`:''}<p>Reference: ${esc(o.payment_reference || 'Not provided')}</p>${o.proof_path ? '<button class="button button-secondary" data-action="view-proof">View private payment proof ↗</button>' : `<p class="muted">${o.payment_status === 'awaiting_payment' && !CLOSED.has(o.fulfillment_status) ? o.order_source==='direct'?'Payment link stays open until payment or manual cancellation.':`Proof deadline: ${esc(dateTime(o.payment_deadline))}` : 'No payment proof on this order.'}</p>`}<div id="proof-viewer"></div></section>${o.refund_label ? '<p class="notice">Fulfillment is Refunded. Remove the Refund label to restore the previous fulfillment status. Refund transfers are handled manually.</p>' : ''}${o.buyer?.email && (o.order_source!=='direct'||o.pos_email_opt_in) && o.method === 'pickup' && canProgress && o.fulfillment_status === 'ready_for_pickup' ? `<section class="detail-section pickup-reminder"><h3>Pickup reminder</h3><p class="muted">Send a reminder to ${esc(o.buyer?.email)} if this order is still waiting for collection.</p><button type="button" class="button button-secondary" data-action="send-pickup-reminder">Send pickup reminder</button><p class="help-text">${o.pickup_reminder_requested_at ? `Last requested ${esc(dateTime(o.pickup_reminder_requested_at))}. ` : ''}Check Email delivery for sending status. Allow 15 minutes between reminders.</p></section>` : ''}<div class="order-toolbar">${needsPaymentReview(o) ? '<button class="button" data-action="payment-approve">Approve full payment</button><button class="button button-secondary" data-action="payment-reject">Reject payment</button>' : ''}${canProgress ? `<select id="next-fulfillment" aria-label="Fulfillment status">${options(statuses, o.fulfillment_status, null)}</select><button class="button button-secondary" data-action="fulfill-order">Update progress</button>` : ''}${!CLOSED.has(o.fulfillment_status) ? '<button class="button button-secondary" data-action="edit-order">Edit order</button><button class="button button-quiet" data-action="cancel-order">Cancel order</button>' : '<button class="button button-secondary" data-action="edit-contact">Edit contact details</button>'}<button class="button button-quiet" data-action="refund-label">${o.refund_label ? 'Remove' : 'Apply'} Refund label</button><button class="button button-quiet" data-action="print-order">Print summary</button></div><section class="private-staff"><h3>Private staff notes</h3>${notes.map(note => `<p class="muted">${esc(typeof note === 'string' ? note : note.note || note.text || '')}</p>`).join('')}<form data-form="staff-note">${formError}${textarea('note', 'Add a private note', '', 'Visible only to authorized team members.', 'required maxlength="4000"')}<button type="submit" class="button button-secondary">Save note</button></form></section><section class="subsection history-block"><h3>Order history</h3><ol class="history">${(o.history || []).slice().reverse().map(event => `<li><strong>${esc(label(event.action))}</strong>${event.reason ? ` — ${esc(event.reason)}` : ''}<small>${esc(dateTime(event.at || event.created_at))} · ${esc(typeof event.actor === 'object' ? event.actor.email || event.actor.id || 'Team member' : event.actor || 'System')}</small>${event.before || event.after ? `<details><summary>View recorded changes</summary><div class="change-grid"><div><strong>Before</strong>${historySnapshot(event.before)}</div><div><strong>After</strong>${historySnapshot(event.after)}</div></div></details>` : ''}</li>`).join('') || '<li>Order history is recorded as changes are made.</li>'}</ol></section></div>`);
+  bindPrivateOrderLink($('#dialog-body [data-private-order-link]'),o.id,api);
   bindPickupProof($('#dialog-body [data-pickup-proof]'), {
     loadPhoto: () => api('pickup_proof_url', { order_id: o.id }),
     uploadPhoto: file => upload(file, { kind: 'pickup', order_id: o.id }),
@@ -961,6 +995,7 @@ async function updateActive(action, payload) {
   const index=state.orders.findIndex(order=>order.id===result.id);if(index>=0)state.orders[index]=result;
   const sameOrder=activeOrder?.id===orderId;
   if(sameOrder)activeOrder=result;
+  posController?.updateOrder(result);
   if(sameOrder&&modal.open&&(!originForm||originForm.isConnected))renderOrderDialog();
   const savedView=sameOrder?$('#print-order'):null;
   const success=action==='send_pickup_reminder'?'Pickup reminder queued. Check Email delivery for its status.':'Order updated.';
@@ -1099,7 +1134,10 @@ async function onAction(button) {
       } finally { button.disabled = false; }
       break;
     }
-    case 'edit-order': if(['direct','in_person'].includes(activeOrder.order_source)){location.href='pos.html?edit='+encodeURIComponent(activeOrder.id);}else startEditOrder(); break;
+    case 'retry-pos': $('#pos-manager')?.remove();render();break;
+    case 'pos-delivery-receipt': await enterPOS(activeOrder.id,'delivery');break;
+    case 'pos-receipt': await enterPOS(activeOrder.id,'receipt');break;
+    case 'edit-order': if(['direct','in_person'].includes(activeOrder.order_source)){await enterPOS(activeOrder.id,'edit');}else startEditOrder(); break;
     case 'edit-contact': contactDialog(); break;
     case 'change-edit-options': captureEdit(); { const item = editDraft.items[index]; const product = state.products.find(p => p.id === item.product_id); item.preserve_configuration = false; item.selections = newSelections(product); } renderEditOrder(); break;
     case 'add-edit-item': captureEdit(); { const product = state.products.find(p => p.active) || state.products[0]; editDraft.items.push({ product_id: product.id, quantity: product.min_quantity || 1, selections: newSelections(product) }); } renderEditOrder(); break;
@@ -1126,6 +1164,7 @@ async function exportOrders() {
 
 document.addEventListener('click', async event => {
   const view = event.target.closest('[data-view]');
+  if(view&&state.view==='pos'&&view.dataset.view!=='pos'&&posController&&!posController.canLeave())return;
   if(view&&state.view==='settings'&&view.dataset.view!==state.view&&!await settingsDraft.canLeave())return;
   if(view && state.view==='website-photos' && view.dataset.view!==state.view){const manager=$('#website-photos-manager');if(manager?.dataset.busy==='true'){toast('Please wait for the photo to finish saving.');return;}if(manager?.dataset.dirty==='true'&&!await confirmDialog('Discard unsaved website photo changes?',{title:'Unsaved photos',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;}
   if(view && state.view==='maintenance' && view.dataset.view!==state.view){const manager=$('#maintenance-manager');if(manager?.dataset.busy==='true'){toast('Please wait for maintenance settings to save.');return;}if(manager?.dataset.dirty==='true'&&!await confirmDialog('Discard unsaved maintenance settings?',{title:'Unsaved maintenance settings',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;}
@@ -1140,7 +1179,7 @@ document.addEventListener('click', async event => {
     if(manager?.dataset.dirty==='true' && !await confirmDialog('Leave accounting and discard these unsaved changes?',{title:'Unsaved accounting entry',confirmLabel:'Discard changes',cancelLabel:'Keep editing'}))return;
   }
   if(view?.dataset.newsletterTab)newsletterAdmin.selectTab(view.dataset.newsletterTab);
-  if (view) { if(compactNavigation.matches&&dashboardNavigation&&$('#admin-nav').contains(view)){dashboardNavigation.open=false;dashboardNavigation.querySelector('summary')?.focus();} state.view = view.dataset.view; state.productFilters = { search: '', status: '', category: '' }; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
+  if (view) { if(compactNavigation.matches&&dashboardNavigation&&$('#admin-nav').contains(view)){dashboardNavigation.open=false;dashboardNavigation.querySelector('summary')?.focus();} if(view.dataset.view==='pos'||location.hash==='#pos'){const url=new URL(location.href);url.hash=view.dataset.view==='pos'?'pos':'';url.searchParams.delete('order');url.searchParams.delete('section');history.replaceState(null,'',url);} state.view = view.dataset.view; state.productFilters = { search: '', status: '', category: '' }; render(); if (state.view === 'analytics' && state.connected) { try { await refresh(); } catch (error) { toast('Analytics could not refresh. The last loaded figures are shown. ' + error.message, 'error'); } } if (state.view === 'team' && state.connected && state.role === 'owner') { try { await loadTeam(); } catch (error) { toast(error.message, 'error'); } } return; }
   const button = event.target.closest('[data-action]');
   if (!button) return;
   event.preventDefault();
@@ -1532,17 +1571,23 @@ async function init() {
     if (!data.session) {
       orderView.clear();
       $('#shop-status').textContent = 'Staff sign-in required';
-      $('#workspace').innerHTML = heading('Welcome to the kitchen', 'Sign in with your authorized owner or staff account.') + `<section class="panel">${empty('Your dashboard is private', 'Only an owner or authorized staff member can access shop administration.', '<a class="button" href="admin-account.html?next=manage.html">Sign in to manage the shop</a>')}</section>`;
+      $('#workspace').innerHTML = heading('Welcome to the kitchen', 'Sign in with your authorized owner or staff account.') + `<section class="panel">${empty('Your dashboard is private', 'Only an owner or authorized staff member can access shop administration.', '<a class="button" href="admin-account.html?next='+(location.hash==='#pos'?'pos.html':'manage.html')+'">Sign in to manage the shop</a>')}</section>`;
       $('#admin-nav').hidden = true;
       return;
     }
     staffUserId=data.session.user.id;
     auth.onAuthStateChange((event,next) => {
-      if(event==='SIGNED_OUT'||next?.user?.id&&next.user.id!==staffUserId){adminReads.invalidate();scopedGeneration++;clearTimeout(orderSearchTimer);orderView.clear();monthDrafts.reset();staffUserId=null;bootstrapRequest++;stopChecklist();state.connected=false;state.orders=[];state.inventoryDrafts={};state.inventoryDates=[];activeOrder=null;editDraft=null;orderEditBaseline=null;visitorPoller.reset();modal.close();$('#workspace').replaceChildren();location.replace('admin-account.html?next=manage.html');}
+      if(event==='SIGNED_OUT'||next?.user?.id&&next.user.id!==staffUserId){adminReads.invalidate();scopedGeneration++;clearTimeout(orderSearchTimer);orderView.clear();monthDrafts.reset();staffUserId=null;bootstrapRequest++;stopChecklist();posController?.destroy();posController=null;state.connected=false;state.orders=[];state.inventoryDrafts={};state.inventoryDates=[];activeOrder=null;editDraft=null;orderEditBaseline=null;visitorPoller.reset();modal.close();$('#workspace').replaceChildren();location.replace('admin-account.html?next=manage.html');}
     });
     await refresh();
     if(!state.connected||!staffUserId)return;
     const params = new URL(location.href).searchParams;
+if(state.view==='pos'&&(params.has('edit')||params.has('delivery_receipt'))){
+      const delivery=params.get('delivery_receipt');
+      const controller=posController||await loadingPOS;
+      await controller?.open(delivery||params.get('edit'),delivery?'delivery':'edit');
+      const url=new URL(location.href);url.searchParams.delete('edit');url.searchParams.delete('delivery_receipt');history.replaceState(null,'',url);
+    }
     if (params.get('order') && await openOrder(params.get('order'))) {
       if (params.get('section') === 'photos') $('#dialog-body [data-order-photos]')?.focus();
       if (params.get('section') === 'client' && activeOrder?.order_source === 'direct') {

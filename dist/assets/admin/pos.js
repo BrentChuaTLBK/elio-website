@@ -1,13 +1,33 @@
-import {api,auth,ready,escapeHtml as esc,money} from './client.js';
+import {api,escapeHtml as esc,money} from './client.js';
 import { printOrderSlips } from './order-slips.js?v=flavor-details-1';
 import { orderItemDetails, renderOrderFlavors } from './order-item-details.js';
 import { posItemVariations } from './pos-variations.js';
 import {boxQuestions,boxQuestionFields} from '../shop/box-questions.js';
 import {deliveryFeeSummary} from '../delivery-fee.js';
-import {accountingDatePicker,bindAccountingDates} from './accounting-date-picker.js?v=branded-calendars-1';
-const $=s=>document.querySelector(s),root=$('#pos'),dialog=$('#dialog');
+import {accountingDatePicker,bindAccountingDates,bindCalendarDismissal} from './accounting-date-picker.js?v=pos-workspace-1';
+import {privateOrderLinkField,bindPrivateOrderLink} from './private-order-link.js';
+
+export function mountPOS(host, {role, openKitchenOrder, onOrderSaved}) {
+const scope = host.attachShadow({mode:'open'});
+const manifest=document.createElement('link');
+manifest.rel='manifest';manifest.href='pos.webmanifest';document.head.append(manifest);
+if('serviceWorker' in navigator)navigator.serviceWorker.register('pos-sw.js',{scope:'./'}).catch(()=>{});
+scope.innerHTML = `<link rel="stylesheet" href="assets/admin/pos.css?v=direct-workspace-1">
+  <link rel="stylesheet" href="assets/box-questions.css">
+  <link rel="stylesheet" href="assets/admin/order-item-details.css">
+  <link rel="stylesheet" href="assets/admin/private-order-link.css">
+  <link rel="stylesheet" href="assets/admin/pos-calendar.css?v=simple-event-products-1">
+  <div class="pos-calendar-ui"><div class="pos-heading"><h1>Point of sale</h1><button id="refresh" type="button">Refresh</button></div>
+  <section id="pos" aria-label="Point of sale"><p role="status">Opening POS…</p></section>
+  <p id="status" role="status"></p><dialog id="dialog" aria-labelledby="pos-dialog-title"><div class="dialog-head"><h2 id="pos-dialog-title"></h2><button type="button" id="close-dialog" aria-label="Close dialog">×</button></div><div id="pos-dialog-body"></div></dialog></div>`;
+const $=selector=>scope.querySelector(selector),root=$('#pos'),dialog=$('#dialog');
+const lifecycle = new AbortController();
+const listen = (target, name, handler) => target.addEventListener(name,handler,{signal:lifecycle.signal});
+const folds=new Set(['customer']);
+function resetFolds(){folds.clear();if(mode==='direct')folds.add('customer');}
+let receipt=null, dirty=false;
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-bindAccountingDates(root);bindAccountingDates(dialog);
+bindAccountingDates(root);bindAccountingDates(dialog);bindCalendarDismissal(scope,lifecycle.signal);
 const uid=()=>crypto.randomUUID(),amount=n=>(Number(n||0)/100).toFixed(2);
 const cents=v=>{if(!/^\d+(\.\d{1,2})?$/.test(String(v)))throw Error('Enter a positive amount with at most two decimal places.');const n=Math.round(Number(v)*100);if(!Number.isSafeInteger(n)||n>1000000000)throw Error('Amount is too large.');return n;};
 const input=(name,label,value='',type='text',attrs='')=>type==='date'?accountingDatePicker(name,label,value,today(),{attrs}):`<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value??'')}" ${attrs}></label>`;
@@ -15,7 +35,7 @@ const opt=(v,label,selected)=>`<option value="${esc(v)}" ${v===selected?'selecte
 const select=(name,label,items,value)=>`<label>${esc(label)}<select name="${name}" aria-label="${esc(label)}">${items.map(([v,l])=>opt(v,l,value)).join('')}</select></label>`;
 const button=(action,label,extra='')=>`<button type="button" data-action="${action}" ${extra}>${label}</button>`;
 const status=m=>{$('#status').textContent=m;clearTimeout(status.timer);status.timer=setTimeout(()=>{$('#status').textContent='';},7000);};
-let role='',mode='in_person',view='sale',catalog={products:[],pos_products:[],flavors:[],payment_options:[]},events=[],event=null,eventId='',orders=[],editing=null,busy=false,pending=null,report=null,reportDate=today(),search='';
+let mode='direct',view='sale',catalog={products:[],pos_products:[],flavors:[],payment_options:[]},events=[],event=null,eventId='',orders=[],editing=null,busy=false,pending=null,report=null,reportDate=today(),search='';
 const newDraft=()=>({items:[],fulfillment_date:today(),method:'pickup',buyer:{name:'',phone:'',email:''},recipient:{name:'',phone:''},address:{line1:'',line2:'',locality:'',postal_code:''},instructions:'',gift:false,discount:{kind:'none',value:0},override_dates:false,override_reason:'',delivery_cents:0,delivery_fee_recipient:'elio',delivery_fee_pending:false,paid:mode==='in_person',pos_handed_over:mode==='in_person',payment:{method:'cash',cash_received_cents:null,reference:''},send_email:false});
 let draft=newDraft(),showDeletedEvents=false,mobileCheckout=false;
 const immediateSale=()=>mode==='in_person'&&!editing;
@@ -64,7 +84,7 @@ function directDiscountFields(){
 }
 function deliveryFields(){if(mode!=='direct')return input('delivery_fee','Delivery fee · PHP',amount(draft.delivery_cents),'number','min="0" step="0.01" required');
  if(draft.gift)return '<p class="muted">Delivery charge waived.</p>';
- if(editing)return '<p>'+esc(deliveryFeeSummary(draft,money))+'</p><small>Use Edit delivery fee in the order list to change the amount or recipient.</small>';
+ if(editing)return '<p>'+esc(deliveryFeeSummary(draft,money))+'</p><small>Use Edit delivery fee in the order details to change the amount or recipient.</small>';
  return select('delivery_fee_recipient','Customer pays delivery to',[['elio','Pay Elio'],['courier','Pay courier directly']],draft.delivery_fee_recipient)+select('delivery_fee_pending','Delivery fee',[['false','Exact fee known'],['true','Confirm after booking']],String(draft.delivery_fee_pending))+(draft.delivery_fee_pending?'<p class="muted">The delivery amount will be confirmed later.</p>':input('delivery_fee','Exact delivery fee · PHP',amount(draft.delivery_cents),'number','min="0" step="0.01" required'));
 }
 function flashError(error){const el=$('#page-error');if(el){el.hidden=false;el.textContent=error.message;el.scrollIntoView({block:'nearest'});}else status(error.message);}
@@ -82,7 +102,7 @@ async function refreshSavedStock(message){
  catch(error){dialog.close();status(message);flashError(new Error('Stock was saved, but the latest quantities could not be loaded. Refresh before making another stock change. '+error.message));}
 }
 function modal(title,html,onSubmit,feedback=null){
- $('#dialog-title').textContent=title;$('#dialog-body').innerHTML=html;dialog.showModal();const form=dialog.querySelector('form');
+ $('#pos-dialog-title').textContent=title;$('#pos-dialog-body').innerHTML=html;dialog.showModal();const form=dialog.querySelector('form');
  if(form)form.onsubmit=async e=>{
   e.preventDefault();if(busy)return;const submit=form.querySelector('[type=submit]'),values=new FormData(form);let finish=()=>{};
   try{busy=true;form.querySelector('.error')?.remove();if(feedback)finish=progressControls(form,feedback.message,{submit,label:feedback.label,extra:[$('#close-dialog')]});else submit.disabled=true;await onSubmit(values);}
@@ -91,36 +111,52 @@ function modal(title,html,onSubmit,feedback=null){
  };
 }
 $('#close-dialog').onclick=()=>{if(!busy)dialog.close();};dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
-async function load(){const [c,ev,os]=await Promise.all([api('pos_catalog',{date:draft.fulfillment_date}),api('pos_events',{include_deleted:showDeletedEvents}),api('pos_orders')]);const nextId=eventId&&ev.some(x=>x.id===eventId)?eventId:'',nextEvent=nextId?await api('pos_event_data',{event_id:nextId,date:today()}):null;catalog=c;events=ev;orders=os;eventId=nextId;event=nextEvent;}
+async function load(){const [c,ev,os]=await Promise.all([api('pos_catalog',{date:draft.fulfillment_date}),mode==='in_person'?api('pos_events',{include_deleted:showDeletedEvents}):events,api('pos_orders')]);const nextId=mode==='in_person'&&eventId&&ev.some(x=>x.id===eventId)?eventId:'',nextEvent=nextId?await api('pos_event_data',{event_id:nextId,date:today()}):null;catalog=c;events=ev;orders=os;eventId=nextId;event=nextEvent;}
 function render(){
  root.classList.toggle('cashier-screen',(immediateSale()||mode==='direct')&&view==='sale'&&!pending);
  root.classList.toggle('setup-screen',view==='setup');
+ root.classList.toggle('direct-screen',mode==='direct');
  if(!draft.items.length&&mode!=='direct')mobileCheckout=false;root.classList.toggle('checkout-open',mobileCheckout);
- root.innerHTML=`<div class="row" aria-label="POS sections">${button('mode-person','In-person sales',`aria-pressed="${mode==='in_person'}" ${editing||pending?'disabled':''}`)}${button('mode-direct','Direct orders',`aria-pressed="${mode==='direct'}" ${editing||pending?'disabled':''}`)}</div><h1>${mode==='in_person'?'Event & pop-up POS':'Direct orders'}</h1><p class="muted">${mode==='in_person'?'Separate event stock and prices. Every sale is paid in full.':'Orders from messages and calls, with live website stock and shareable payment links.'}</p><p id="page-error" class="notice error" hidden></p>${!navigator.onLine?'<p class="notice error">You’re offline. Reconnect before checking stock or recording a sale.</p>':''}
+ const count=draft.items.reduce((n,item)=>n+item.quantity,0);
+ root.innerHTML=`${!pending&&!editing?`<div class="pos-source" aria-label="POS sections">${button('mode-direct','Direct orders',`aria-pressed="${mode==='direct'}"`)}${button('mode-person','In-person sales',`aria-pressed="${mode==='in_person'}"`)}</div>`:''}<p id="page-error" role="alert" class="notice error" hidden></p>${!navigator.onLine?'<p class="notice error">Reconnect to record a sale.</p>':''}
+
  ${mode==='in_person'?`<div class="section-head event-toolbar"><label>Event<select id="event-select" ${editing||pending?'disabled':''}>${opt('','Choose an event',eventId)}${events.map(e=>opt(e.id,e.name+(e.deleted_at?' · deleted':e.active?'':' · closed'),eventId)).join('')}</select></label>${view!=='sale'?`<label class="check"><input id="show-deleted-events" type="checkbox" ${showDeletedEvents?'checked':''}>Show deleted events</label>`:''}${role==='owner'&&(view==='setup'||!events.length)?button('new-event','+ Create event'):''}</div>`:''}
- <nav class="tabs" aria-label="POS pages">${[['sale',editing?'Edit order':'New sale'],['orders','Orders'],...(mode==='in_person'?[['report','Event report']]:[]),...(role==='owner'&&mode==='in_person'?[['setup','Setup']]:[])].map(([id,label])=>button('view-'+id,label,`aria-pressed="${view===id}" ${pending?'disabled':''}`)).join('')}</nav>
+ <nav class="tabs" aria-label="POS pages" ${editing||pending?'hidden':''}>${[['sale',editing?'Edit order':mode==='direct'?'Sell':'New sale'],['orders','Orders'],...(mode==='in_person'?[['report','Event report']]:[]),...(role==='owner'&&mode==='in_person'?[['setup','Setup']]:[])].map(([id,label])=>button('view-'+id,label,`aria-pressed="${view===id||view==='receipt'&&id==='orders'}" ${pending?'disabled':''}`)).join('')}</nav>
  ${mode==='direct'&&role==='owner'&&view==='orders'?button('direct-methods','Payment methods'):''}
- ${pending?renderReview():view==='orders'?renderOrders():view==='setup'?renderSetup():view==='report'?renderReport():renderSale()}${(immediateSale()||mode==='direct')&&view==='sale'&&!pending&&(draft.items.length||mode==='direct')?`<div class="mobile-sale-bar"><span>${draft.items.reduce((n,i)=>n+i.quantity,0)} items <strong>${money(estimated())}</strong></span>${button('show-cart',mode==='direct'?'View basket':'View sale')}</div>`:''}`;
+ ${pending?renderReview():view==='receipt'&&receipt?renderReceipt(receipt):view==='orders'?renderOrders():view==='setup'?renderSetup():view==='report'?renderReport():renderSale()}${view==='sale'&&!pending?mobileSaleBar(count):''}`;
  bind();
+ const link=root.querySelector('[data-private-order-link]');
+ if(link&&receipt)bindPrivateOrderLink(link,receipt.id,api);
+}
+function mobileSaleBar(count){
+  if(mode==='direct'){
+    const label=editing?'Review changes':'Review order';
+    return `<div class="mobile-sale-bar direct-dock">
+      ${button('back-to-items','Products',mobileCheckout?'':'aria-current="page"')}
+      ${mobileCheckout?`<button type="submit" form="sale-form" class="primary" aria-label="${label}" ${count?'':'disabled'}>${label}<strong>${money(estimated())}</strong></button>`
+        :`<button type="button" data-action="show-cart" class="primary" aria-label="View basket">Basket · ${count}<strong>${money(estimated())}</strong></button>`}
+    </div>`;
+  }
+  if(!immediateSale()||!count)return '';
+  return `<div class="mobile-sale-bar"><span>${count} ${count===1?'item':'items'}<strong>${money(estimated())}</strong></span>${button('show-cart','View sale')}</div>`;
 }
 function renderSale(){
  if(mode==='in_person'&&!event)return '<section class="panel empty">Choose an event to begin. The owner can create an event and enter its stock, items, and prices.</section>';
  if(mode==='in_person'&&event?.deleted_at)return '<section class="panel"><h2>This event was deleted</h2><p>View Event report or Orders for its preserved history.</p></section>';
  const products=currentProducts().filter(p=>(p.active!==false||editing?.items.some(i=>i.product_id===p.id))&&p.name.toLowerCase().includes(search.toLowerCase()));
  const cash=event?.cash_session;
- return `${editing?`<p class="notice">Editing ${esc(editing.reference)}. Saved item prices are preserved. Changes are recorded in order history. ${button('cancel-edit','Leave editor')}</p>`:''}${mode==='in_person'&&!editing&&(!cash||cash.closed_at)?`<section class="panel"><h2>${cash?'Cash session closed':'Start today’s cash session'}</h2><p>Enter the opening float before the first sale. You can open with ₱0 if there is no cash float.</p>${cash?(role==='owner'?button('reopen-cash','Reopen cash session'):'<p>Ask the owner to reopen this cash session.</p>'):button('open-cash','Open cash session','class="primary"')}</section>`:''}
- <div class="sales-grid"><section class="panel catalog-panel"><div class="section-head"><h2>Choose items</h2>${mode==='direct'?button('custom-item','+ Add custom item'):'<small>Event stock only</small>'}</div><label class="search">Search items<input id="search" type="search" value="${esc(search)}" placeholder="Find a product"></label><div class="catalog">${products.map(p=>`<button type="button" class="product" data-add="${esc(p.id)}" ${p.active===false||mode==='in_person'&&eventAvailable(p)<1?'disabled':''}><strong>${esc(p.name)}</strong><span class="price">${money(p.price_cents)}</span><small>${p.kind==='variant_item'?'Choose 1 flavor · '+eventAvailable(p)+' more available':p.kind==='custom_box'?'Choose 3 flavors · surcharges apply'+(mode==='in_person'?' · '+eventAvailable(p)+' more available':''):p.source==='website'?(p.remaining_boxes==null?'Shared website flavor stock':`${p.remaining_boxes} available on this date`):p.remaining===null?'Unlimited stock':`${mode==='in_person'?eventAvailable(p):p.remaining??0} ${mode==='in_person'?'more available':'available'}`}</small>${p.source==='website'&&p.stock_available===false?'<small>Check availability for the selected date</small>':''}</button>`).join('')||'<p class="empty">No items available. Check the event setup or choose another date.</p>'}</div></section>
- <section class="panel checkout-panel" id="checkout-panel"><form id="sale-form">${(immediateSale()||mode==='direct')?button('back-to-items','← Back to items','class="back-to-items"'):''}<h2>${editing?'Order details':mode==='direct'?'Direct order':'Your sale'}</h2><div id="cart">${draft.items.map((i,index)=>`<div class="cart-line ${immediateSale()?'cart-line-quick':''}"><div><strong>${esc(product(i.product_id)?.name||i.name||'Saved item')}</strong>${i.description?`<small>${esc(i.description)}</small>`:''}${i.source==='custom'?button('edit-custom-item','Edit name / price',`data-id="${index}"`):''}<div class="cart-price"><strong>${money(linePrice(i))}</strong><span>each</span></div>${i.quantity>1?`<div class="cart-line-total">${money(linePrice(i)*i.quantity)} <span>for ${i.quantity}</span></div>`:''}<small>${i.selections?.flavors?Object.entries(i.selections.flavors).filter(([,q])=>q>0).map(([id,q])=>esc(q+' × '+(saleFlavor(id)?.name||'Saved flavor'))).join(', '):''}</small>${selectedBoxAnswers(product(i.product_id),i.selections,i.selection_labels).map(c=>`<small>${esc(c.question)} — ${esc(c.label)}${c.surcharge_cents&&!draft.gift?' (+'+money(c.surcharge_cents)+')':''}</small>`).join('')}</div>${cartQuantity(i,index)}<button type="button" data-remove="${index}" aria-label="Remove item">×</button></div>`).join('')||'<p class="empty">Add items to your sale.</p>'}</div>
- ${mode==='direct'?directDiscountFields():''}
+ return `${editing?`<p class="notice"><strong>Editing ${esc(editing.reference)}</strong> ${button('cancel-edit','Cancel edits')}</p>`:''}${mode==='in_person'&&!editing&&(!cash||cash.closed_at)?`<section class="panel"><h2>${cash?'Cash session closed':'Start today’s cash session'}</h2><p>Enter the opening float before the first sale. You can open with ₱0 if there is no cash float.</p>${cash?(role==='owner'?button('reopen-cash','Reopen cash session'):'<p>Ask the owner to reopen this cash session.</p>'):button('open-cash','Open cash session','class="primary"')}</section>`:''}
+ <div class="sales-grid"><section class="panel catalog-panel"><div class="section-head"><h2>${mode==='direct'?'Choose products':'Choose items'}</h2>${mode==='direct'?button('custom-item','+ Add custom item'):'<small>Event stock only</small>'}</div><label class="search">Search items<input id="search" type="search" value="${esc(search)}" placeholder="Find a product"></label><div class="catalog">${products.map(p=>`<button type="button" class="product" data-add="${esc(p.id)}" ${p.active===false||mode==='in_person'&&eventAvailable(p)<1?'disabled':''}><strong>${esc(p.name)}</strong><span class="price">${money(p.price_cents)}</span><small>${p.kind==='variant_item'?'Choose 1 flavor · '+eventAvailable(p)+' more available':p.kind==='custom_box'?'Choose 3 flavors · surcharges apply'+(mode==='in_person'?' · '+eventAvailable(p)+' more available':''):p.source==='website'?(p.remaining_boxes==null?'Shared website flavor stock':`${p.remaining_boxes} available on this date`):p.remaining===null?'Unlimited stock':`${mode==='in_person'?eventAvailable(p):p.remaining??0} ${mode==='in_person'?'more available':'available'}`}</small>${p.source==='website'&&p.stock_available===false?'<small>Check availability for the selected date</small>':''}</button>`).join('')||'<p class="empty">No items available. Check the event setup or choose another date.</p>'}</div></section>
+ <section class="panel checkout-panel" id="checkout-panel"><form id="sale-form">${immediateSale()?button('back-to-items','← Back to items','class="back-to-items"'):''}<h2>${editing?'Order details':mode==='direct'?'Basket':'Your sale'}</h2><div id="cart">${draft.items.map((i,index)=>`<div class="cart-line ${immediateSale()?'cart-line-quick':''}"><div><strong>${esc(product(i.product_id)?.name||i.name||'Saved item')}</strong>${i.description?`<small>${esc(i.description)}</small>`:''}${i.source==='custom'?button('edit-custom-item','Edit name / price',`data-id="${index}"`):''}<div class="cart-price"><strong>${money(linePrice(i))}</strong><span>each</span></div>${i.quantity>1?`<div class="cart-line-total">${money(linePrice(i)*i.quantity)} <span>for ${i.quantity}</span></div>`:''}<small>${i.selections?.flavors?Object.entries(i.selections.flavors).filter(([,q])=>q>0).map(([id,q])=>esc(q+' × '+(saleFlavor(id)?.name||'Saved flavor'))).join(', '):''}</small>${selectedBoxAnswers(product(i.product_id),i.selections,i.selection_labels).map(c=>`<small>${esc(c.question)} — ${esc(c.label)}${c.surcharge_cents&&!draft.gift?' (+'+money(c.surcharge_cents)+')':''}</small>`).join('')}</div>${cartQuantity(i,index)}<button type="button" data-remove="${index}" aria-label="Remove item">×</button></div>`).join('')||'<p class="empty">Add items to your sale.</p>'}</div>
+ ${mode==='direct'?'<details data-fold="discount" '+(folds.has('discount')?'open':'')+'><summary>Discount or gift</summary>'+directDiscountFields()+'</details>':''}
  ${!immediateSale()?`<div class="subheading fields">${select('method','Fulfillment',[['pickup','Pickup'],['delivery','Delivery']],draft.method)}${input('fulfillment_date','Fulfillment date',draft.fulfillment_date,'date','required')}</div>`:''}
- ${mode==='direct'&&role==='owner'?`<details><summary>Owner date override</summary><label class="check"><input name="override_dates" type="checkbox" ${draft.override_dates?'checked':''}>Override lead times and closed dates</label>${input('override_reason','Reason for override · optional',draft.override_reason,'text','maxlength="500"')}</details>`:''}
- <details ${mode==='direct'?'open':''}><summary>Customer details · optional</summary><div class="subheading fields">${input('buyer_name','Customer name',draft.buyer.name,'text','maxlength="160"')}${input('buyer_phone','Contact number',draft.buyer.phone,'tel','maxlength="40"')}</div>${input('buyer_email','Email · optional',draft.buyer.email,'email','maxlength="254"')}<div class="fields">${input('social_platform','Social platform · optional',draft.buyer.social_platform||'','text','maxlength="50" placeholder="Instagram, Facebook…"')}${input('social_username','Username / profile · optional',draft.buyer.social_username||'','text','maxlength="160"')}</div>${immediateSale()?notesField():''}</details>
- ${draft.method==='delivery'?`<div class="subheading"><h3>Delivery details</h3><div class="fields">${input('recipient_name','Recipient name',draft.recipient.name,'text','maxlength="160"')}${input('recipient_phone','Recipient phone',draft.recipient.phone,'tel','maxlength="40"')}</div>${button('copy-buyer','Use customer as recipient')}${input('line1','Street / building / unit',draft.address.line1,'text','maxlength="500"')}<div class="fields delivery-fields">${input('locality','Delivery area',draft.address.locality,'text','maxlength="160"')}${deliveryFields()}</div></div>`:''}
+ ${mode==='direct'&&role==='owner'?`<details data-fold="override" ${folds.has('override')?'open':''}><summary>Owner date override</summary><label class="check"><input name="override_dates" type="checkbox" ${draft.override_dates?'checked':''}>Override lead times and closed dates</label>${input('override_reason','Reason for override · optional',draft.override_reason,'text','maxlength="500"')}</details>`:''}
+ <details data-fold="customer" ${folds.has('customer')?'open':''}><summary>Customer details · optional</summary><div class="subheading fields">${input('buyer_name','Customer name',draft.buyer.name,'text','maxlength="160"')}${input('buyer_phone','Contact number',draft.buyer.phone,'tel','maxlength="40"')}</div>${input('buyer_email','Email · optional',draft.buyer.email,'email','maxlength="254"')}<div class="fields">${input('social_platform','Social platform · optional',draft.buyer.social_platform||'','text','maxlength="50" placeholder="Instagram, Facebook…"')}${input('social_username','Username / profile · optional',draft.buyer.social_username||'','text','maxlength="160"')}</div>${immediateSale()?notesField():''}</details>
+ ${draft.method==='delivery'?`<div class="subheading"><h3>Delivery details</h3><div class="fields">${input('recipient_name','Recipient name',draft.recipient.name,'text','maxlength="160"')}${input('recipient_phone','Recipient phone',draft.recipient.phone,'tel','maxlength="40"')}</div>${button('copy-buyer','Same as customer','class="copy-recipient" title="Copy the customer name and phone to the recipient"')}${input('line1','Street / building / unit',draft.address.line1,'text','maxlength="500"')}<div class="fields delivery-fields">${input('locality','Delivery area',draft.address.locality,'text','maxlength="160"')}${deliveryFields()}</div></div>`:''}
  ${!immediateSale()?notesField():''}
  ${mode==='in_person'&&draft.paid&&!editing?paymentFields(draft.payment,immediateSale()):''}
- ${mode==='direct'&&!editing?`<label class="check"><input type="checkbox" name="send_email" ${draft.send_email?'checked':''}>${draft.gift?'Email pickup or delivery updates':'Email order details and future order updates to the customer'}</label>${draft.gift?'':'<small>The payment link stays open until proof is submitted or your team cancels the order. Stock stays reserved.</small>'}`:''}
- ${editing?input('reason','Reason for the edit',draft.reason||'','text','required maxlength="1000"'):''}
- <div class="totals">${draft.gift?`<div class="grand"><span>Gift total</span><span>${money(0)}</span></div>`:`<div><span>Products</span><strong>${money(subtotal())}</strong></div>${discountAmount()?`<div><span>Discount</span><span>−${money(discountAmount())}</span></div>`:''}${!immediateSale()?`<div><span>Delivery</span><span>${esc(deliveryFeeSummary({...draft,delivery_charge:draftCharge()},money))}</span></div>`:''}<div class="grand"><span>${immediateSale()?'Total':'Total estimate'}</span><span>${money(estimated())}</span></div>${draft.paid&&draft.payment.method==='cash'&&!editing?`<div><span>Change</span><strong id="cash-change">${money(Math.max(0,draft.payment.cash_received_cents-estimated()))}</strong></div>`:''}`}</div><small>${immediateSale()?'Full payment received · handed to the customer now.':'Review checks the current price and available stock before you record the sale.'}</small><button class="primary full subheading" type="submit" ${!draft.items.length||mode==='in_person'&&!editing&&(!cash||cash.closed_at)?'disabled':''}>${immediateSale()?'Complete sale':editing?'Review changes':'Review sale'}</button></form></section></div>`;
+ ${mode==='direct'&&!editing?`<label class="check"><input type="checkbox" name="send_email" ${draft.send_email?'checked':''}>${draft.gift?'Email pickup or delivery updates':'Email order details and future order updates to the customer'}</label>`:''}
+ <div class="totals">${draft.gift?`<div class="grand"><span>Gift total</span><span>${money(0)}</span></div>`:`<div><span>Products</span><strong>${money(subtotal())}</strong></div>${discountAmount()?`<div><span>Discount</span><span>−${money(discountAmount())}</span></div>`:''}${!immediateSale()?`<div><span>Delivery</span><span>${esc(deliveryFeeSummary({...draft,delivery_charge:draftCharge()},money))}</span></div>`:''}<div class="grand"><span>${immediateSale()?'Total':'Total estimate'}</span><span>${money(estimated())}</span></div>${draft.paid&&draft.payment.method==='cash'&&!editing?`<div><span>Change</span><strong id="cash-change">${money(Math.max(0,draft.payment.cash_received_cents-estimated()))}</strong></div>`:''}`}</div>${immediateSale()?'<small>Full payment received · handed to the customer now.</small>':''}<button class="primary full subheading" type="submit" ${!draft.items.length||mode==='in_person'&&!editing&&(!cash||cash.closed_at)?'disabled':''}>${immediateSale()?'Complete sale':editing?'Review changes':'Review order'}</button></form></section></div>`;
 }
 const directMethods=()=>catalog.direct_methods??(catalog.payment_options||[]).map(m=>({label:m.label,active:true}));
 function editDirectMethods(){
@@ -136,7 +172,9 @@ function editDirectMethods(){
  list.onclick=event=>event.target.closest('[data-remove-method]')?.closest('[data-direct-method]')?.remove();
 }
 function paymentFields(p,quick=false){const methods=mode==='in_person'?['GCash','BDO','EastWest']:directMethods().filter(m=>m.active).map(m=>m.label);return `<div class="subheading"><h3>Payment received</h3>${quick?`<input type="hidden" name="payment_method" value="${esc(p.method)}"><div class="payment-methods" role="group" aria-label="Payment method">${[['cash','Cash'],...methods.map(x=>[x,x])].map(([value,label])=>`<button type="button" data-payment-method="${esc(value)}" aria-pressed="${p.method===value}">${esc(label)}</button>`).join('')}</div>`:select('payment_method','Payment method',[['cash','Cash'],...methods.map(x=>[x,x])],p.method)}${p.method==='cash'?input('cash_received','Cash received · PHP',p.cash_received_cents==null?'':amount(p.cash_received_cents),'number','min="0" step="0.01" required')+(quick?`<div class="cash-shortcuts" aria-label="Cash received shortcuts">${button('cash-exact','Exact amount',draft.items.length?'':'disabled')}${[10000,20000,50000,100000].filter(n=>n>estimated()).slice(0,3).map(n=>`<button type="button" data-cash-amount="${n}" ${draft.items.length?'':'disabled'}>${money(n).replace('.00','')}</button>`).join('')}</div>`:''):input('payment_reference','Payment reference · optional',p.reference,'text','maxlength="160"')}<small>Confirm the full payment was received before recording the sale.</small></div>`;}
-function readDraft(){const f=$('#sale-form');if(!f)return;const v=new FormData(f),get=n=>String(v.get(n)||'');draft.method=immediateSale()?'pickup':get('method');draft.fulfillment_date=immediateSale()?today():get('fulfillment_date');if(!editing){if(mode==='in_person'){draft.paid=true;draft.pos_handed_over=immediateSale();}draft.send_email=v.has('send_email');}
+function readDraft(){const f=$('#sale-form');if(!f)return;
+ f.querySelectorAll('[data-fold]').forEach(section=>{if(section.open)folds.add(section.dataset.fold);else folds.delete(section.dataset.fold);});
+ const v=new FormData(f),get=n=>String(v.get(n)||'');draft.method=immediateSale()?'pickup':get('method');draft.fulfillment_date=immediateSale()?today():get('fulfillment_date');if(!editing){if(mode==='in_person'){draft.paid=true;draft.pos_handed_over=immediateSale();}draft.send_email=v.has('send_email');}
  if(mode==='direct'){
   draft.gift=Boolean(editing?.gift || v.has('gift'));
   if(v.has('discount_kind')){
@@ -146,9 +184,9 @@ function readDraft(){const f=$('#sale-form');if(!f)return;const v=new FormData(f
   if(role==='owner'){draft.override_dates=v.has('override_dates');draft.override_reason=get('override_reason');}
  }
  draft.buyer={...draft.buyer,name:get('buyer_name'),phone:get('buyer_phone'),email:get('buyer_email'),social_platform:get('social_platform'),social_username:get('social_username')};if(draft.method==='delivery'){draft.recipient={name:get('recipient_name'),phone:get('recipient_phone')};draft.address={...draft.address,line1:get('line1'),locality:get('locality')};if(v.has('delivery_fee'))draft.delivery_cents=cents(get('delivery_fee')||'0');if(v.has('delivery_fee_recipient'))draft.delivery_fee_recipient=get('delivery_fee_recipient');if(v.has('delivery_fee_pending'))draft.delivery_fee_pending=get('delivery_fee_pending')==='true';}else draft.delivery_cents=0;
- draft.instructions=get('instructions');if(v.has('payment_method'))draft.payment={method:get('payment_method'),reference:get('payment_reference'),cash_received_cents:get('cash_received')===''?null:cents(get('cash_received'))};if(editing)draft.reason=get('reason');}
+ draft.instructions=get('instructions');if(v.has('payment_method'))draft.payment={method:get('payment_method'),reference:get('payment_reference'),cash_received_cents:get('cash_received')===''?null:cents(get('cash_received'))};}
 function payload(){return {...structuredClone(draft),...(draft.gift?{paid:true,discount:{kind:'none',value:0},delivery_cents:0}:{}),order_source:mode,...(mode==='in_person'?{event_id:eventId}:{}),items:draft.items.map(i=>({product_id:i.product_id,source:i.source,selections:i.selections||{},quantity:i.quantity,...(i.source==='custom'?{name:i.name,description:i.description||'',unit_price_cents:i.unit_price_cents}:{})}))};}
-async function review(){readDraft();const sale=payload();if(immediateSale()&&draft.payment.method==='cash'&&draft.payment.cash_received_cents<estimated())throw Error('Cash received is less than the total. Enter the full amount received.');if(editing){const changes=Object.fromEntries(['items','fulfillment_date','method','buyer','recipient','address','instructions','delivery_cents',...(mode==='direct'?['discount','override_dates','override_reason']:[]),...(sale.gift?['gift']:[])].map(k=>[k,sale[k]]));const q=await api('preview_edit_order',{order_id:editing.id,revision:editing.revision,changes});pending={action:'edit_order',payload:{order_id:editing.id,revision:editing.revision,changes,reason:draft.reason,idempotency_key:uid(),expected_quote:Object.fromEntries(['items','subtotal_cents','discount_cents','delivery_cents','total_cents','delivery_zone_name','delivery_zone_description',...(q.gift?['gift']:[])].map(k=>[k,q[k]]))},quote:q};}else{const q=await api('pos_quote',sale);pending={action:'pos_create_order',payload:{...sale,idempotency_key:uid(),expected_quote:q},quote:q};if(immediateSale()&&q.total_cents===estimated()&&q.items.length===draft.items.length&&q.items.every((item,index)=>item.unit_price_cents===linePrice(draft.items[index])&&item.quantity===draft.items[index].quantity)){await saveSale();return;}}render();}
+async function review(){readDraft();const sale=payload();if(immediateSale()&&draft.payment.method==='cash'&&draft.payment.cash_received_cents<estimated())throw Error('Cash received is less than the total. Enter the full amount received.');if(editing){const changes=Object.fromEntries(['items','fulfillment_date','method','buyer','recipient','address','instructions','delivery_cents',...(mode==='direct'?['discount','override_dates','override_reason']:[]),...(sale.gift?['gift']:[])].map(k=>[k,sale[k]]));const q=await api('preview_edit_order',{order_id:editing.id,revision:editing.revision,changes});pending={action:'edit_order',payload:{order_id:editing.id,revision:editing.revision,changes,reason:draft.reason,idempotency_key:uid(),expected_quote:Object.fromEntries(['items','subtotal_cents','discount_cents','delivery_cents','total_cents','delivery_zone_name','delivery_zone_description',...(q.gift?['gift']:[])].map(k=>[k,q[k]]))},quote:q};}else{const q=await api('pos_quote',sale);pending={action:'pos_create_order',payload:{...sale,idempotency_key:uid(),expected_quote:q},quote:q};if(immediateSale()&&q.total_cents===estimated()&&q.items.length===draft.items.length&&q.items.every((item,index)=>item.unit_price_cents===linePrice(draft.items[index])&&item.quantity===draft.items[index].quantity)){await saveSale();return;}}render();root.querySelector('.pending-review h2')?.focus();}
 function directPaymentReview(){
  const handoff=draft.paid&&draft.method==='pickup'&&draft.fulfillment_date===today();
  return `<form id="direct-payment-review"><fieldset ${pending.attempted?'disabled':''}>${select('paid','Payment status',[['false','Awaiting payment · share a payment link'],['true','Full payment already received']],String(draft.paid))}
@@ -163,13 +201,13 @@ function readDirectPayment(form){
 }
 function reviewPaymentText(total){
  if(pending.quote.gift)return 'Gift · No payment required.';
- if(editing)return 'Save these order changes.';
+ if(editing)return '';
  if(!draft.paid)return 'Unpaid · stock reserved until payment or cancellation.';
  if(draft.payment.method!=='cash')return 'Paid via '+draft.payment.method;
  const received=draft.payment.cash_received_cents;
  return received==null||received<total?'Enter the full cash amount received.':'Cash received '+money(received)+' · Change '+money(received-total);
 }
-function renderReview(){const q=pending.quote;return `<section class="panel pending-review"><h2>${pending.attempted?'Confirming your saved request':'Review before recording'}</h2><p>${mode==='in_person'?esc(event?.name):q.gift?'Gift':'Direct order'} · ${esc(draft.method)} · ${esc(draft.fulfillment_date)}</p><div class="table-wrap"><table><thead><tr><th>Item</th><th>Quantity</th><th class="num">Amount</th></tr></thead><tbody>${q.items.map(i=>`<tr><td class="review-item">${esc(i.name)}${i.description?`<small>${esc(i.description)}</small>`:''}${renderOrderFlavors(orderItemDetails(i,product(i.product_id)).flavors,{esc,money:q.gift?null:money})}</td><td>${i.quantity}</td><td class="num">${money(i.line_total_cents)}</td></tr>`).join('')}</tbody></table></div><div class="totals">${q.gift?`<div class="grand"><span>Gift total</span><strong>${money(q.total_cents)}</strong></div>`:`<div><span>Products</span><strong>${money(q.subtotal_cents)}</strong></div>${q.discount_cents?`<div><span>Discount</span><span>−${money(q.discount_cents)}</span></div>`:''}<div><span>Delivery</span><span>${esc(deliveryFeeSummary({...q,method:draft.method},money))}</span></div><div class="grand"><span>Total</span><strong>${money(q.total_cents)}</strong></div>`}</div>${mode==='direct'&&draft.method==='delivery'&&!draft.address?.line1?.trim()?'<p class="notice">Add the delivery address to the order before arranging a courier.</p>':''}${mode==='direct'&&!editing&&!q.gift?directPaymentReview():''}<p data-review-payment aria-live="polite">${esc(reviewPaymentText(q.total_cents))}</p><p class="muted">${pending.attempted?'The same request will be retried safely. Stay on this screen if the connection drops.':'Recording this sale updates inventory and saves the order.'}</p><div class="row">${!pending.attempted?button('back-review','Back'):''}${button('save-sale',pending.attempted?'Retry saving this request':editing?'Save changes':q.gift?'Record gift':'Record sale','class="primary"')}</div></section>`;}
+function renderReview(){const q=pending.quote;return `<section class="panel pending-review"><h2 tabindex="-1">${pending.attempted?'Confirming your saved request':editing?'Review changes':'Review order'}</h2><p>${mode==='in_person'?esc(event?.name):q.gift?'Gift':'Direct order'} · ${esc(draft.method)} · ${esc(draft.fulfillment_date)}</p><div class="table-wrap"><table><thead><tr><th>Item</th><th>Quantity</th><th class="num">Amount</th></tr></thead><tbody>${q.items.map(i=>`<tr><td class="review-item">${esc(i.name)}${i.description?`<small>${esc(i.description)}</small>`:''}${renderOrderFlavors(orderItemDetails(i,product(i.product_id)).flavors,{esc,money:q.gift?null:money})}</td><td>${i.quantity}</td><td class="num">${money(i.line_total_cents)}</td></tr>`).join('')}</tbody></table></div><div class="totals">${editing?`<div><span>Previous total</span><span>${money(editing.total_cents)}</span></div>`:''}${q.gift?`<div class="grand"><span>${editing?'New total · Gift':'Gift total'}</span><strong>${money(q.total_cents)}</strong></div>`:`<div><span>Products</span><strong>${money(q.subtotal_cents)}</strong></div>${q.discount_cents?`<div><span>Discount</span><span>−${money(q.discount_cents)}</span></div>`:''}<div><span>Delivery</span><span>${esc(deliveryFeeSummary({...q,method:draft.method},money))}</span></div><div class="grand"><span>${editing?'New total':'Total'}</span><strong>${money(q.total_cents)}</strong></div>`}</div>${mode==='direct'&&draft.method==='delivery'&&!draft.address?.line1?.trim()?'<p class="notice">Add the delivery address to the order before arranging a courier.</p>':''}${editing?`<label>Reason for changes · optional<textarea id="amendment-reason" maxlength="1000" ${pending.attempted?'disabled':''}>${esc(draft.reason||'')}</textarea></label>`:mode==='direct'&&!q.gift?directPaymentReview():''}<p data-review-payment aria-live="polite">${esc(reviewPaymentText(q.total_cents))}</p>${pending.attempted?'<p class="muted">If the connection drops, retry this request here.</p>':''}<div class="row">${!pending.attempted?button('back-review','Back'):''}${button('save-sale',pending.attempted?'Retry saving this request':editing?'Save changes':q.gift?'Record gift':'Record sale','class="primary"')}</div></section>`;}
 async function saveSale(){if(!pending)return;
  const paymentForm=$('#direct-payment-review');
  if(paymentForm&&!pending.attempted){
@@ -178,22 +216,71 @@ async function saveSale(){if(!pending)return;
   if(draft.paid&&draft.payment.method==='cash'&&Number(draft.payment.cash_received_cents)<pending.quote.total_cents)throw Error('Cash received is less than the order total.');
   Object.assign(pending.payload,{paid:draft.paid,pos_handed_over:draft.pos_handed_over,payment:structuredClone(draft.payment)});
  }
- pending.attempted=true;const req=pending;render();try{const o=await api(req.action,req.payload);pending=null;editing=null;draft=newDraft();await load();view=mode==='in_person'?'sale':'orders';render();showSaved(o);}catch(error){if(error.code==='P0001'||/^22|^23/.test(error.code||'')){pending.attempted=false;render();}throw error;}}
-function showSaved(o){
- const direct=o.order_source==='direct', id=esc(o.id);
- modal('Order saved',`<p class="notice success"><strong>${esc(o.reference)}</strong> · ${money(o.total_cents)} · ${o.gift?'Gift':esc(o.payment_status.replaceAll('_',' '))}</p>
-  ${o.pos_payment?.method==='cash'?`<p class="saved-change">Change to give: <strong>${money(o.pos_payment.change_cents)}</strong></p>`:''}
-  ${direct?`<label class="field">Private customer order link<input data-receipt-link readonly placeholder="Loading link…"></label>`:''}
-  <div class="row">${direct?button('client-details','Client details',`data-id="${id}"`)+button('payment-link','Copy payment / order link',`data-id="${id}"`)+button('print-slip','Print slip',`data-id="${id}"`)+button('order-photos','Reference photos',`data-id="${id}"`):''}
-  ${button('open-order','View order',`data-id="${id}"`)}${button('next-sale','Next sale',direct?'class="primary"':'class="primary full"')}</div>`);
- const link=dialog.querySelector('[data-receipt-link]');
- if(link){
-   link.onclick=()=>link.select();
-   privateOrderLink(o.id).then(url=>{if(link.isConnected)link.value=url;}).catch(()=>{if(link.isConnected)link.placeholder='Use Copy payment / order link to retry';});
- }
- dialog.querySelector('[data-action="next-sale"]')?.focus();
+if(editing&&!pending.attempted)pending.payload.reason=draft.reason?.trim()||null;
+  pending.attempted=true;
+  const req=pending;
+  render();
+  let saved;
+  try { saved=await api(req.action,req.payload); }
+  catch(error){
+    if(error.code==='P0001'||/^22|^23/.test(error.code||'')){pending.attempted=false;render();}
+    throw error;
+  }
+  pending=null;editing=null;draft=newDraft();dirty=false;resetFolds();mobileCheckout=false;
+  showSaved(saved);
+  await refreshAfterSave();
 }
-function renderOrders(){const rows=orders.filter(o=>o.order_source===mode&&(mode!=='in_person'||!eventId||o.event_id===eventId));return `<section class="panel"><h2>Recent ${mode==='in_person'?'event sales':'direct orders'}</h2><p class="muted">Latest 200 POS orders. Use the Kitchen dashboard for the complete order history, payment-proof review, fulfillment, cancellation and refunds.</p><div class="table-wrap"><table><thead><tr><th>Order / customer</th><th>Fulfillment</th><th>Payment</th><th class="num">Total</th><th>Actions</th></tr></thead><tbody>${rows.map(o=>`<tr><td><strong>${esc(o.reference)}</strong><small>${esc(o.buyer?.name)}</small>${o.event_name?`<small>${esc(o.event_name)}</small>`:''}</td><td>${esc(o.method)}<small>${esc(o.fulfillment_date)} · ${esc(o.fulfillment_status.replaceAll('_',' '))}</small></td><td>${o.gift?'Gift':esc(o.payment_status.replaceAll('_',' '))}${o.refund_label?'<small>Refunded</small>':''}${o.order_source==='direct'&&o.method==='delivery'?`<small>${esc(deliveryFeeSummary(o,money))}</small>`:''}</td><td class="num">${money(o.total_cents)}</td><td><div class="row">${button('open-order','Open',`data-id="${o.id}"`)}${o.order_source==='direct'&&o.method==='delivery'&&!o.gift&&!o.refund_label&&!['cancelled','expired'].includes(o.fulfillment_status)?button('delivery-fee',o.delivery_charge?.proof_status==='under_review'?'Review delivery receipt':'Edit delivery fee',`data-id="${o.id}"`):''}${mode==='direct'?button('client-details','Client details',`data-id="${o.id}"`)+button('payment-link','Copy payment link',`data-id="${o.id}"`)+button('print-slip','Print slip',`data-id="${o.id}"`)+button('order-photos','Reference photos',`data-id="${o.id}"`):''}${o.payment_status==='awaiting_payment'&&o.fulfillment_status==='pending_confirmation'&&!o.refund_label?button('pay-order','Record payment',`data-id="${o.id}"`):''}${!o.refund_label&&o.payment_status!=='under_review'&&!['completed','cancelled','expired'].includes(o.fulfillment_status)?button('edit-order','Edit',`data-id="${o.id}"`):''}</div></td></tr>`).join('')||'<tr><td colspan="5">No orders in this section.</td></tr>'}</tbody></table></div></section>`;}
+async function refreshAfterSave(){
+  onOrderSaved();
+  try { await load(); if(host.isConnected&&view==='sale')render(); }
+  catch { status('Order saved. Refresh to load the latest stock and orders.'); }
+}
+function showSaved(order){
+  if(order.order_source==='direct'){showReceipt(order);status('Order saved.');return;}
+  view='sale';render();
+  modal('Order saved',`<p class="notice success"><strong>${esc(order.reference)}</strong> · ${money(order.total_cents)}</p>
+    ${order.pos_payment?.method==='cash'?`<p class="saved-change">Change to give: <strong>${money(order.pos_payment.change_cents)}</strong></p>`:''}
+    <div class="row">${button('open-order','View order',`data-id="${esc(order.id)}"`)}${button('next-sale','Next sale','class="primary"')}</div>`);
+  dialog.querySelector('[data-action="next-sale"]')?.focus();
+}
+const readable=value=>String(value||'').replaceAll('_',' ');
+const editable=o=>!o.refund_label&&o.payment_status!=='under_review'&&!['completed','cancelled','expired'].includes(o.fulfillment_status);
+function showReceipt(order){
+  if(dialog.open)dialog.close();
+  receipt=order;mode=order.order_source;view='receipt';render();
+  root.querySelector('.pos-receipt h2')?.focus();
+}
+function renderReceipt(o){
+  const id=`data-id="${esc(o.id)}"`,details=[o.buyer?.name,readable(o.method),o.fulfillment_date].filter(Boolean);
+  const packing=(o.items||[]).map(item=>{
+    const parts=orderItemDetails(item,catalog.products.find(p=>p.id===item.product_id));
+    return `<li><div><strong>${item.quantity} × ${esc(item.name)}</strong>${item.description?`<small>${esc(item.description)}</small>`:''}
+      ${renderOrderFlavors(parts.flavors,{esc,money:o.gift?null:money,products:catalog.flavors})}
+      ${parts.insulated?`<small>Insulated · ${esc(parts.insulated)}</small>`:''}${parts.extras.map(text=>`<small>${esc(text)}</small>`).join('')}</div>
+      <strong>${money(item.line_total_cents)}</strong></li>`;
+  }).join('');
+  const canSetFee=o.order_source==='direct'&&o.method==='delivery'&&!o.gift&&!o.refund_label&&!['cancelled','expired'].includes(o.fulfillment_status);
+  return `<section class="panel pos-receipt"><h2 tabindex="-1">${esc(o.reference)}</h2><p>${esc(details.join(' · '))}</p>
+    <p class="receipt-status">${esc([o.gift?'Paid · Gift':readable(o.payment_status),readable(o.fulfillment_status),o.refund_label?'Refunded':''].filter(Boolean).join(' · '))}</p>
+    <ul class="receipt-items">${packing}</ul>
+    <div class="totals">${o.discount_cents?`<div><span>Discount</span><span>−${money(o.discount_cents)}</span></div>`:''}
+    ${o.method==='delivery'&&!o.gift?`<div><span>Delivery</span><span>${esc(deliveryFeeSummary(o,money))}</span></div>`:''}
+    ${o.pos_payment?.method==='cash'?`<div><span>Cash received</span><span>${money(o.pos_payment.cash_received_cents)}</span></div><div><span>Change</span><span>${money(o.pos_payment.change_cents)}</span></div>`:''}
+    <div class="grand"><span>${o.gift?'Gift total':'Total'}</span><strong>${money(o.total_cents)}</strong></div></div>
+    ${privateOrderLinkField()}
+    <div class="receipt-actions">${editable(o)?button('edit-order','Edit order',id):''}${button('print-slip','Print slip',id)}${button('client-details','Client details',id)}${button('order-history','Order history / status',id)}
+    ${o.order_source==='direct'?button('order-photos','Reference photos',id):''}${o.payment_status==='awaiting_payment'&&o.fulfillment_status==='pending_confirmation'&&!o.refund_label?button('pay-order','Record payment',id):''}
+    ${canSetFee?button('delivery-fee',o.delivery_charge?.proof_status==='under_review'?'Review delivery receipt':'Edit delivery fee',id):''}
+    ${button('view-sale',dirty||draft.items.length?'Return to basket':'New order','class="primary"')}</div></section>`;
+}
+function renderOrders(){
+  const rows=orders.filter(o=>o.order_source===mode&&(mode!=='in_person'||!eventId||o.event_id===eventId));
+  return `<section class="panel"><h2>Recent ${mode==='in_person'?'event sales':'direct orders'}</h2>
+    ${rows.length?`<ul class="pos-order-list">${rows.map(o=>`<li><div><strong>${esc(o.reference)}</strong><small>${esc(o.buyer?.name||o.event_name||'')}</small></div>
+    <div>${esc(readable(o.method))} · ${esc(o.fulfillment_date)}<small>${esc(readable(o.fulfillment_status))}</small></div>
+    <div>${esc(o.gift?'Paid · Gift':readable(o.payment_status))}${o.refund_label?'<small>Refunded</small>':''}</div>
+    <strong>${money(o.total_cents)}</strong>${button('open-order','Open',`data-id="${esc(o.id)}" aria-label="Open ${esc(o.reference)}"`)}</li>`).join('')}</ul>`:'<p class="empty">No orders in this section.</p>'}</section>`;
+}
 function renderSetup(){
  if(!event)return '<p class="notice">Choose or create an event first.</p>';
  if(event.deleted_at)return '<section class="panel"><h2>'+esc(event.name)+' · deleted</h2><p>Sales, cash counts and accounting records are preserved. Open Event report or Orders to view the history.</p></section>';
@@ -318,14 +405,13 @@ function renderReport(){if(!event)return '<p class="notice">Choose an event firs
 function cashForm(action){const c=view==='report'?report?.cash:event?.cash_session,date=view==='report'?reportDate:today(),movementId=uid();const fields=action==='pos_open_cash'?input('opening','Opening cash float · PHP','0.00','number','required min="0" step="0.01"'):action==='pos_close_cash'?`<p>Expected: <strong>${money(c.expected_cents)}</strong></p>${input('counted','Cash counted · PHP','','number','required min="0" step="0.01"')}`:action==='pos_reopen_cash'?input('reason','Reason for reopening','','text','required maxlength="1000"'):`${select('direction','Cash direction',[['in','Cash in'],['out','Cash out']],'out')}${input('amount','Amount · PHP','','number','required min="0.01" step="0.01"')}${input('reason','Reason (e.g. cash refund, float added)','','text','required maxlength="1000"')}`;
  modal(({pos_open_cash:'Open cash session',pos_close_cash:'Count & close',pos_reopen_cash:'Reopen cash session',pos_cash_movement:'Record cash movement'})[action],`<form>${fields}<button type="submit" class="primary">Save</button></form>`,async f=>{await api(action,{event_id:eventId,date,revision:c?.revision,id:movementId,opening_cents:f.has('opening')?cents(f.get('opening')):undefined,counted_cents:f.has('counted')?cents(f.get('counted')):undefined,expected_cents:c?.expected_cents,amount_cents:f.has('amount')?cents(f.get('amount'))*(f.get('direction')==='out'?-1:1):undefined,reason:f.get('reason')});await load();await loadReport();dialog.close();render();});
 }
-async function privateOrderLink(id){const o=await api('pos_payment_link',{order_id:id});if(o.id!==id||typeof o.token!=='string'||o.token.length<40)throw Error('The private order link could not be opened.');const url=new URL('order.html',location.href);url.hash=new URLSearchParams({order:o.id,token:o.token}).toString();return url.href;}
-async function copyPaymentLink(id){const url=await privateOrderLink(id);try{await navigator.clipboard.writeText(url);status('Private order / payment link copied.');}catch{modal('Private payment link',`<p>Anyone with this link can view the order. Send it only to the customer.</p><label>Copy this link<input readonly value="${esc(url)}"></label>`);dialog.querySelector('input').select();}}
+
 // Keep the same request on an uncertain network response; known validation failures can be corrected.
 function deliveryDialog(title,fields,action,o,values){let request=null;
  modal(title,'<form>'+fields+'<button class="primary subheading" type="submit">Save</button></form>',async f=>{
   request??={order_id:o.id,revision:o.revision,idempotency_key:uid(),...values(f)};
   try{await api(action,request);}catch(e){if(e.code==='P0001'||/^22|^23/.test(e.code||''))request=null;else dialog.querySelectorAll('input,select').forEach(el=>el.disabled=true);throw e;}
-  await load();dialog.close();render();status('Delivery details saved.');
+  dialog.close();if(receipt?.id===o.id)showReceipt(await api('get_order',{order_id:o.id}));await refreshAfterSave();status('Delivery details saved.');
  });
 }
 function deliveryFeeForm(o){if(o.delivery_charge?.proof_status==='under_review'){deliveryReceiptReview(o);return;}const c=o.delivery_charge||{state:'included',recipient:'elio',fee_cents:o.delivery_cents},collected=c.state==='paid'||c.state==='included'&&o.payment_status==='paid'&&c.fee_cents>0;
@@ -396,10 +482,11 @@ function addItem(id){readDraft();const p=product(id);if(!p||immediateSale()&&eve
  });
  }else{pushItem(p,{});render();}}
 function pushItem(p,selections,quantity=1){const existing=draft.items.find(i=>i.product_id===p.id&&JSON.stringify(i.selections)===JSON.stringify(selections));if((existing?.quantity||0)+quantity>10000)throw Error('Each line can have up to 10,000 units.');if(existing)existing.quantity+=quantity;else draft.items.push({product_id:p.id,source:p.source||'event',quantity,selections,name:p.name});}
-async function editOrder(id){const o=await api('get_order',{order_id:id});if(['completed','cancelled','expired'].includes(o.fulfillment_status)||o.refund_label||o.order_source==='direct'&&o.payment_status==='under_review'){mode=o.order_source;view='orders';await load();render();return;}if(!['direct','in_person'].includes(o.order_source))throw Error('Use the kitchen editor for this order.');mode=o.order_source;eventId=o.event_id||'';editing=o;draft={...newDraft(),...structuredClone(o),payment:o.pos_payment||{method:'cash',cash_received_cents:null,reference:''},reason:'',items:structuredClone(o.items)};await load();mobileCheckout=mode==='direct';view='sale';render();}
-function payOrder(o){let p={method:'cash',cash_received_cents:null,reference:''},request=null;const draw=()=>{modal('Record full payment',`<form><p><strong>${esc(o.reference)}</strong> · ${money(o.total_cents)} due</p>${paymentFields(p)}<button class="primary" type="submit">Record payment received</button></form>`,async f=>{request??={order_id:o.id,revision:o.revision,idempotency_key:uid(),payment:{method:f.get('payment_method'),cash_received_cents:cents(f.get('cash_received')||'0'),reference:String(f.get('payment_reference')||'')}};let saved;try{saved=await api('pos_pay_order',request);}catch(error){if(error.code==='P0001'||/^22|^23/.test(error.code||''))request=null;else{dialog.querySelectorAll('input,select').forEach(el=>el.disabled=true);}throw error;}await load();dialog.close();render();showSaved(saved);});dialog.querySelector('[name=payment_method]').onchange=e=>{p.method=e.target.value;dialog.close();draw();};};draw();}
+async function editOrder(id){const o=await api('get_order',{order_id:id});if(!editable(o)){showReceipt(o);return;}if(!['direct','in_person'].includes(o.order_source))throw Error('Use the kitchen editor for this order.');mode=o.order_source;eventId=o.event_id||'';editing=o;receipt=o;dirty=false;resetFolds();if(o.discount_cents||o.gift)folds.add('discount');draft={...newDraft(),...structuredClone(o),payment:o.pos_payment||{method:'cash',cash_received_cents:null,reference:''},reason:'',items:structuredClone(o.items)};await load();mobileCheckout=mode==='direct';view='sale';render();}
+function payOrder(o){let p={method:'cash',cash_received_cents:null,reference:''},request=null;const draw=()=>{modal('Record full payment',`<form><p><strong>${esc(o.reference)}</strong> · ${money(o.total_cents)} due</p>${paymentFields(p)}<button class="primary" type="submit">Record payment received</button></form>`,async f=>{request??={order_id:o.id,revision:o.revision,idempotency_key:uid(),payment:{method:f.get('payment_method'),cash_received_cents:cents(f.get('cash_received')||'0'),reference:String(f.get('payment_reference')||'')}};let saved;try{saved=await api('pos_pay_order',request);}catch(error){if(error.code==='P0001'||/^22|^23/.test(error.code||''))request=null;else{dialog.querySelectorAll('input,select').forEach(el=>el.disabled=true);}throw error;}dialog.close();showSaved(saved);await refreshAfterSave();});dialog.querySelector('[name=payment_method]').onchange=e=>{p.method=e.target.value;dialog.close();draw();};};draw();}
+function confirmDiscard(){return !(dirty||draft.items.length||editing)||confirm('Discard unsaved changes to this order?');}
 async function action(name,id){
- if(name.startsWith('mode-')){readDraft();if(draft.items.length&&!confirm('Clear this unsaved cart and change POS section?'))return;mode=name==='mode-person'?'in_person':'direct';draft=newDraft();editing=null;view='sale';await load();render();return;}
+ if(name.startsWith('mode-')){readDraft();if(mode===(name==='mode-person'?'in_person':'direct'))return;if(!confirmDiscard())return;mode=name==='mode-person'?'in_person':'direct';draft=newDraft();editing=null;dirty=false;receipt=null;resetFolds();mobileCheckout=false;view='sale';await load();render();return;}
  if(name.startsWith('view-')){readDraft();view=name.slice(5);if(view==='sale')mobileCheckout=false;if(view==='report')await loadReport();render();return;}
  switch(name){
  case 'show-cart':readDraft();mobileCheckout=true;render();window.scrollTo({top:0,behavior:'instant'});break;
@@ -417,10 +504,13 @@ async function action(name,id){
  case 'new-product':productForm();break;case 'edit-product':productForm(catalog.pos_products.find(x=>x.id===id));break;case 'stock-product':stockProduct(catalog.pos_products.find(x=>x.id===id));break;
  case 'delete-product':{const p=catalog.pos_products.find(x=>x.id===id);if(confirm(`Delete ${p.name} from the POS catalog? Existing orders and records will stay intact.`)){await api('pos_delete_product',{id,revision:p.revision});await load();render();}break;}
  case 'open-cash':cashForm('pos_open_cash');break;case 'close-cash':cashForm('pos_close_cash');break;case 'reopen-cash':cashForm('pos_reopen_cash');break;case 'cash-movement':cashForm('pos_cash_movement');break;
- case 'refresh-report':await loadReport();render();break;case 'print-slip':await printOrderSlips(()=>api('get_order',{order_id:id}),{products:[...catalog.products,...catalog.flavors]});break;case 'payment-link':await copyPaymentLink(id);break;case 'client-details':location.href=`manage.html?order=${encodeURIComponent(id)}&section=client`;break;case 'order-photos':location.href=`manage.html?order=${encodeURIComponent(id)}&section=photos`;break;case 'open-order':location.href=`manage.html?order=${encodeURIComponent(id)}`;break;
+ case 'refresh-report':await loadReport();render();break;case 'print-slip':await printOrderSlips(()=>api('get_order',{order_id:id}),{products:[...catalog.products,...catalog.flavors]});break;case 'client-details':await openKitchenOrder(id,'client');break;
+  case 'order-photos':await openKitchenOrder(id,'photos');break;
+  case 'order-history':await openKitchenOrder(id,'history');break;
+  case 'open-order':readDraft();showReceipt(await api('get_order',{order_id:id}));break;
  case 'copy-buyer':readDraft();draft.recipient={name:draft.buyer.name,phone:draft.buyer.phone};render();break;case 'back-review':pending=null;render();break;case 'save-sale':await saveSale();break;
- case 'next-sale':dialog.close();view='sale';mobileCheckout=false;draft=newDraft();render();break;case 'pay-order':payOrder(orders.find(o=>o.id===id));break;case 'edit-order':await editOrder(id);break;
- case 'cancel-edit':editing=null;draft=newDraft();view='orders';render();break;
+ case 'next-sale':dialog.close();receipt=null;view='sale';mobileCheckout=false;draft=newDraft();dirty=false;resetFolds();render();break;case 'pay-order':payOrder(await api('get_order',{order_id:id}));break;case 'edit-order':if(confirmDiscard())await editOrder(id);break;
+ case 'cancel-edit':{if(!confirmDiscard())break;const original=editing;editing=null;dirty=false;resetFolds();draft=newDraft();showReceipt(original);break;}
  }
 }
 async function run(fn){if(busy)return;try{busy=true;$('#refresh').disabled=true;await fn();}catch(e){flashError(e);}finally{busy=false;$('#refresh').disabled=false;}}
@@ -438,6 +528,8 @@ async function switchEvent(selector){
  });
 }
 function bind(){
+ const amendment=$('#amendment-reason');
+ if(amendment)amendment.oninput=()=>{draft.reason=amendment.value;};
  const reviewForm=$('#direct-payment-review');
  if(reviewForm){
   reviewForm.onsubmit=event=>{event.preventDefault();run(saveSale);};
@@ -456,9 +548,30 @@ function bind(){
  $('#event-select')?.addEventListener('change',e=>switchEvent(e.target));
  $('#report-date')?.addEventListener('change',e=>run(async()=>{reportDate=e.target.value;await loadReport();render();}));
 }
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(b){e.preventDefault();run(()=>action(b.dataset.action,b.dataset.id));}});
-$('#refresh').onclick=()=>run(async()=>{if(pending){status('Finish or retry the pending request first.');return;}readDraft();await load();if(view==='report')await loadReport();render();status('Stock and orders refreshed.');});
-window.addEventListener('beforeunload',e=>{if(pending||draft.items.length){e.preventDefault();e.returnValue='';}});
-window.addEventListener('offline',()=>{status('Connection lost. Sales require internet.');});window.addEventListener('online',()=>status('Connection restored. Refresh to see current stock.'));
-await ready;
-try{const access=await api('account_access');if(!['owner','staff'].includes(access.role))throw Error('Sign in with an authorized Elio team account.');role=access.role;await load();const params=new URLSearchParams(location.search),edit=params.get('edit'),receipt=params.get('delivery_receipt');if(receipt){mode='direct';view='orders';render();deliveryFeeForm(await api('get_order',{order_id:receipt}));}else if(edit)await editOrder(edit);else render();auth?.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){draft=newDraft();pending=null;location.replace('admin-account.html?next=pos.html');}});if('serviceWorker' in navigator)navigator.serviceWorker.register('pos-sw.js',{scope:'./'}).catch(()=>{});}catch(error){root.innerHTML=`<section class="panel"><h1>Elio POS</h1><p>${esc(error.message)}</p><a class="button" href="admin-account.html?next=pos.html">Team sign in</a></section>`;}
+scope.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(b){e.preventDefault();run(()=>action(b.dataset.action,b.dataset.id));}});
+root.addEventListener('input',e=>{if(e.target.closest('#sale-form')&&e.target.name)dirty=true;});
+
+$('#refresh').onclick=()=>run(async()=>{if(pending){status('Finish or retry the pending request first.');return;}readDraft();await load();if(view==='report')await loadReport();if(view==='receipt'&&receipt)receipt=await api('get_order',{order_id:receipt.id});render();status('Stock and orders refreshed.');});
+listen(window,'beforeunload',e=>{if(pending||dirty||draft.items.length||editing){e.preventDefault();e.returnValue='';}});
+listen(window,'offline',()=>status('Connection lost. Sales require internet.'));
+listen(window,'online',()=>status('Connection restored. Refresh to see current stock.'));
+const ready=load().then(()=>{if(host.isConnected)render();}).catch(error=>{
+  if(!host.isConnected)return;
+  root.innerHTML='<p id="page-error" class="notice error" role="alert"></p>';
+  flashError(error);
+});
+return {
+  async open(id,intent='receipt'){
+    await ready;
+    if(busy||pending){status('Finish the current request first.');return;}
+    await run(async()=>{
+      if(intent==='edit'){if(confirmDiscard())await editOrder(id);return;}
+      const order=await api('get_order',{order_id:id});
+      if(intent==='delivery'){showReceipt(order);deliveryFeeForm(order);}else showReceipt(order);
+    });
+  },
+  canLeave(){if(busy||pending?.attempted){status('Finish the current request first.');return false;}return confirmDiscard();},
+  updateOrder(order){if(receipt?.id===order.id&&view==='receipt')showReceipt(order);},
+  destroy(){manifest.remove();lifecycle.abort();clearTimeout(status.timer);if(dialog.open)dialog.close();}
+};
+}

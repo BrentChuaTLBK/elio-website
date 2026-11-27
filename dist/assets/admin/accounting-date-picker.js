@@ -83,6 +83,14 @@ export function setAccountingDate(root,name,value,{notify=false}={}) {
  if(notify){input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));}
 }
 
+export function bindCalendarDismissal(scope, signal) {
+ const opened=()=>scope.querySelectorAll('.accounting-date-picker[open]');
+ document.addEventListener('click',event=>{
+  const path=event.composedPath();
+  opened().forEach(picker=>{if(!path.includes(picker))picker.open=false;});
+ },{signal});
+ window.addEventListener('resize',()=>opened().forEach(positionCalendar),{signal});
+}
 const bound=new WeakSet();let outsideBound=false;
 export function bindAccountingDates(root) {
  if(bound.has(root))return;bound.add(root);
@@ -128,6 +136,5 @@ export function bindAccountingDates(root) {
   const next=calendarKeyDate(button.dataset.dateValue,event.key,event.shiftKey);if(!next||!isCalendarDate(next)||next.startsWith('0000')||!withinBounds(next,picker))return;
   event.preventDefault();picker.dataset.month=next.slice(0,7);render(picker,next);
  });
- if(!outsideBound){outsideBound=true;document.addEventListener('click',event=>document.querySelectorAll('.accounting-date-picker[open]').forEach(picker=>{if(!picker.contains(event.target))picker.open=false;}));window.addEventListener('resize',()=>document.querySelectorAll('.accounting-date-picker[open]').forEach(positionCalendar));}
+ if(!outsideBound){outsideBound=true;bindCalendarDismissal(document);}
 }
-
