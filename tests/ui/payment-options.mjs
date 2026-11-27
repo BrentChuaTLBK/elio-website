@@ -9,7 +9,7 @@ const source=await readFile(join(root,'assets/admin/client.js'),'utf8'),helpers=
 const options=[{label:'GCash',account_name:'Test Shop',account_number:'09170000001',note:''},{label:'BDO',account_name:'Test Shop',account_number:'001234567890',note:''},{label:'East West',account_name:'Test Pastries Shop',account_number:'000987654321',note:''}];
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
 try {
- for(const width of [1440,390,320]) {
+ for(const width of [1440,768,390,320]) {
   const errors=[],calls=[];let settings={shop_name:'Elio',paused:false,payment_options:structuredClone(options),payment_options_revision:1,payment_note:'',contact_email:'shop@example.test',contact_phone:'09170000002',pickup_address:'Test kitchen',pickup_hours:'9 AM–6 PM',site_url:origin,delivery_window:'9 AM–6 PM',reminder_time:'08:00',production_weekdays:[0,1,2,3,4,5,6],fulfillment_weekdays:[0,1,2,3,4,5,6],nonproduction_dates:[],blocked_dates:[],delivery_blocked_dates:[]};
   const original={id:'payment-test',reference:'ELIO-PAYMENT-TEST',created_at:new Date().toISOString(),revision:1,buyer:{name:'Test customer',email:'buyer@example.test',phone:'09170000003'},items:[{name:'Signature Trio',quantity:1,unit_price_cents:90000,line_total_cents:90000,selection_labels:[]}],subtotal_cents:90000,discount_cents:0,delivery_cents:0,total_cents:90000,method:'pickup',fulfillment_date:'2026-10-01',payment_status:'awaiting_payment',fulfillment_status:'pending_confirmation',payment_deadline:new Date(Date.now()+900000).toISOString(),payment_options:structuredClone(options),payment_note:'',payment_instructions:'Accepted Payment Methods:\n\n'+options.map(o=>[o.label,o.account_name,o.account_number].join('\n')).join('\n\n'),pickup_address:'Test kitchen',pickup_hours:'9 AM–6 PM',history:[]};
   let order=structuredClone(original);
@@ -39,15 +39,48 @@ try {
    }catch{return route.fulfill({status:404,body:''});}
   });
   const page=await ctx.newPage();page.on('pageerror',error=>errors.push(error.message));
-  await page.goto(origin+'/order.html#order=payment-test');await page.locator('.payment-option').first().waitFor();assert.equal(await page.locator('.payment-option').count(),3);
-  const buttons=page.locator('[data-copy-payment]');for(let index=0;index<6;index++)await buttons.nth(index).click();
-  assert.deepEqual(await page.evaluate(()=>window.__copied),options.flatMap(o=>[o.account_name,o.account_number]));
+  await page.goto(origin+'/order.html#order=payment-test');
+  const panel=page.locator('.payment-options'), details=panel.locator('.payment-option');
+  const method=name=>panel.getByRole('radio',{name,exact:true});
+  const amount=panel.getByRole('textbox',{name:'Amount to pay',exact:true});
+  await details.waitFor();
+  assert.equal(await panel.getByRole('radio').count(),3);
+  assert.equal(await method('GCash').isChecked(),true);
+  assert.equal(await amount.inputValue(),'900.00');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  await page.locator('.payment-options').screenshot({path:join(output,`customer-${width}.png`)});
-  await page.evaluate(()=>{window.__clipboardFail=true;});await buttons.nth(3).click();assert.match(await page.locator('.payment-copy-status').textContent(),/selected/);assert.equal(await page.evaluate(()=>getSelection().toString()),'001234567890');
-  await page.locator('[name=proof]').setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2FzQAAAAASUVORK5CYII=','base64')});await page.getByRole('button',{name:'Submit payment proof',exact:true}).click();await page.getByRole('heading',{name:'Your payment is under review',exact:true}).waitFor();assert.equal(await page.locator('.payment-options').count(),0);
+  await panel.screenshot({path:join(output,`customer-${width}.png`)});
+  const proof=page.locator('[name=proof]'), reference=page.locator('[name=payment_reference]');
+  await proof.setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2FzQAAAAASUVORK5CYII=','base64')});
+  await reference.fill('transfer-reference');
+  for(const option of options){
+    await method(option.label).check();
+    assert.equal(await details.count(),1);
+    assert.equal(await details.getByRole('heading').innerText(),option.label);
+    assert.equal(await details.getByRole('textbox',{name:'Account name'}).inputValue(),option.account_name);
+    const numberLabel=option.label==='GCash'?'Mobile number':'Account number';
+    assert.equal(await details.getByRole('textbox',{name:numberLabel}).inputValue(),option.account_number);
+    await details.getByRole('button',{name:'Copy account name',exact:true}).click();
+    await details.getByRole('button',{name:'Copy '+numberLabel.toLowerCase(),exact:true}).click();
+  }
+  await panel.getByRole('button',{name:'Copy amount to pay'}).click();
+  assert.deepEqual(await page.evaluate(()=>window.__copied),[...options.flatMap(o=>[o.account_name,o.account_number]),'900.00']);
+  await method('East West').focus();
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await method('BDO').isChecked(),true);
+  const beforeRefresh=calls.filter(c=>c.action==='get_order').length;
+  await page.locator('#refresh-order').click();
+  await page.waitForFunction(()=>!document.querySelector('#refresh-order')?.disabled);
+  assert(calls.filter(c=>c.action==='get_order').length>beforeRefresh);
+  assert.equal(await method('BDO').isChecked(),true);
+  assert.equal(await proof.evaluate(input=>input.files[0]?.name),'receipt.png');
+  assert.equal(await reference.inputValue(),'transfer-reference');
+  await page.evaluate(()=>{window.__clipboardFail=true;});
+  await details.getByRole('button',{name:'Copy account number',exact:true}).click();
+  assert.match(await panel.locator('.payment-copy-status').innerText(),/selected/);
+  assert.equal(await details.getByRole('textbox',{name:'Account number'}).evaluate(input=>input.value.slice(input.selectionStart,input.selectionEnd)),'001234567890');
+  await page.getByRole('button',{name:'Submit payment proof',exact:true}).click();await page.getByRole('heading',{name:'Your payment is under review',exact:true}).waitFor();assert.equal(await page.locator('.payment-options').count(),0);
   for(const changes of [{payment_status:'paid'},{fulfillment_status:'expired'},{refund_label:true},{uploads_paused:true,payment_seconds_remaining:600}]){order={...original,...changes};await page.reload();await page.locator('.order-title').waitFor();assert.equal(await page.locator('.payment-option').count(),0);assert.equal(await page.locator('#proof-form').count(),0);}
-  order={...original};delete order.payment_options;await page.reload();await page.locator('.payment-option').first().waitFor();assert.equal(await page.locator('.payment-option').count(),3);
+  order={...original};delete order.payment_options;await page.reload();await details.waitFor();assert.equal(await details.count(),1);assert.equal(await panel.getByRole('radio').count(),3);await method('BDO').check();assert.equal(await details.getByRole('textbox',{name:'Account number'}).inputValue(),'001234567890');
   // The same email URL resolves the current courier link on every visit.
   const trackingPage=origin+'/order.html#order=payment-test&token=fixture-token&section=tracking';
   for(const [changes,expected] of [
@@ -92,14 +125,17 @@ try {
   await page.locator('.payment-option-editor').first().locator('summary').click();
   await page.getByRole('button',{name:'Save shop settings',exact:true}).click();
   assert.equal(await page.locator('.payment-option-editor').first().locator('details').evaluate(el=>el.open),true);
-  order={...original,payment_options:structuredClone(settings.payment_options)};await page.goto(origin+'/order.html#order=payment-test');await page.getByRole('heading',{name:'Maya',exact:true}).waitFor();assert.equal(await page.locator('.payment-option').count(),4);
+  order={...original,payment_options:structuredClone(settings.payment_options)};await page.goto(origin+'/order.html#order=payment-test');await method('Maya').check();await details.getByRole('heading',{name:'Maya',exact:true}).waitFor();assert.equal(await panel.getByRole('radio').count(),4);assert.equal(await details.count(),1);assert.equal(await details.getByText('Use your order reference.').count(),1);
   order={...order,order_source:'direct',payment_deadline:null,payment_seconds_remaining:null};await page.reload();await page.locator('#proof-form').waitFor();assert.match(await page.locator('#app').textContent(),/link stays open/i);assert.doesNotMatch(await page.locator('#app').textContent(),/deadline has passed/i);
   for(const [charge,expected] of [
    [{state:'pending',recipient:'elio',fee_cents:null},/To be confirmed.*Pay Elio/],
    [{state:'courier',recipient:'courier',fee_cents:20000},/200.00.*Pay courier directly/],
    [{state:'quoted',recipient:'elio',fee_cents:20000},/200.00.*not yet received/],
    [{state:'paid',recipient:'elio',fee_cents:20000},/Paid to Elio separately/]
-  ]){order={...order,recipient:{},address:{},method:'delivery',payment_status:'paid',paid_amount_cents:original.total_cents,fulfillment_status:'confirmed',delivery_charge:charge};await page.reload();await page.getByRole('heading',{name:'Your treats'}).waitFor();assert.match(await page.locator('#app').textContent(),expected);assert.equal(await page.locator('#proof-form').count(),0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
-  assert.deepEqual(errors,[]);assert.equal(calls.filter(c=>c.action==='mock_upload').length,1);await ctx.close();console.log(`PASS payment copy, fallback, proof upload and closed states; admin adds/saves/removes methods ${width}px`);
+  ]){order={...order,recipient:{},address:{},method:'delivery',payment_status:'paid',paid_amount_cents:original.total_cents,fulfillment_status:'confirmed',delivery_charge:charge};await page.reload();await page.getByRole('heading',{name:'Your treats'}).waitFor();
+   if(charge.state==='quoted'){assert.equal(await amount.inputValue(),'200.00');await method('BDO').check();assert.equal(await details.getByRole('textbox',{name:'Account number'}).inputValue(),'001234567890');}
+   else assert.equal(await panel.count(),0);
+   assert.match(await page.locator('#app').textContent(),expected);assert.equal(await page.locator('#proof-form').count(),0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
+  assert.deepEqual(errors,[]);assert.equal(calls.filter(c=>c.action==='mock_upload').length,1);await ctx.close();console.log(`PASS payment method switching, receipt preservation, copy, delivery fee and admin payment methods at ${width}px`);
  }
 }finally{await browser.close();}

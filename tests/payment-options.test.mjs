@@ -4,7 +4,18 @@ const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replac
 const legacy='Accepted Payment Methods:\r\n\r\nGCash\r\nTest Shop\r\n09170000001\r\n\r\nBank\r\nTest Shop\r\n001234567890';
 const parsed=paymentDetails({payment_instructions:legacy});assert.equal(parsed.options.length,2);assert.equal(parsed.options[1].account_number,'001234567890');
 assert.equal(paymentDetails({payment_instructions:'Contact the kitchen.'}).note,'Contact the kitchen.');
-const html=renderPaymentOptions({payment_instructions:legacy},{payment_options:[{label:'New account',account_name:'New',account_number:'123'}]},{esc});assert.match(html,/001234567890/);assert.doesNotMatch(html,/New account/);
+const html=renderPaymentOptions({payment_instructions:legacy,total_cents:98765},{payment_options:[{label:'New account',account_name:'New',account_number:'123'}]},{esc});
+assert.match(html,/Choose how to pay/);
+assert.match(html,/09170000001/);
+assert.match(html,/>Bank<\/span>/);
+assert.match(html,/value="987\.65"/);
+assert.doesNotMatch(html,/001234567890|New account/);
+
+const single=renderPaymentOptions({payment_options:[{...parsed.options[0],enabled:false},parsed.options[1]]},{},{esc});
+assert.doesNotMatch(single,/type="radio"|09170000001/);
+assert.match(single,/001234567890/);
+assert.doesNotMatch(renderPaymentOptions({payment_options:[]},{payment_options:parsed.options},{esc}),/type="radio"|001234567890/);
+assert.match(renderPaymentOptions({}, {payment_options:parsed.options},{esc}),/09170000001/);
 const unsafe=renderPaymentOptions({payment_options:[{label:'<script>x</script>',account_name:'<img src=x>',account_number:'00123',note:'<b>note</b>'}]},{},{esc});assert.doesNotMatch(unsafe,/<script>|<img|<b>/);assert.match(unsafe,/&lt;script&gt;/);
 assert.match(renderPaymentOptions({payment_instructions:'Saved old account'},{payment_options:parsed.options},{esc}),/Saved old account/);
-console.log('PASS legacy payment parsing, leading zeroes, saved order precedence and escaped account details');
+console.log('PASS default payment method, saved accounts, disabled methods, leading zeroes, amount and escaped details');
