@@ -51,6 +51,26 @@ export function insideBox(product, flavors = [], content = window.ELIO_CONTENT) 
   return `<section class="inside-box" aria-label="Inside your box"><p class="inside-box-label">Inside your box</p><ul>${tiles}</ul><p class="inside-box-note">A curated set of three. To choose different flavors, <a href="order.html?product=your-own">build your own box</a>.</p></section>`;
 }
 
+export function boxInformation(product = {}) {
+  return {
+    box_details: typeof product.box_details === 'string' ? product.box_details
+      : 'Three individual square Basque cheesecakes, presented in a single row inside a brown carton with a cream interior.\n\nEach cheesecake is approximately 6 × 6 × 5 cm.',
+    care_instructions: typeof product.care_instructions === 'string' ? product.care_instructions
+      : 'Care and serving information is coming soon.',
+  };
+}
+
+function informationSection(title, text) {
+  if (!text.trim()) return '';
+  const paragraphs = text.trim().replace(/\r\n?/g, '\n').split(/\n[ \t]*\n+/)
+    .map(paragraph => '<p>' + esc(paragraph).replaceAll('\n', '<br>') + '</p>').join('');
+  return '<details><summary>' + esc(title) + '</summary><div>' + paragraphs + '</div></details>';
+}
+
 export function boxDetails(product = {}, { gallery = false } = {}) {
-  return `<div class="product-accordions"><details><summary>What’s in the box</summary><div><p>${esc(product.box_details || 'Three individual square Basque cheesecakes, presented in a single row inside a brown carton with a cream interior.')}</p><p>Each cheesecake is approximately 6 × 6 × 5 cm.</p></div></details><details><summary>Care &amp; serving</summary><div><p>${esc(product.care_instructions || 'Care and serving information is coming soon.')}</p></div></details>${gallery ? '<details class="ep-details"><summary>Box photos</summary><div data-product-gallery></div></details>' : ''}</div>`;
+  const info = boxInformation(product);
+  const sections = informationSection('What’s in the box', info.box_details)
+    + informationSection('Care & serving', info.care_instructions)
+    + (gallery ? '<details class="ep-details"><summary>Box photos</summary><div data-product-gallery></div></details>' : '');
+  return sections ? '<div class="product-accordions">' + sections + '</div>' : '';
 }
