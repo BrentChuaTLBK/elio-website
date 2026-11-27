@@ -138,6 +138,14 @@
 .quantity-calendar .date-calendar{padding:0;border:0;margin:0;min-width:0;background:transparent}
 .quantity-calendar .calendar-hint{margin-top:10px}.quantity-calendar .calendar-footer{gap:8px;flex-wrap:wrap}
 .quantity-explainer,.quantity-help{font-size:12px;line-height:1.7;color:var(--muted)}.quantity-explainer{border-top:1px solid var(--line);padding-top:16px;margin:16px 0 0}
+#daily-box-limit{padding-bottom:18px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+#daily-box-limit h2{margin:0 0 6px}
+#daily-box-limit p,#box-limit-status{color:var(--muted);font-size:12px;line-height:1.5}
+#daily-box-limit p{margin:0 0 12px}
+#daily-box-limit label{display:block;margin-bottom:5px;font-size:12px;font-weight:600}
+#daily-box-limit .quantity-input-row{max-width:240px}
+#daily-box-limit .button{white-space:nowrap}
+#box-limit-status{display:block;margin-top:6px}
 .quantity-products-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.quantity-products-heading h2{margin-bottom:7px}.quantity-products-heading p{margin:0;color:var(--caramel);font-size:12px}.quantity-products-heading>span{font-size:11px;color:var(--muted);white-space:nowrap}
 .quantity-help{margin:16px 0}.quantity-product{display:grid;grid-template-columns:62px minmax(0,1fr) minmax(165px,225px);align-items:center;gap:14px;padding:17px 0;border-top:1px solid var(--line)}
 .quantity-photo{width:62px;height:62px;border-radius:9px;background:#f2ece2;overflow:hidden;display:grid;place-items:center}.quantity-photo img{width:100%;height:100%;object-fit:cover}.quantity-photo span{font-size:10px;color:var(--muted)}

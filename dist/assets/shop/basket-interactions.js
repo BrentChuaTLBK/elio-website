@@ -1,4 +1,4 @@
-import {flavorStock} from './shop-rules.js';
+import {flavorStock,dailyBoxRemaining} from './shop-rules.js';
 
 export function selectionKey(selections={}) {
   return JSON.stringify(Object.entries(selections||{}).map(([group,choices])=>[group,Object.entries(choices||{}).filter(([,count])=>Number(count)>0).map(([id,count])=>[id,Number(count)]).sort(([a],[b])=>a.localeCompare(b))]).filter(([,choices])=>choices.length).sort(([a],[b])=>a.localeCompare(b)));
@@ -28,7 +28,7 @@ export function flavorPickerLimit(items,products,flavor,quantity,inventory,date)
   return {remaining,maximum:Math.floor(remaining/boxes)};
 }
 // Capacity is shared across every basket line using the same flavor.
-export function basketIncreaseLimit(items,index,products,inventory,date) {
+export function basketIncreaseLimit(items,index,products,inventory,date,settings={}) {
   const line=items[index],product=products.find(p=>p.id===line?.product_id);
   if(!line||!product)return {maximum:Number(line?.quantity||0),message:'This box is no longer available.'};
   const otherDemand=new Map();
@@ -40,6 +40,10 @@ export function basketIncreaseLimit(items,index,products,inventory,date) {
     const limit=Math.max(0,Math.floor((flavorStock(f,date,inventory)-(otherDemand.get(id)||0))/Number(f.quantity)));
     if(limit<maximum){maximum=limit;limitingFlavor=f.name||f.label||'a selected flavor';}
   }
+  const otherBoxes=items.reduce((sum,other,i)=>sum+(i===index?0:Number(other.quantity)),0);
+  const boxLimit=Math.max(0,dailyBoxRemaining(settings,date)-otherBoxes);
+  if(boxLimit<=maximum && Number(line.quantity)>=boxLimit)return {maximum:boxLimit,message:'There isn’t room for another box on this date. Choose another date to order more.'};
+  maximum=Math.min(maximum,boxLimit);
   const message=Number(line.quantity)<maximum?'':maximum>=999?'You’ve reached the maximum of 999 boxes per selection.':`Another box needs more ${limitingFlavor||'flavor stock'} than is left${date?' for this date':''}. Choose another date to order more.`;
   return {maximum,message};
 }

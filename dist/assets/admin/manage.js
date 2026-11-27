@@ -43,7 +43,7 @@ import { mountLiveChecklist } from './live-checklist.js';
 import { mountOrderChecklists } from './order-checklists.js';
 import { productLabelSettings, labelTextColor, MAX_LABEL_LENGTH } from './product-label.js';
 import { dateCalendar, bindDateCalendars, calendarDates, calendarMonthDays } from './date-calendar.js';
-import { quantitySelection, quantitySaveRows, quantityStatus, bulkQuantityDrafts } from './daily-quantities.js';
+import { boxLimitKey, boxLimitSelection, boxLimitChanges, quantitySelection, quantitySaveRows, quantityStatus, bulkQuantityDrafts } from './daily-quantities.js';
 import { analyticsDateRange, buildAnalytics } from './analytics.js';
 import { renderFlavorMenus, flavorMenuFields, menuMonths, menuFor, monthLabel, lineupChanged } from './flavor-menus.js?v=menu-photos-2';
 import { renderAnalytics } from './analytics-view.js';
@@ -515,13 +515,24 @@ function inventoryView() {
   const months=menuMonths(state,manilaDate());
   if (!months.some(m=>m.startsWith(state.inventoryMonth))) {state.inventoryMonth=months[0].slice(0,7);state.inventoryDates=[];state.inventoryDrafts={};}
   const days=calendarMonthDays(state.inventoryMonth).filter(d=>d && d>=manilaDate()), first=days[0],last=days.at(-1);
-  return heading('Daily quantities', 'Plan individual pieces for your monthly lineup.') + `<section class="panel quantity-month-tools">${select('inventory_month','Monthly lineup',months.map(m=>option(m.slice(0,7),monthLabel(m)+(menuFor(state,m).published?'':' · Hidden / preparation only'),state.inventoryMonth)).join(''),'id="inventory-month"')}<button type="button" class="button button-secondary" data-action="inventory-whole-month" ${locked()}>Select whole month</button><div class="quantity-range">${input('quantity_from','From',first,'date',`min="${first}" max="${last}"`)}${input('quantity_to','To',last,'date',`min="${first}" max="${last}"`)}<button type="button" class="button button-secondary" data-action="inventory-range" ${locked()}>Select date range</button></div><p>Selections stay within this month. Past dates are excluded. Save quantities to apply your edits.</p></section>` +
+  return heading('Daily quantities', 'Set the total boxes and individual flavor pieces available for each fulfillment date.') + `<section class="panel quantity-month-tools">${select('inventory_month','Monthly lineup',months.map(m=>option(m.slice(0,7),monthLabel(m)+(menuFor(state,m).published?'':' · Hidden / preparation only'),state.inventoryMonth)).join(''),'id="inventory-month"')}<button type="button" class="button button-secondary" data-action="inventory-whole-month" ${locked()}>Select whole month</button><div class="quantity-range">${input('quantity_from','From',first,'date',`min="${first}" max="${last}"`)}${input('quantity_to','To',last,'date',`min="${first}" max="${last}"`)}<button type="button" class="button button-secondary" data-action="inventory-range" ${locked()}>Select date range</button></div><p>Selections stay within this month. Past dates are excluded. Save quantities to apply your edits.</p></section>` +
     `<section class="panel quantity-default-panel"><form data-form="inventory-default">${formError}<div><h2>Automatic daily stock</h2><p>One starting total per flavor, per day. Applies to unconfigured dates in this month’s and next month’s lineups, including re-added flavors. Saved daily quantities stay unchanged.</p><p>Ordered pieces count toward the total. Existing orders are protected if they exceed this default. Shop closures and hidden lineups still block new orders.</p></div><div class="quantity-default-controls">${input('inventory_default','Default pieces per flavor',state.inventory_default ?? 0,'number','required min="0" max="1000000" step="1" inputmode="numeric" '+ownerLocked())}<button type="submit" class="button button-secondary" ${ownerLocked()}>Save default</button></div></form></section>` +
-    `<form data-form="inventory">${formError}${select('quantity_mode','How to apply quantities',option('replace','Replace quantities on selected dates',state.quantityMode)+option('fill_unconfigured','Fill only unconfigured dates',state.quantityMode),'id="quantity-mode"')}<div class="quantity-layout"><aside class="panel quantity-calendar">${dateCalendar('inventory_dates', 'Select dates', state.inventoryDates, 'Choose one or more fulfillment dates.', manilaDate(), !state.connected, { saveLabel: 'Save quantities', selectionLabel: 'Apply quantities to these dates', minDate: manilaDate(), fixedMonth: state.inventoryMonth })}<p class="quantity-explainer">Only this month’s lineup is shown. Fixed sets and custom boxes share these piece quantities. Saving stock never reopens a closed shop or fulfillment date.</p></aside><section class="panel quantity-products"><div class="quantity-products-heading"><div><h2>Flavor quantities</h2><p>Automatic starting total: ${Number(state.inventory_default ?? 0)} pieces per flavor / day</p></div><span>${stockProducts().length} stock items</span></div><p class="quantity-help">Totals include quantities already ordered. Removing a flavor from its lineup clears unsold stock; adding it back uses your automatic daily stock. Hidden lineups remain closed to customer orders.</p><div class="quantity-bulk"><div>${input('bulk_quantity','Set all flavors to','', 'number','min="0" max="1000000" step="1" inputmode="numeric" placeholder="Total" '+locked())}<button type="button" class="button button-secondary" data-action="bulk-quantities" ${locked()}>Apply to all flavors</button></div><p>Applies to every flavor below on your selected dates. Review the totals, then click Save quantities.</p></div><div id="quantity-products">${inventoryProducts()}</div><div class="quantity-save"><p id="quantity-save-summary" aria-live="polite">${inventorySaveSummary()}</p><button type="button" class="button button-secondary" data-action="reset-quantities">Reset edits</button><button type="submit" class="button" ${locked()}>Save quantities</button></div></section></div></form>`;
+    `<form data-form="inventory">${formError}${select('quantity_mode','How to apply quantities',option('replace','Replace quantities on selected dates',state.quantityMode)+option('fill_unconfigured','Fill only unconfigured dates',state.quantityMode),'id="quantity-mode"')}<div class="quantity-layout"><aside class="panel quantity-calendar">${dateCalendar('inventory_dates', 'Select dates', state.inventoryDates, 'Choose one or more fulfillment dates.', manilaDate(), !state.connected, { saveLabel: 'Save quantities', selectionLabel: 'Apply quantities to these dates', minDate: manilaDate(), fixedMonth: state.inventoryMonth })}<p class="quantity-explainer">Only this month’s lineup is shown. Fixed sets and custom boxes share these piece quantities. Saving stock never reopens a closed shop or fulfillment date.</p></aside><section class="panel quantity-products"><div id="daily-box-limit">${boxLimitFields()}</div><div class="quantity-products-heading"><div><h2>Flavor quantities</h2><p>Automatic starting total: ${Number(state.inventory_default ?? 0)} pieces per flavor / day</p></div><span>${stockProducts().length} stock items</span></div><p class="quantity-help">Totals include quantities already ordered. Removing a flavor from its lineup clears unsold stock; adding it back uses your automatic daily stock. Hidden lineups remain closed to customer orders.</p><div class="quantity-bulk"><div>${input('bulk_quantity','Set all flavors to','', 'number','min="0" max="1000000" step="1" inputmode="numeric" placeholder="Total" '+locked())}<button type="button" class="button button-secondary" data-action="bulk-quantities" ${locked()}>Apply to all flavors</button></div><p>Applies to every flavor below on your selected dates. Review the totals, then click Save quantities.</p></div><div id="quantity-products">${inventoryProducts()}</div><div class="quantity-save"><p id="quantity-save-summary" aria-live="polite">${inventorySaveSummary()}</p><button type="button" class="button button-secondary" data-action="reset-quantities">Reset edits</button><button type="submit" class="button" ${locked()}>Save quantities</button></div></section></div></form>`;
+}
+function boxLimitFields() {
+  const selection = boxLimitSelection(state.inventoryDates, state.daily_box_limits, state.inventoryDrafts);
+  const disabled = !state.connected || !state.inventoryDates.length ? 'disabled' : '';
+  return `<h2>Daily box limit</h2><p>Website and POS direct orders share this total. Pop-up sales use their own stock.</p>
+    <label for="daily-box-capacity">Maximum boxes per date</label>
+    <div class="quantity-input-row"><input id="daily-box-capacity" data-quantity-id="${boxLimitKey}" type="number" min="0" max="1000000" step="1" inputmode="numeric" value="${esc(selection.value)}" placeholder="${selection.mixed ? 'Mixed' : 'No limit'}" aria-describedby="box-limit-status" ${disabled}>
+    <button type="button" class="button button-quiet" data-action="unlimit-quantity" data-id="${boxLimitKey}" aria-label="Remove daily box limit" ${disabled}>No limit</button></div>
+    <small id="box-limit-status" aria-live="polite">${esc(selection.status)}</small>`;
 }
 function inventorySaveSummary() {
-  const count = Object.keys(state.inventoryDrafts).length, dates = state.inventoryDates.length;
-  return count ? `${count} edited product${count === 1 ? '' : 's'} will apply to ${dates} selected date${dates === 1 ? '' : 's'}.` : dates ? `${dates} date${dates === 1 ? '' : 's'} selected. Saved limits are shown; mixed limits stay unchanged until edited.` : 'Select at least one date to begin.';
+  const dates = state.inventoryDates.length;
+  const count = Object.keys(state.inventoryDrafts).filter(id => id !== boxLimitKey).length;
+  const changes = [Object.hasOwn(state.inventoryDrafts, boxLimitKey) && 'Daily box limit', count && `${count} edited product${count === 1 ? '' : 's'}`].filter(Boolean);
+  return changes.length ? `${changes.join(' and ')} will apply to ${dates} selected date${dates === 1 ? '' : 's'}.` : dates ? `${dates} date${dates === 1 ? '' : 's'} selected. Saved limits are shown; mixed limits stay unchanged until edited.` : 'Select at least one date to begin.';
 }
 function inventoryProducts() {
   const rows = products => products.map(product => {
@@ -533,6 +544,7 @@ function inventoryProducts() {
   return stockProducts().length ? rows(stockProducts()) : empty('No flavors in this lineup', 'Assign flavors to this month in Flavor menus before setting quantities.');
 }
 function updateInventoryProducts() {
+  $('#daily-box-limit').innerHTML = boxLimitFields();
   $('#quantity-products').innerHTML = inventoryProducts();
   $('#quantity-save-summary').textContent = inventorySaveSummary();
 }
@@ -1210,7 +1222,8 @@ document.addEventListener('input', event => {
     const id = target.dataset.quantityId;
     state.inventoryDrafts[id] = target.value;
     target.placeholder = 'No limit';
-    $('[data-quantity-status]', target.closest('[data-quantity-product]')).textContent = quantityStatus(quantitySelection(id, state.inventoryDates, state.inventory, state.inventoryDrafts), state.inventoryDates);
+    if (id === boxLimitKey) $('#box-limit-status').textContent = boxLimitSelection(state.inventoryDates, state.daily_box_limits, state.inventoryDrafts).status;
+    else $('[data-quantity-status]', target.closest('[data-quantity-product]')).textContent = quantityStatus(quantitySelection(id, state.inventoryDates, state.inventory, state.inventoryDrafts), state.inventoryDates);
     $('#quantity-save-summary').textContent = inventorySaveSummary();
   }
   if (target.closest('[data-form="order-edit"]')) $('#edit-save-notice').innerHTML = '';
@@ -1254,7 +1267,7 @@ document.addEventListener('change', async event => {
       if(state.inventorySaving){target.value=state.inventoryMonth;return;}
       monthDrafts.remember(state.inventoryMonth,{dates:state.inventoryDates,drafts:state.inventoryDrafts,mode:state.quantityMode});
       state.inventoryMonth=target.value;
-      const saved=monthDrafts.restore(state.inventoryMonth,{today:manilaDate(),productIds:stockProducts().filter(p=>!p.deleted_at).map(p=>p.id),months:menuMonths(state,manilaDate()).map(month=>month.slice(0,7))});
+      const saved=monthDrafts.restore(state.inventoryMonth,{today:manilaDate(),productIds:[boxLimitKey,...stockProducts().filter(p=>!p.deleted_at).map(p=>p.id)],months:menuMonths(state,manilaDate()).map(month=>month.slice(0,7))});
       state.inventoryDates=saved.dates;state.inventoryDrafts=saved.drafts;state.quantityMode=saved.mode;render();
       if(saved.adjusted)toast('Your quantity draft was adjusted for the current dates and monthly lineup. Review it before saving.');return;
     }
@@ -1460,15 +1473,19 @@ async function submitForm(form, submitter) {
     }
     case 'inventory': {
       const rows = quantitySaveRows(stockProducts(), state.inventory, state.inventoryDates, state.inventoryDrafts, manilaDate(), state.quantityMode);
+      const limits = boxLimitChanges(state.inventoryDates, state.daily_box_limits, state.inventoryDrafts, state.quantityMode);
       const dateCount = state.inventoryDates.length;
-      if (!rows.length) { monthDrafts.clear(state.inventoryMonth);state.inventoryDrafts = {}; state.inventoryDates = []; render(); toast('Quantities are already up to date.'); break; }
+      if (!rows.length && !limits.length) { monthDrafts.clear(state.inventoryMonth);state.inventoryDrafts = {}; state.inventoryDates = []; render(); toast('Quantities are already up to date.'); break; }
       const savingMonth=state.inventoryMonth,savingUser=staffUserId;state.inventorySaving=true;
       const controls = [...form.elements, ...$$('[data-view],#inventory-month,[data-action="inventory-whole-month"],[data-action="inventory-range"],[name="quantity_from"],[name="quantity_to"]')].filter(control => !control.disabled);
       controls.forEach(control => { control.disabled = true; });
       try {
-        const inventory = await api('save_inventory', { rows, mode:state.quantityMode });
+        const result = limits.length
+          ? await api('save_box_quantities', { rows, box_limits:limits, mode:state.quantityMode })
+          : await api('save_inventory', { rows, mode:state.quantityMode });
         if(savingUser!==staffUserId)return;
-        state.inventory=inventory;
+        state.inventory = limits.length ? result.inventory : result;
+        if (limits.length) state.daily_box_limits = result.daily_box_limits;
         monthDrafts.clear(savingMonth);
         state.inventoryDrafts = {};
         state.inventoryDates = [];

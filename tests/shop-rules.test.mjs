@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import {basketIncreaseLimit} from '../dist/assets/shop/basket-interactions.js';
+import {customerDateIssue} from '../dist/assets/shop/shop-rules.js';
 import {firstAvailableDate,prepareCatalog,boxStock,basketStockIssues,customerBookingWindow,selectionPrice,availability} from '../dist/assets/shop/shop-rules.js';
 const now=new Date('2026-09-24T01:00:00Z');
 const settings={paused:false,production_weekdays:[1,2,3,4,5,6],fulfillment_weekdays:[0,1,2,3,4,5,6],cutoff_time:'10:00'};
@@ -16,6 +18,15 @@ assert.throws(()=>selectionPrice(products[0],{flavors:{a:3}}),/cannot be changed
 assert.equal(selectionPrice(products[1],{flavors:{a:1,b:2}}),100000);
 assert.equal(basketStockIssues([{product_id:'set',quantity:1,selections:{}},{product_id:'custom',quantity:1,selections:{flavors:{a:2,b:1}}}],products,inventory,'2026-09-26').length,1);
 assert.equal(availability(products[0],'2026-11-01',settings,[],now).available,false);
+const limited={...settings,daily_box_remaining:{'2026-09-26':0,'2026-09-27':1}};
+const twoBoxes=[{product_id:'set',quantity:1,selections:{}},{product_id:'custom',quantity:1,selections:{flavors:{a:3}}}];
+for(const method of ['pickup','delivery'])assert.match(customerDateIssue('2026-09-26',limited,method,now),/fully booked/);
+assert.equal(firstAvailableDate([],products,limited,inventory,now),'2026-09-27');
+assert.equal(firstAvailableDate(twoBoxes,products,limited,inventory,now),'');
+assert.match(basketStockIssues(twoBoxes,products,inventory,'2026-09-27',limited)[0],/fewer boxes/);
+assert.equal(basketStockIssues(twoBoxes,products,inventory,'2026-09-27').length,0);
+assert.equal(basketIncreaseLimit(twoBoxes.slice(0,1),0,products,inventory,'2026-09-27',limited).maximum,1);
+assert.match(availability({...products[0],min_quantity:2},'2026-09-27',limited,inventory,now).reason,/minimum order/);
 const unavailable=prepareCatalog({flavors:flavors.map(f=>f.id==='b'?{...f,active:false}:f),products}).products;
 assert.equal(boxStock(unavailable[0],'2026-09-26',inventory),0);
 console.log('PASS 12 shop date, pricing, and shared-stock checks');

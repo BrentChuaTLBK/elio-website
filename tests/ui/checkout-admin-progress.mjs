@@ -25,8 +25,12 @@ async function make(width=1440){
   const ok=result=>({data:structuredClone(result),error:null}),fail=error=>({data:null,error});
   if(action==='catalog')return ok(data.catalog);
   if(action==='get_order'){if(data.readError)return fail(data.readError);return ok(payload.order_id==='order2'?data.otherOrder:data.order);}
-  if(action==='admin_bootstrap'){if(data.bootstrapError)return fail(data.bootstrapError);return ok({role:data.role,products:[data.product,...data.flavors],categories:[],inventory:data.inventory,promos:[],zones:[],orders:[data.order,data.otherOrder],settings:data.settings,staff:[],inventory_default:60,flavor_menus:{current_month:month+'-01',next_month:nextMonth+'-01',menus:data.menus},email_status:[]});}
+  if(action==='admin_bootstrap'){if(data.bootstrapError)return fail(data.bootstrapError);return ok({role:data.role,products:[data.product,...data.flavors],categories:[],inventory:data.inventory,promos:[],zones:[],orders:[data.order,data.otherOrder],settings:data.settings,staff:[],inventory_default:60,daily_box_limits:data.boxLimits||[],flavor_menus:{current_month:month+'-01',next_month:nextMonth+'-01',menus:data.menus},email_status:[]});}
   if(action==='quote'){if(data.expiredPromo&&payload.promo_code)return fail({message:'This code has expired.',code:'P0001'});const discount=payload.promo_code?data.discount:0;return ok({...data.order,discount_cents:discount,total_cents:105000-discount,promo_snapshot:payload.promo_code?{code:payload.promo_code}:null});}
+  if(action==='save_box_quantities'){
+   data.boxLimits=payload.box_limits.map(row=>({date:row.date,capacity:row.capacity,configured:true,reserved:4}));
+   return ok({inventory:data.inventory,daily_box_limits:data.boxLimits});
+  }
   if(action==='save_inventory'){if(data.mutationError)return fail(data.mutationError);for(const row of payload.rows){const old=data.inventory.find(i=>i.product_id===row.product_id&&i.date===row.date);if(old&&row.capacity<old.reserved)return fail({message:'Stock is reserved by another order.',code:'P0001'});if(old)Object.assign(old,row,{configured:true});else data.inventory.push({...row,remaining:row.capacity,reserved:0,configured:true});}return ok(data.inventory);}
   if(action==='preview_edit_order')return ok({...data.order,...payload.changes});
   if(action==='approve_payment'||action==='edit_order'){
@@ -123,6 +127,34 @@ try{
   if(failure==='refresh'){await page.locator('#dialog-body [role=status]').filter({hasText:'Order saved.'}).waitFor();assert.match(await page.locator('.order-status-row').innerText(),/Paid/);assert.equal(await page.locator('[data-form=order-action]').count(),0);await page.screenshot({path:join(out,'approval-refresh-failure.png')});}
   else{await page.locator('[data-form=order-action] .form-error').filter({hasText:failure==='mutation'?'order changed':'Connection interrupted'}).waitFor();assert.equal(await page.locator('#dialog-body').getByText('Paid',{exact:true}).count(),0);assert.equal(data.order.payment_status,'under_review');}
   assert.equal(data.calls.filter(c=>c.action==='approve_payment').length,1);await finish(t,'approval '+failure+' distinguishes confirmed mutation from refresh failure with no automatic retry');
+ }
+ for(const width of [390,1440]){
+  const t=await make(width),{page,data}=t;
+  data.boxLimits=[{date,capacity:null,configured:false,reserved:4}];
+  await admin(t);await view(page,'inventory');
+  await page.locator('#inventory-month').selectOption(date.slice(0,7));
+  const day=page.locator('[data-calendar-date="'+date+'"]'),limit=page.getByLabel('Maximum boxes per date');
+  const prior=page.locator('[data-calendar-date][aria-pressed="true"]');
+  for(const d of await prior.evaluateAll(buttons=>buttons.map(b=>b.dataset.calendarDate)))await page.locator('[data-calendar-date="'+d+'"]').click();
+  await day.click();await limit.fill('20');
+  assert.match(await page.locator('#box-limit-status').innerText(),/16 left · 4 already booked/);
+  const save=page.locator('[data-form=inventory] [type=submit]');
+  await save.click();await page.waitForFunction(()=>document.querySelector('#daily-box-capacity').disabled);
+  assert.deepEqual(data.calls.findLast(c=>c.action==='save_box_quantities').payload.box_limits,[{date,capacity:20,expected:null,configured:false}]);
+  await day.click();assert.equal(await limit.inputValue(),'20');
+  await page.locator('#daily-box-limit').screenshot({path:join(out,'daily-box-limit-'+width+'.png')});
+  await page.getByRole('button',{name:'Remove daily box limit'}).click();await save.click();
+  await page.waitForFunction(()=>document.querySelector('#daily-box-capacity').disabled);
+  assert.equal(data.boxLimits[0].capacity,null);
+  data.catalog.settings.daily_box_remaining={[date]:1};
+  await page.goto(origin+'/order.html');await page.locator('[data-product="box"]').click();
+  await page.locator('#product-quantity').fill('2');
+  await page.locator('#product-error').filter({hasText:'fewer boxes'}).waitFor();
+  assert(await page.locator('#add-to-cart').isDisabled());
+  await page.locator('#product-quantity').fill('1');await page.locator('#add-to-cart').click();
+  await page.waitForFunction(()=>!document.querySelector('#product-dialog').open);
+  assert(await page.locator('#cart [data-delta="1"]').isDisabled());
+  await finish(t,'daily limit set, cleared, and enforced in product and basket controls at '+width);
  }
  await writeFile(join(out,'results.json'),JSON.stringify(results,null,2));
 }catch(error){if(currentTest&&!currentTest.page.isClosed()){await currentTest.page.screenshot({path:join(out,'failure.png'),fullPage:true});const diagnostic={error:error.message,errors:currentTest.errors,calls:currentTest.data.calls.slice(-6),text:await currentTest.page.locator('body').innerText(),invalid:await currentTest.page.locator('input:invalid,select:invalid,textarea:invalid').evaluateAll(list=>list.map(e=>({name:e.name,value:e.value,message:e.validationMessage})))};await writeFile(join(out,'failure.json'),JSON.stringify(diagnostic,null,2));console.log(JSON.stringify({error:diagnostic.error,errors:diagnostic.errors,calls:diagnostic.calls,invalid:diagnostic.invalid}));}throw error;}finally{await browser.close();}

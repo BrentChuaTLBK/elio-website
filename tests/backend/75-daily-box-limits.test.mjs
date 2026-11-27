@@ -1,0 +1,96 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+
+export default async function({db,check,state}) {
+  const h=state.h,{api,ids}=h;
+  const day=await h.day(14),other=await h.day(15),today=await h.day(0);
+  const flavor=await h.product({kind:'flavor',price_cents:0,lead_days:0});
+  const fixed=await h.product({kind:'set',box_flavors:[flavor.id,flavor.id,flavor.id],lead_days:0});
+  const custom=await h.product({kind:'custom_box',lead_days:0});
+  const booked=async date=>Number(await h.scalar('select elio.booked_boxes($1)',[date]));
+  const settings=async()=> (await api('catalog')).settings.daily_box_remaining;
+  const save=(entries,rows=[],mode='replace',user=ids.staff)=>api('save_box_quantities',{box_limits:entries,rows,mode},user);
+  const entry=(date,capacity,expected=null,configured=false)=>({date,capacity,expected,configured});
+  const direct=(date,items)=>({order_source:'direct',method:'pickup',fulfillment_date:date,items,paid:false,buyer:{name:'Local buyer',phone:'09170000000'}});
+  const sale=async payload=>api('pos_create_order',{...payload,idempotency_key:randomUUID(),expected_quote:await api('pos_quote',payload,ids.staff)},ids.staff);
+  const edit=(order,changes)=>api('edit_order',{order_id:order.id,revision:order.revision,changes,reason:'Fixture change',idempotency_key:randomUUID()},ids.staff);
+  const base=await booked(day),otherBase=await booked(other);
+  const maximum=base+3;
+  let web,pos;
+  await check('daily limits can be set for individual dates, filled in bulk, removed and edited atomically',async()=>{
+    assert.equal((await settings())[day],undefined);
+    for(const user of [null,ids.customer])await assert.rejects(save([entry(day,20)],[],'replace',user),/authorized|staff|sign in/i);
+    await assert.rejects(h.as(ids.customer,()=>db.query('select * from elio.daily_box_limits')),/permission denied/);
+    for(const invalid of [-1,0.5,1000001,'20'])await assert.rejects(save([entry(day,invalid)]),/whole box|box limit/i);
+    const result=await save([entry(day,20)]);
+    assert.deepEqual(result.daily_box_limits.find(r=>r.date===day),{date:day,capacity:20,reserved:base,configured:true});
+    await save([entry(day,7),entry(other,7)],[],'fill_unconfigured');
+    assert.equal((await settings())[day],Math.max(0,20-base));
+    assert.equal((await settings())[other],Math.max(0,7-otherBase));
+    await assert.rejects(save([entry(other,11,7,true),entry(day,4,19,true)]),/limit changed/);
+    assert.equal((await settings())[other],Math.max(0,7-otherBase));
+    await assert.rejects(save([entry(day,8,20,true)],[{date:day,product_id:flavor.id,capacity:-1,available:true}]),/capacity|quantity|quantities|limit/i);
+    assert.equal((await settings())[day],Math.max(0,20-base));
+    await save([entry(day,maximum,20,true),entry(other,null,7,true)]);
+    assert.equal((await settings())[other],undefined);
+    assert.equal((await api('admin_bootstrap',{scope:'core'},ids.staff)).daily_box_limits.find(r=>r.date===day).capacity,maximum);
+  })();
+  await check('website checkout and direct sales share boxes across pickup, delivery, fixed sets and custom trios',async()=>{
+    const payload=h.checkout(fixed,day,{items:[h.item(fixed),h.item(custom,1,{flavors:{[flavor.id]:3}})]});
+    const posPayload={...direct(day,[h.item(fixed)]),method:'delivery',recipient:{name:'Local recipient',phone:'09170000000'},address:{line1:'Fixture',locality:'Manila'},delivery_cents:0};
+    const staleQuote=await api('pos_quote',direct(day,[h.item(fixed,2)]),ids.staff);
+    web=await api('create_order',payload,ids.customer);
+    assert.equal((await api('create_order',payload,ids.customer)).id,web.id);
+    assert.equal((await settings())[day],1);
+    await assert.rejects(api('pos_create_order',{...direct(day,[h.item(fixed,2)]),expected_quote:staleQuote,idempotency_key:randomUUID()},ids.staff),/box limit/i);
+    pos=await sale(posPayload);
+    assert.equal((await settings())[day],0);
+    await assert.rejects(api('create_order',h.checkout(fixed,day),ids.customer),/box limit/i);
+    assert.equal(await booked(day),maximum);
+    const customItem={source:'custom',product_id:randomUUID(),name:'Candle',quantity:4,unit_price_cents:500};
+    await sale(direct(day,[customItem]));
+    assert.equal(await booked(day),maximum);
+  })();
+  await check('lowering a full date protects existing boxes, rejects increases, and checks a move on the destination date',async()=>{
+    await save([entry(day,0,maximum,true),entry(other,otherBase,null,true)]);
+    web=await edit(web,{items:[h.item(fixed)]});
+    pos=await edit(pos,{instructions:'Leave at reception'});
+    assert.equal(await booked(day),base+2);
+    await assert.rejects(edit(web,{items:[h.item(fixed,2)]}),/box limit/i);
+    await assert.rejects(edit(pos,{fulfillment_date:other}),/box limit/i);
+    await save([entry(other,otherBase+1,otherBase,true)]);
+    pos=await edit(pos,{fulfillment_date:other});
+    assert.equal(await booked(day),base+1);
+    assert.equal(await booked(other),otherBase+1);
+    await h.action('cancel_order',pos,{reason:'Fixture cancellation'});
+    assert.equal(await booked(other),otherBase);
+  })();
+  await check('expired website holds and rejected payments free capacity while paid boxes and retained cancellations use it',async()=>{
+    await save([entry(day,base+1,0,true)]);
+    await db.query("update elio.orders set payment_deadline=now()-interval '1 minute' where id=$1",[web.id]);
+    assert.equal(await booked(day),base);
+    assert.equal((await settings())[day],1);
+    const unpaid=await api('create_order',h.checkout(fixed,day),ids.customer);
+    const review=await h.proof(unpaid);
+    assert.equal((await settings())[day],0);
+    await h.action('reject_payment',review,{reason:'Fixture rejection'});
+    assert.equal((await settings())[day],1);
+    const gift=await sale({...direct(day,[h.item(fixed)]),gift:true});
+    assert.equal(gift.gift,true);
+    await h.action('cancel_order',gift,{reason:'Already prepared',restore_stock:false});
+    assert.equal((await settings())[day],0);
+  })();
+  await check('pop-up sales of imported website boxes use event stock even when the same date has zero box capacity',async()=>{
+    const before=await booked(today),event_id=randomUUID();
+    await save([entry(today,0)]);
+    await api('pos_save_event',{event_id,name:'Local box-cap fixture',starts_on:today,ends_on:today},ids.owner);
+    await api('pos_import_event_flavors',{event_id,flavors:[{product_id:flavor.id,available:6}]},ids.owner);
+    await api('pos_import_event_products',{event_id,product_ids:[fixed.id]},ids.owner);
+    const data=await api('pos_event_data',{event_id},ids.staff),item=data.items.find(i=>i.source_product_id===fixed.id);
+    await api('pos_open_cash',{event_id,date:today,opening_cents:0},ids.staff);
+    await sale({order_source:'in_person',event_id,fulfillment_date:today,method:'pickup',paid:true,payment:{method:'cash',cash_received_cents:100000},items:[{source:'event',product_id:item.id,quantity:2,selections:{}}]});
+    assert.equal((await api('pos_event_data',{event_id},ids.staff)).items.find(i=>i.id===item.id).remaining,0);
+    assert.equal(await booked(today),before);
+    await save([entry(today,null,0,true),entry(day,null,base+1,true),entry(other,null,otherBase+1,true)]);
+  })();
+}

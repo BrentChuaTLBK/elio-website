@@ -1,6 +1,6 @@
 import {escapeHtml as esc,money} from '../admin/client.js';
 import {flavorPickerLimit} from './basket-interactions.js';
-import {dateInManila,selectionPrice} from './shop-rules.js';
+import {dateInManila,selectionPrice,basketBoxIssue} from './shop-rules.js';
 import {boxQuestions,boxQuestionFields,validBoxAnswers} from './box-questions.js';
 import {boxDetails, productPurchaseRow} from './box-details.js';
 
@@ -87,6 +87,7 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
         </section>
         <div class="trio-questions" data-box-questions hidden></div>
         <div class="ep-total"><span data-trio-total-label></span><strong class="product-price" id="detail-price"></strong><small data-trio-extra></small></div>
+        <div data-trio-box-limit class="notice" role="status" hidden></div>
         <div id="product-error" class="notice" role="status" aria-live="polite" hidden></div>
         ${productPurchaseRow(quantity)}
         ${boxDetails(product, {gallery: Boolean(product.photos?.length)})}
@@ -158,7 +159,10 @@ export function mountTrioBuilder(dialog, {read, draft, save, commit, close, choo
     const unit=selectionPrice(product,selected(),{allowIncomplete:true});
     const complete=count===3, validQty=Number.isInteger(Number(qtyInput.value))&&Number(qtyInput.value)>=1&&Number(qtyInput.value)<=999;
     const available=ctx.availability.available && Boolean(ctx.date) && !ctx.paused && !loading && !failed && validQty;
-    const canAdd=complete&&Object.keys(answers).length===questions.length&&available&&!committing;
+    const boxIssue=basketBoxIssue([...ctx.items,{quantity}],ctx.date,ctx.settings);
+    const boxNotice=$('[data-trio-box-limit]');
+    boxNotice.textContent=boxIssue;boxNotice.hidden=!boxIssue;
+    const canAdd=complete&&Object.keys(answers).length===questions.length&&available&&!boxIssue&&!committing;
     $('#product-title').textContent=product.name;
     $('.ep-lead').textContent=complete?'Tap a cake in the box to remove it.':'Tap to fill each space. You can repeat a favorite.';
     $('.ep-count').textContent=count+' of 3';

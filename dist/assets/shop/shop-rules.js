@@ -48,9 +48,19 @@ export function earliestLeadDate(product,settings,now = new Date()){
   }
   return null;
 }
+export function dailyBoxRemaining(settings, date) {
+  return settings?.daily_box_remaining?.[date] ?? Infinity;
+}
+export function basketBoxIssue(items, date, settings) {
+  const remaining = dailyBoxRemaining(settings, date);
+  const quantity = items.reduce((sum, line) => sum + Number(line.quantity), 0);
+  if (quantity <= remaining) return '';
+  return remaining === 0 ? 'This date is fully booked. Choose another date.' : 'There isn’t room for this many boxes on this date. Choose fewer boxes or another date.';
+}
 export function fulfillmentIssue(method,date,settings){
   if(!date)return '';
   if(!(settings.fulfillment_weekdays??[0,1,2,3,4,5,6]).includes(dayOfWeek(date))||(settings.blocked_dates??[]).includes(date))return 'Closed to new orders on this date. Choose another date.';
+  if(dailyBoxRemaining(settings,date)===0)return 'This date is fully booked. Choose another date.';
   if((settings[`${method}_blocked_dates`]??[]).includes(date))return `${method==='delivery'?'Delivery':'Pickup'} is unavailable on this date. Choose another date or fulfillment method.`;
   return '';
 }
@@ -79,8 +89,10 @@ export function availability(product,date,settings,inventory,now=new Date(),meth
   const dateIssue=customerDateIssue(date,settings,method,now,allowsSameDay(product));
   if(dateIssue)return {available:false,reason:dateIssue,earliest};
   if(!earliest||date<earliest)return {available:false,reason:earliest?`Needs more preparation time. Earliest ${earliest}.`:'No production dates configured.',earliest};
-  if(!Number.isFinite(pieces))return {available:true,unlimited:true,remaining:Infinity,reason:'Available on this date',earliest};
-  const remaining=pieces;
+  const remaining=Math.min(pieces,dailyBoxRemaining(settings,date));
+  if(remaining<Number(product.min_quantity||1))return {available:false,remaining,reason:'This date cannot fit the minimum order. Choose another date.',earliest};
+  if(!Number.isFinite(remaining))return {available:true,unlimited:true,remaining,reason:'Available on this date',earliest};
+  if(remaining<pieces)return {available:true,remaining,reason:'Available on this date',earliest};
   return {available:remaining>=Number(product.min_quantity||1),remaining,reason:remaining>0?`${remaining} available on this date`:'Sold out for this date',earliest};
 }
 export function selectionPrice(product,selections,{allowIncomplete=false}={}){
@@ -127,7 +139,9 @@ export function boxStock(product,date,inventory){
   const choices=product.option_groups?.find(g=>g.id==='flavors')?.choices||[];
   return Math.floor(choices.reduce((sum,f)=>sum+flavorStock(f,date,inventory),0)/3);
 }
-export function basketStockIssues(items,products,inventory,date){
+export function basketStockIssues(items,products,inventory,date,settings={}){
+  const boxIssue=basketBoxIssue(items,date,settings);
+  if(boxIssue)return [boxIssue];
   const demand=new Map(),flavors=new Map();
   for(const line of items){
     const p=products.find(p=>p.id===line.product_id);if(!p)continue;
@@ -149,7 +163,7 @@ export function firstAvailableDate(items,products,settings,inventory,now=new Dat
         try{selectionPrice(p,line.selections||{});}catch{return false;}
         return availability(p,date,settings,inventory,now,'pickup').available;
       });
-      if(valid&&!basketStockIssues(items,products,inventory,date).length)return date;
+      if(valid&&!basketStockIssues(items,products,inventory,date,settings).length)return date;
     }else if(products.some(p=>availability(p,date,settings,inventory,now,'pickup').available))return date;
   }
   return '';

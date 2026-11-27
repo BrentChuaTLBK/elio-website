@@ -1,5 +1,38 @@
 import { calendarDates } from './date-calendar.js';
 
+export const boxLimitKey = 'daily_box_limit';
+
+export function boxLimitSelection(dates, saved = [], drafts = {}) {
+  const rows = dates.map(date => saved.find(row => row.date === date));
+  const values = rows.map(row => row?.capacity == null ? '' : String(row.capacity));
+  const edited = Object.hasOwn(drafts, boxLimitKey);
+  const mixed = !edited && new Set(values).size > 1;
+  const value = edited ? drafts[boxLimitKey] : mixed ? '' : values[0] ?? '';
+  const booked = rows.map(row => Number(row?.reserved || 0));
+  const low = Math.min(...booked), high = Math.max(...booked);
+  const count = low === high ? String(low) : low + '–' + high;
+  let status = 'Select a date to set its box limit.';
+  if (rows.length) {
+    const bookedText = count + ' already booked' + (rows.length > 1 ? ' per date' : '');
+    const left = booked.map(n => Math.max(0, Number(value) - n));
+    const min = Math.min(...left), max = Math.max(...left);
+    status = (mixed ? 'Different saved limits' : value === '' ? 'No limit' : (min === max ? min : min + '–' + max) + ' left') + ' · ' + bookedText;
+  }
+  return { value, mixed, status };
+}
+
+export function boxLimitChanges(dates, saved = [], drafts = {}, mode = 'replace') {
+  if (!Object.hasOwn(drafts, boxLimitKey)) return [];
+  const input = String(drafts[boxLimitKey]).trim();
+  if (input !== '' && (!/^\d+$/.test(input) || Number(input) > 1000000)) throw new Error('Enter a whole box limit from 0 to 1,000,000, or select No limit.');
+  const capacity = input === '' ? null : Number(input);
+  return calendarDates(dates).flatMap(date => {
+    const row = saved.find(item => item.date === date);
+    if (row?.configured && (mode === 'fill_unconfigured' || row.capacity === capacity)) return [];
+    return [{ date, capacity, expected: row?.capacity ?? null, configured: row?.configured === true }];
+  });
+}
+
 // Missing rows mean zero; explicit null capacities mean unlimited. Drafts contain only
 // products explicitly edited, so mixed or untouched limits are never replaced.
 export function quantitySelection(productId, dates, inventory, drafts = {}) {
