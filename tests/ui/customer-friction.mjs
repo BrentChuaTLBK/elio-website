@@ -147,6 +147,31 @@ try{
   assert(await card.evaluate(el=>document.activeElement===el));
   await finish(test,'Box entrance with '+action+' at '+width+'px');
  }
+ {
+  const t=await make({width:768,touch:true}),{ctx,page}=t;
+  let releaseCatalog;
+  const delayed=new Promise(resolve=>{releaseCatalog=resolve;});
+  await ctx.route('**/home-content.js',async route=>{await delayed;await route.fallback();});
+  await page.goto(origin+'/index.html',{waitUntil:'domcontentloaded'});
+  try{
+   await page.getByRole('button',{name:'Open navigation'}).tap();
+   assert(await page.getByRole('link',{name:'Order a Box',exact:true}).isVisible());
+  }finally{releaseCatalog();}
+  await page.getByRole('link',{name:'Order a Box',exact:true}).tap();
+  await page.waitForURL('**/order.html');
+  await finish(t,'Home menu opens on the first tap while the catalog is loading');
+ }
+ for(const width of [320,768,900,1440]){
+  const t=await make({width,touch:width<900}),{page}=t;
+  await page.goto(origin+'/flavors.html');
+  const header=page.getByRole('banner'),link=header.getByRole('link',{name:'Order a Box',exact:true});
+  const button=await link.boundingBox(),logo=await header.locator('.wordmark').boundingBox(),icons=await header.locator('nav').boundingBox();
+  assert(button&&button.height>=46&&button.x>=0&&button.x+button.width<=width);
+  assert(button.y>=logo.y+logo.height||(button.x>=logo.x+logo.width&&button.x+button.width<=icons.x));
+  if(width<900)await link.tap();else await link.press('Enter');
+  await page.waitForURL('**/order.html');
+  await finish(t,'Flavors header order button at '+width+'px');
+ }
  for(const width of [320,390,1440]){
   const t=await make({width}),{page,data}=t;
   data.catalog.settings.delivery_blocked_dates=[date];

@@ -1,4 +1,11 @@
 .flavors-page .order-header{margin:0;padding:0 var(--gutter);background:var(--brown);color:var(--ivory);border-bottom:1px solid #795c46}.flavors-page .order-header .wordmark{color:var(--bronze-light)}.flavors-page .order-header a:focus-visible{outline-color:var(--bronze-light)}
+.flavors-header-actions { display:flex; align-items:center; justify-self:end; gap:12px; }
+@media (max-width:880px) {
+ .flavors-page .order-header { row-gap:8px; padding-block:12px; }
+ .flavors-header-actions { display:contents; }
+ .flavors-header-actions nav { grid-column:3; grid-row:1; }
+ .flavors-header-actions .header-order { grid-column:1 / -1; grid-row:2; justify-self:center; }
+}
 .flavors-hero{position:relative;isolation:isolate;overflow:hidden;min-height:290px;max-width:1600px;margin:0 auto;background:#eee2d2;display:flex;align-items:center}
 .flavors-hero>img{position:absolute;inset:0 0 0 auto;width:72%;height:100%;object-fit:cover;object-position:68% 58%;z-index:-2}
 .flavors-hero:after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#eee2d2 18%,rgba(238,226,210,.97) 32%,rgba(238,226,210,0) 66%)}
