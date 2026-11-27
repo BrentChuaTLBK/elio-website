@@ -12,7 +12,7 @@ export function mountFlavorTexture(figure, path, entered, motion) {
   video.defaultMuted = true;
   video.playsInline = true;
   video.loop = true;
-  video.preload = 'none';
+  video.preload = motion.matches ? 'none' : 'auto';
   video.setAttribute('aria-hidden','true');
   const toggle = document.createElement('button');
   toggle.type = 'button';
@@ -47,13 +47,15 @@ export function mountFlavorTexture(figure, path, entered, motion) {
     toggle.remove();
   }
   function snapshot() {
-    if (!presented || !video.videoWidth || !video.videoHeight) return null;
+    if (!presented || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) return null;
     const canvas = document.createElement('canvas');
     canvas.width = Math.min(640,video.videoWidth);
     canvas.height = Math.max(1,Math.round(canvas.width * video.videoHeight / video.videoWidth));
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+    // A phone can discard the decoded frame when playback is interrupted.
+    try { ctx.drawImage(video,0,0,canvas.width,canvas.height); }
+    catch { return null; }
     canvas.className = 'flavor-texture is-playing';
     return canvas;
   }
