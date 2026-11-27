@@ -71,6 +71,7 @@ try{
    assert(await order.isVisible());
    assert.equal(await order.getAttribute('href'),'order.html');
    assert((await order.boundingBox()).height>=44);
+   assert(Number.parseFloat(await order.evaluate(el=>getComputedStyle(el).fontSize))>=16);
    assert.equal(await order.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(228, 196, 150)');
    if(width===390)await page.locator('.site-header').screenshot({path:join(out,'mobile-order-menu.png')});
    await page.getByRole('button',{name:'Close navigation'}).click();
