@@ -16,11 +16,11 @@ function fixture(capacity=30){
  return {catalog,collection,session:null,orderError:null,orderGate:null,collectionGate:null,calls:[]};
 }
 const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH,headless:true});
-async function make({width=390,capacity=30,session=null,holdCollection=false,reducedMotion='reduce',motionProbe=false,newsletterPopup=false}={}){
+async function make({width=390,capacity=30,session=null,holdCollection=false,reducedMotion='reduce',motionProbe=false,newsletterPopup=false,touch=false}={}){
  const data=fixture(capacity);data.session=session;
  if(motionProbe)for(let i=0;i<3;i++)data.catalog.products.push({...data.catalog.products[1],id:'row-fixture-'+i,name:'Extra box '+i,sort_order:i+1});
  if(holdCollection)data.collectionGate=new Promise(r=>data.releaseCollection=r);
- const ctx=await browser.newContext({viewport:{width,height:900},reducedMotion,serviceWorkers:'block'}),errors=[];
+ const ctx=await browser.newContext({viewport:{width,height:900},reducedMotion,hasTouch:touch,isMobile:touch,serviceWorkers:'block'}),errors=[];
  await ctx.addInitScript(showPopup=>{
   if(!showPopup)localStorage.setItem('elio-newsletter-popup-v1',JSON.stringify({state:'submitted',firstVisit:Date.now(),updatedAt:Date.now()}));
   localStorage.setItem('elio-analytics-choice-v1',JSON.stringify({value:'denied',expires:Date.now()+86400000}));
@@ -108,6 +108,44 @@ try{
   assert.equal(saved,close==='Continue exploring'?'submitted':'dismissed');
   await page.reload();assert.equal(await page.locator('#elio-newsletter-dialog[open]').count(),0);
   await finish(test,'Newsletter dismissal via '+close+' at '+width+'px');
+ }
+ for(const [width,id,action,reduce] of [
+  [1440,'fixed','click',false],[768,'custom','keyboard',false],
+  [390,'custom','tap',false],[320,'fixed','tap',true],
+ ]){
+  const test=await make({width,touch:action==='tap',reducedMotion:reduce?'reduce':'no-preference'});
+  const {page}=test;await menu(page);
+  const dialog=page.locator('#product-dialog'),card=page.locator('[data-product="'+id+'"]');
+  await dialog.evaluate(panel=>{
+   const observer=new MutationObserver(()=>{
+    if(!panel.open)return;
+    observer.disconnect();
+    const transitions=panel.getAnimations({subtree:true}).filter(a=>a instanceof CSSTransition);
+    for(const a of transitions){a.pause();a.currentTime=a.effect.getTiming().duration/2;}
+    const style=getComputedStyle(panel),matrix=new DOMMatrixReadOnly(style.transform);
+    window.boxEntry={modal:panel.matches(':modal'),opacity:Number(style.opacity),
+     backdrop:Number(getComputedStyle(panel,'::backdrop').opacity),scale:matrix.a,offset:matrix.f};
+    transitions.forEach(a=>a.play());
+   });
+   observer.observe(panel,{attributes:true,attributeFilter:['open']});
+  });
+  if(action==='keyboard')await card.press('Enter');
+  else if(action==='tap')await card.tap();
+  else await card.click();
+  await page.waitForFunction(()=>Boolean(window.boxEntry));
+  const frame=await page.evaluate(()=>window.boxEntry);
+  assert.equal(frame.modal,true);
+  if(reduce)assert.deepEqual(frame,{modal:true,opacity:1,backdrop:1,scale:1,offset:0});
+  else{
+   assert(Math.abs(frame.opacity-.5)<.05&&Math.abs(frame.backdrop-frame.opacity)<.05,'Panel and backdrop fade together');
+   assert(Math.abs(frame.scale-.99)<.002&&Math.abs(frame.offset-2.5)<.2,'Box opens with the newsletter’s subtle scale and rise');
+  }
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('#product-dialog')).transform==='none');
+  await page.locator('#product-quantity').fill('2');
+  assert.equal(await dialog.evaluate(el=>el.getAnimations().length),0);
+  await close(page);
+  assert(await card.evaluate(el=>document.activeElement===el));
+  await finish(test,'Box entrance with '+action+' at '+width+'px');
  }
  for(const width of [320,390,1440]){
   const t=await make({width}),{page,data}=t;
