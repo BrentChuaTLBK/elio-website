@@ -33,6 +33,31 @@ for(const payment_status of ['awaiting_payment','under_review','rejected']){
  assert.doesNotMatch(update.summary,/Unpaid/);
 }
 const album='a'.repeat(64);
+{
+ const packedOrder={...order,items:[
+  {name:'Trio',quantity:2,selection_labels:[
+   {group_id:'flavors',label:'Matcha',quantity:2},
+   {group_id:'insulated-bag',group:'Add an insulated bag with ice?',label:'Yes · Insulated bag + ice (recommended)',quantity:1}
+  ]},
+  {name:'Signature box',quantity:1,selection_labels:[
+   {group_id:'previous-question',group:'Add an insulated bag with ice? We recommend it for longer trips.',label:'No',quantity:1}
+  ]},
+  {name:'Gift note',quantity:1,selection_labels:[{group:'Include a card?',label:'No',quantity:1}]},
+  {name:'Legacy box',quantity:1,selection_labels:['Packaging: 1 × Paper bag only']}
+ ]};
+ const details=eventBody(packedOrder,job.event_id).description;
+ assert.match(details,/2 × Trio\n  2 × Matcha\n  Insulated · Yes\n1 × Signature box\n  Insulated · No\n1 × Gift note\n  1 × No\n1 × Legacy box\n  Insulated · No\n/);
+ assert.doesNotMatch(details,/recommended|We recommend|Paper bag only/);
+ assert.doesNotMatch(body.description,/Insulated/);
+ assert.match(calendarDescription({...packedOrder,items:[{name:'Trio',quantity:1,selection_labels:[
+  {group_id:'insulated-bag',label:'No · Paper bag only',quantity:1}
+ ]}]}),/Insulated · No/);
+ const f=fixture([{method:'GET',data:owned},{method:'PUT',data:{etag:'packing-refreshed'}}]);
+ await f.client.sync('elio@example.test',{...job,desired:packedOrder});
+ const updated=JSON.parse(f.calls.at(-1).body);
+ assert.equal(updated.id,job.event_id);
+ assert.equal(updated.description,details);
+}
 const referenced={...order,method:'pickup',photo_count:2,photo_share:album,instructions:'Keep <cold>',items:[{name:'Custom cake',quantity:1,description:'Write Happy Birthday'}]};
 const described=eventBody(referenced,job.event_id).description;
 assert.match(described,/Order notes: Keep &lt;cold&gt;/);assert.match(described,/Happy Birthday/);

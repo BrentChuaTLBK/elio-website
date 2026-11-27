@@ -70,7 +70,7 @@ const confirmation=page=>page.getByRole('heading',{name:'Unsaved order changes',
 const consumeCloseActivation=page=>page.evaluate(()=>{
  const watcher=new CloseWatcher();watcher.addEventListener('cancel',event=>event.preventDefault());watcher.requestClose();watcher.destroy();
 });
-function seed(data){const today=dateInManila(),past=addDays(today,-2);Object.assign(data.order,{fulfillment_date:today,payment_status:'under_review',fulfillment_status:'pending_confirmation',proof_path:'private-sample'});Object.assign(data.otherOrder,{fulfillment_date:today,payment_status:'paid',fulfillment_status:'preparing'});data.extraOrders=[{...structuredClone(data.otherOrder),id:'complete',reference:'ELIO-COMPLETE',fulfillment_status:'completed'},{...structuredClone(data.otherOrder),id:'refund',reference:'ELIO-REFUND',refund_label:true},{...structuredClone(data.otherOrder),id:'later',reference:'ELIO-LATER',fulfillment_date:date},
+function seed(data){const today=dateInManila(),past=addDays(today,-2);Object.assign(data.order,{fulfillment_date:today,payment_status:'under_review',fulfillment_status:'pending_confirmation',proof_path:'private-sample'});Object.assign(data.otherOrder,{fulfillment_date:today,payment_status:'paid',fulfillment_status:'preparing'});data.extraOrders=[{...structuredClone(data.otherOrder),id:'complete',reference:'ELIO-COMPLETE',fulfillment_status:'completed',order_source:'direct',gift:true,total_cents:0,paid_amount_cents:0},{...structuredClone(data.otherOrder),id:'refund',reference:'ELIO-REFUND',refund_label:true},{...structuredClone(data.otherOrder),id:'later',reference:'ELIO-LATER',fulfillment_date:date},
  {...structuredClone(data.otherOrder),id:'overdue',reference:'ELIO-OVERDUE',fulfillment_date:past},
  ...[['awaiting-past',past],['awaiting-future',date]].map(([id,fulfillment_date])=>({...structuredClone(data.otherOrder),id,reference:'ELIO-'+id.toUpperCase(),payment_status:'awaiting_payment',fulfillment_status:'pending_confirmation',fulfillment_date})),
  ...['completed','cancelled','expired','refunded'].map(status=>({...structuredClone(data.otherOrder),id:'past-'+status,reference:'ELIO-PAST-'+status.toUpperCase(),fulfillment_date:past,fulfillment_status:status})),
@@ -86,6 +86,13 @@ try{
     {group:'Add an insulated bag with ice? We recommend it for longer trips.',label:'No',quantity:1},
   ];
   await admin(t);assert.match(await page.locator('#workspace').innerText(),/ELIO-OVERDUE/);await view(page,'orders');assert.equal(await page.locator('#order-quick-panel').isVisible(),false);assert.equal(await page.locator('[data-order-view=review] span').innerText(),'1');assert.equal(await page.locator('[data-order-view=today] span').innerText(),'2');assert.equal(await page.locator('[data-order-view=awaiting_payment] span').innerText(),'2');
+  const giftRow=page.locator('[data-order-row=complete]');
+  assert.deepEqual(await giftRow.locator('.badge').allTextContents(),['Paid','Gift','Completed']);
+  assert.equal(await page.locator('[data-order-row=order2] .badge.gift').count(),0);
+  await giftRow.getByRole('button',{name:'ELIO-COMPLETE',exact:true}).click();
+  await page.locator('#print-order .order-status-row').waitFor();
+  assert.deepEqual(await page.locator('#print-order .order-status-row .badge').allTextContents(),['Paid','Gift','Completed']);
+  await page.locator('#dialog-close').click();
   await page.locator('[data-filter=upcoming]').check();assert.deepEqual(await page.locator('[data-order-row]').evaluateAll(rows=>rows.map(row=>row.dataset.orderRow)),['overdue','awaiting-past','rejected-past','order1','order2','later','awaiting-future']);assert.equal(await page.locator('[data-order-row=overdue]').isVisible(),true);
   await page.locator('[data-order-view=awaiting_payment]').click();assert.equal(await page.locator('[data-filter=upcoming]').isChecked(),false);assert.equal(await page.locator('.order-view-title').innerText(),'Awaiting payment');assert.deepEqual(await page.locator('[data-order-row]').evaluateAll(rows=>rows.map(row=>row.dataset.orderRow).sort()),['awaiting-future','awaiting-past']);
   await page.reload();await page.locator('#order-table').waitFor();assert.equal(await page.locator('[data-order-view=awaiting_payment]').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('#order-table tbody tr').count(),2);await page.screenshot({path:join(out,'awaiting-payment-'+width+'.png'),fullPage:true});
